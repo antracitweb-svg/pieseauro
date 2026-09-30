@@ -1,109 +1,153 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ro">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PieseAuto — Piese auto noi și second-hand</title>
-  <meta name="description" content="Marketplace pentru piese auto noi și second-hand.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PieseAuto — Mașini și piese auto</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="topbar">
+<header class="header">
   <div class="container nav">
     <a class="logo" href="#"><span>PIESE</span>AUTO</a>
     <nav>
-      <a href="#categorii">Categorii</a>
+      <a href="#masini">Mașini</a>
+      <a href="#piese">Piese</a>
       <a href="#anunturi">Anunțuri</a>
-      <a href="#cum-functioneaza">Cum funcționează</a>
     </nav>
-    <button class="btn btn-primary" onclick="openPost()">+ Publică un anunț</button>
+    <button class="btn btn-primary" id="openModal">+ Publică anunț</button>
   </div>
 </header>
 
 <main>
   <section class="hero">
-    <div class="container">
+    <div class="container hero-inner">
       <div class="hero-copy">
-        <span class="eyebrow">PIESE AUTO NOI & SECOND-HAND</span>
-        <h1>Găsește piesa potrivită pentru mașina ta.</h1>
-        <p>Caută rapid după piesă, cod OEM, marcă sau model și contactează direct vânzătorul.</p>
+        <div class="eyebrow">Marketplace auto</div>
+        <h1>Mașini, piese și anunțuri. <span>Totul într-un singur loc.</span></h1>
+        <p>Caută rapid piese auto și mașini de la vânzători din România.</p>
+        <div class="search-box">
+          <input id="searchInput" type="search" placeholder="Caută o piesă, o mașină sau un model...">
+          <button class="btn btn-primary" id="searchBtn">Caută</button>
+        </div>
+        <div class="quick">
+          <span>Căutări populare:</span>
+          <button data-search="BMW">BMW</button>
+          <button data-search="motor">motor</button>
+          <button data-search="far">faruri</button>
+          <button data-search="Dacia">Dacia</button>
+        </div>
       </div>
-      <form class="search-box" id="searchForm">
-        <input id="search" type="search" placeholder="Ex: far Audi A4, 8K0941004..." aria-label="Caută piese">
-        <select id="condition">
-          <option value="">Toate stările</option>
-          <option value="Nou">Nou</option>
-          <option value="Second-hand">Second-hand</option>
-        </select>
-        <button class="btn btn-primary" type="submit">Caută</button>
-      </form>
-      <div class="quick-tags">
-        <button onclick="quickSearch('motor')">Motoare</button>
-        <button onclick="quickSearch('far')">Faruri</button>
-        <button onclick="quickSearch('bara')">Bare</button>
-        <button onclick="quickSearch('cutie')">Cutii de viteze</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="categorii">
-    <div class="container">
-      <div class="section-head"><div><span class="eyebrow">EXPLOREAZĂ</span><h2>Categorii de piese</h2></div></div>
-      <div class="categories">
-        <button class="category" onclick="quickSearch('caroserie')"><b>🚗</b><span>Caroserie</span><small>Uși, capote, aripi, bare</small></button>
-        <button class="category" onclick="quickSearch('motor')"><b>⚙️</b><span>Motor</span><small>Motoare, turbine, injectoare</small></button>
-        <button class="category" onclick="quickSearch('cutie')"><b>🔩</b><span>Transmisie</span><small>Cutii, ambreiaje, diferențiale</small></button>
-        <button class="category" onclick="quickSearch('electrica')"><b>💡</b><span>Electrică</span><small>Faruri, alternatoare, module</small></button>
-        <button class="category" onclick="quickSearch('frane')"><b>🛑</b><span>Frâne</span><small>Discuri, etriere, plăcuțe</small></button>
-        <button class="category" onclick="quickSearch('suspensie')"><b>🛞</b><span>Suspensie</span><small>Amortizoare, brațe, arcuri</small></button>
-        <button class="category" onclick="quickSearch('interior')"><b>💺</b><span>Interior</span><small>Scaune, bord, volan</small></button>
-        <button class="category" onclick="quickSearch('altele')"><b>🔧</b><span>Alte piese</span><small>Accesorii și componente</small></button>
+      <div class="hero-art" aria-hidden="true">
+        <div class="car-icon">🚗</div>
+        <div class="parts-float">⚙️</div>
+        <div class="parts-float second">🔧</div>
       </div>
     </div>
   </section>
 
-  <section class="section light" id="anunturi">
+  <section class="section" id="masini">
     <div class="container">
       <div class="section-head">
-        <div><span class="eyebrow">PIESE DISPONIBILE</span><h2>Ultimele anunțuri</h2></div>
-        <div class="filters"><button class="filter active" onclick="setFilter('')">Toate</button><button class="filter" onclick="setFilter('Nou')">Noi</button><button class="filter" onclick="setFilter('Second-hand')">Second-hand</button></div>
+        <div>
+          <div class="eyebrow">Explorează</div>
+          <h2>Mașini</h2>
+        </div>
+        <a href="#anunturi">Vezi anunțurile →</a>
       </div>
-      <div class="grid" id="listings"></div>
-      <div id="empty" class="empty" hidden>Nu am găsit piese pentru căutarea ta.</div>
+      <div class="brand-grid">
+        <button class="brand-card" data-search="BMW"><strong>BMW</strong><span>Mașini & piese</span></button>
+        <button class="brand-card" data-search="Mercedes"><strong>Mercedes-Benz</strong><span>Mașini & piese</span></button>
+        <button class="brand-card" data-search="Volkswagen"><strong>Volkswagen</strong><span>Mașini & piese</span></button>
+        <button class="brand-card" data-search="Audi"><strong>Audi</strong><span>Mașini & piese</span></button>
+        <button class="brand-card" data-search="Ford"><strong>Ford</strong><span>Mașini & piese</span></button>
+        <button class="brand-card" data-search="Dacia"><strong>Dacia</strong><span>Mașini & piese</span></button>
+      </div>
     </div>
   </section>
 
-  <section class="how section" id="cum-functioneaza">
+  <section class="section soft" id="piese">
     <div class="container">
-      <span class="eyebrow">SIMPLU ȘI RAPID</span><h2>Cum funcționează</h2>
-      <div class="steps">
-        <div><b>01</b><h3>Caută</h3><p>Introdu piesa, codul sau modelul mașinii.</p></div>
-        <div><b>02</b><h3>Compară</h3><p>Vezi starea, prețul, fotografiile și detaliile.</p></div>
-        <div><b>03</b><h3>Contactează</h3><p>Vorbește direct cu vânzătorul prin telefon sau WhatsApp.</p></div>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Găsește rapid</div>
+          <h2>Piese auto</h2>
+        </div>
       </div>
+      <div class="parts-grid">
+        <button class="part-card" data-search="Caroserie"><span>🚘</span><strong>Caroserie</strong><small>Aripi, capote, uși</small></button>
+        <button class="part-card" data-search="Motor"><span>⚙️</span><strong>Motor</strong><small>Motor, componente</small></button>
+        <button class="part-card" data-search="Transmisie"><span>🔩</span><strong>Transmisie</strong><small>Cutii, ambreiaje</small></button>
+        <button class="part-card" data-search="Electrică"><span>🔋</span><strong>Electrică</strong><small>Baterii, alternatoare</small></button>
+        <button class="part-card" data-search="Frâne"><span>🛞</span><strong>Frâne</strong><small>Discuri, etriere</small></button>
+        <button class="part-card" data-search="Suspensie"><span>🔧</span><strong>Suspensie</strong><small>Amortizoare, arcuri</small></button>
+        <button class="part-card" data-search="Interior"><span>💺</span><strong>Interior</strong><small>Scaune, borduri</small></button>
+        <button class="part-card" data-search="Jante"><span>⭕</span><strong>Jante & roți</strong><small>Jante, anvelope</small></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="anunturi">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Marketplace</div>
+          <h2>Ultimele anunțuri</h2>
+        </div>
+        <div class="filters">
+          <button class="filter active" data-filter="all">Toate</button>
+          <button class="filter" data-filter="piesa">Piese</button>
+          <button class="filter" data-filter="masina">Mașini</button>
+        </div>
+      </div>
+
+      <div class="listing-grid" id="listingGrid">
+        <article class="listing" data-type="piesa" data-title="Far dreapta BMW Seria 3">
+          <div class="listing-photo photo1">🚘</div>
+          <div class="listing-body"><span class="tag">PIESĂ</span><h3>Far dreapta BMW Seria 3</h3><p>Compatibilitate verificată · SH</p><strong>450 lei</strong></div>
+        </article>
+        <article class="listing" data-type="piesa" data-title="Motor 1.5 dCi Dacia">
+          <div class="listing-photo photo2">⚙️</div>
+          <div class="listing-body"><span class="tag">PIESĂ</span><h3>Motor 1.5 dCi Dacia</h3><p>Stare bună · verificat</p><strong>3.200 lei</strong></div>
+        </article>
+        <article class="listing" data-type="masina" data-title="Volkswagen Golf 7">
+          <div class="listing-photo photo3">🚗</div>
+          <div class="listing-body"><span class="tag car">MAȘINĂ</span><h3>Volkswagen Golf 7</h3><p>2017 · diesel · manuală</p><strong>10.900 €</strong></div>
+        </article>
+        <article class="listing" data-type="piesa" data-title="Jante aliaj Audi">
+          <div class="listing-photo photo4">⭕</div>
+          <div class="listing-body"><span class="tag">PIESĂ</span><h3>Jante aliaj Audi 18"</h3><p>Set 4 bucăți · stare bună</p><strong>2.000 lei</strong></div>
+        </article>
+      </div>
+      <div id="noResults" class="empty hidden">Nu am găsit anunțuri pentru această căutare.</div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="container cta-inner">
+      <div><div class="eyebrow">Vrei să vinzi?</div><h2>Publică-ți anunțul în câteva minute.</h2><p>Adaugă mașina sau piesa și începe să primești cumpărători.</p></div>
+      <button class="btn btn-white" id="openModal2">Publică un anunț</button>
     </div>
   </section>
 </main>
 
-<div class="modal" id="postModal" aria-hidden="true">
+<div class="modal hidden" id="modal">
   <div class="modal-card">
-    <button class="close" onclick="closePost()">×</button>
-    <span class="eyebrow">VÂNZARE</span><h2>Publică un anunț</h2>
-    <p class="muted">Aceasta este prima versiune. Formularul este pregătit pentru conectarea la o bază de date.</p>
-    <div class="form-grid">
-      <input placeholder="Denumirea piesei">
-      <input placeholder="Marcă / model">
-      <input placeholder="Cod OEM">
-      <input placeholder="Preț (lei)">
-      <select><option>Nou</option><option>Second-hand</option></select>
-      <input placeholder="Județ / localitate">
-    </div>
-    <textarea placeholder="Descrierea piesei"></textarea>
-    <button class="btn btn-primary full" onclick="alert('În versiunea următoare conectăm formularul la baza de date.')">Continuă</button>
+    <button class="close" id="closeModal">×</button>
+    <div class="eyebrow">Anunț nou</div>
+    <h2>Publică un anunț</h2>
+    <form id="listingForm">
+      <label>Tip
+        <select id="type"><option value="piesa">Piesă auto</option><option value="masina">Mașină</option></select>
+      </label>
+      <label>Titlu<input id="title" required placeholder="Ex. Far stânga Audi A4"></label>
+      <label>Preț<input id="price" required placeholder="Ex. 500 lei"></label>
+      <label>Descriere<textarea id="description" placeholder="Câteva detalii despre anunț..."></textarea></label>
+      <button class="btn btn-primary full">Adaugă anunțul</button>
+    </form>
   </div>
 </div>
 
-<footer><div class="container footer"><strong>PIESE<span>AUTO</span></strong><span>Marketplace pentru piese auto</span><span>© 2026 PieseAuto</span></div></footer>
 <script src="script.js"></script>
 </body>
 </html>

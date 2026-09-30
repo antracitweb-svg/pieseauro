@@ -1,25 +1,36 @@
-const data=[
- {name:"Far LED față",car:"Audi A4 B9",condition:"Nou",price:"1.450 lei",meta:"2016–2020 • cod OEM",icon:"💡"},
- {name:"Motor 2.0 TDI",car:"VW Passat B8",condition:"Second-hand",price:"8.900 lei",meta:"150 CP • verificat",icon:"⚙️"},
- {name:"Bară față",car:"BMW Seria 3 F30",condition:"Second-hand",price:"650 lei",meta:"2012–2015 • stare bună",icon:"🚗"},
- {name:"Cutie automată",car:"Mercedes C-Class",condition:"Second-hand",price:"5.500 lei",meta:"2015 • 7G-Tronic",icon:"🔩"},
- {name:"Alternator",car:"Dacia Logan",condition:"Nou",price:"720 lei",meta:"1.5 dCi • compatibil",icon:"🔋"},
- {name:"Scaun șofer",car:"Skoda Octavia III",condition:"Second-hand",price:"450 lei",meta:"2013–2019 • textil",icon:"💺"},
- {name:"Etrier frână",car:"Ford Focus",condition:"Nou",price:"380 lei",meta:"față • stânga",icon:"🛑"},
- {name:"Aripă dreapta",car:"Opel Astra K",condition:"Second-hand",price:"300 lei",meta:"2016–2021",icon:"🔧"}
-];
-let current="";
-function render(q="",filter=current){
- const box=document.getElementById("listings"),empty=document.getElementById("empty");
- const s=q.toLowerCase();
- const items=data.filter(x=>(!filter||x.condition===filter)&&(!s||(x.name+" "+x.car+" "+x.meta).toLowerCase().includes(s)));
- box.innerHTML=items.map(x=>`<article class="card"><div class="pic">${x.icon}</div><div class="card-body"><span class="badge">${x.condition}</span><h3>${x.name}</h3><div class="meta">${x.car}</div><div class="meta">${x.meta}</div><div class="price">${x.price}</div><button class="contact" onclick="contact('${x.name}')">Contactează vânzătorul</button></div></article>`).join("");
- empty.hidden=items.length>0;
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const modal=$("#modal");
+function openModal(){modal.classList.remove("hidden")}
+function closeModal(){modal.classList.add("hidden")}
+$("#openModal").onclick=openModal; $("#openModal2").onclick=openModal; $("#closeModal").onclick=closeModal;
+modal.addEventListener("click",e=>{if(e.target===modal)closeModal()});
+
+function search(value){
+  const q=value.trim().toLowerCase();
+  const cards=$$(".listing");
+  let shown=0;
+  cards.forEach(c=>{
+    const ok=!q || c.dataset.title.toLowerCase().includes(q);
+    c.style.display=ok?"":"none"; if(ok)shown++;
+  });
+  $("#noResults").classList.toggle("hidden",shown!==0);
+  location.hash="anunturi";
 }
-function contact(name){alert("În versiunea următoare conectăm fiecare anunț la telefon și WhatsApp. Piesa: "+name);}
-function quickSearch(q){document.getElementById("search").value=q;document.getElementById("anunturi").scrollIntoView({behavior:"smooth"});render(q,current);}
-function setFilter(f){current=f;document.querySelectorAll(".filter").forEach(b=>b.classList.remove("active"));event.currentTarget.classList.add("active");render(document.getElementById("search").value,f);}
-document.getElementById("searchForm").addEventListener("submit",e=>{e.preventDefault();render(document.getElementById("search").value,document.getElementById("condition").value);document.getElementById("anunturi").scrollIntoView({behavior:"smooth"});});
-function openPost(){document.getElementById("postModal").classList.add("show");}
-function closePost(){document.getElementById("postModal").classList.remove("show");}
-render();
+$("#searchBtn").onclick=()=>search($("#searchInput").value);
+$("#searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")search(e.target.value)});
+$$("[data-search]").forEach(b=>b.onclick=()=>{$("#searchInput").value=b.dataset.search;search(b.dataset.search)});
+
+$$(".filter").forEach(btn=>btn.onclick=()=>{
+  $$(".filter").forEach(x=>x.classList.remove("active")); btn.classList.add("active");
+  const f=btn.dataset.filter; let shown=0;
+  $$(".listing").forEach(c=>{const ok=f==="all"||c.dataset.type===f;c.style.display=ok?"":"none";if(ok)shown++});
+  $("#noResults").classList.toggle("hidden",shown!==0);
+});
+
+$("#listingForm").onsubmit=e=>{
+  e.preventDefault();
+  const type=$("#type").value, title=$("#title").value, price=$("#price").value, desc=$("#description").value||"Anunț nou";
+  const article=document.createElement("article"); article.className="listing"; article.dataset.type=type; article.dataset.title=title;
+  article.innerHTML=`<div class="listing-photo">${type==="masina"?"🚗":"🔧"}</div><div class="listing-body"><span class="tag ${type==="masina"?"car":""}">${type==="masina"?"MAȘINĂ":"PIESĂ"}</span><h3>${title}</h3><p>${desc}</p><strong>${price}</strong></div>`;
+  $("#listingGrid").prepend(article); closeModal(); e.target.reset(); location.hash="anunturi";
+};
