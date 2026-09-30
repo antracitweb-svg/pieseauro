@@ -223,7 +223,8 @@ async function sendMail(to,subject,text,html){
  let data={}; try{data=await resp.json();}catch{}
  if(!resp.ok){
    console.error('Resend error',resp.status,JSON.stringify(data));
-   if(resp.status===403) throw new Error('EMAIL_TEST_ONLY');
+   if(resp.status===401) throw new Error('EMAIL_AUTH_FAILED');
+   if(resp.status===403 || resp.status===422) throw new Error('EMAIL_SENDER_NOT_VERIFIED');
    throw new Error('EMAIL_SEND_FAILED');
  }
  return data;
@@ -243,7 +244,14 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
    await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href="${link}">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
   }
   res.json({ok:true,message:'Dacă adresa există, am trimis instrucțiunile de resetare pe email.'});
- }catch(e){console.error(e);if(e.message==='EMAIL_NOT_CONFIGURED')return res.status(503).json({error:'EMAIL_NOT_CONFIGURED'});res.status(500).json({error:'SERVER_ERROR'});}
+ }catch(e){
+  console.error('forgot-password:',e);
+  if(e.message==='EMAIL_NOT_CONFIGURED')return res.status(503).json({error:'EMAIL_NOT_CONFIGURED'});
+  if(e.message==='EMAIL_SENDER_NOT_VERIFIED')return res.status(502).json({error:'EMAIL_SENDER_NOT_VERIFIED'});
+  if(e.message==='EMAIL_AUTH_FAILED')return res.status(502).json({error:'EMAIL_AUTH_FAILED'});
+  if(e.message==='EMAIL_SEND_FAILED')return res.status(502).json({error:'EMAIL_SEND_FAILED'});
+  res.status(500).json({error:'SERVER_ERROR'});
+ }
 });
 
 app.post('/api/auth/reset-password',requireDb,async(req,res)=>{
