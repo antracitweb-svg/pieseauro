@@ -13,3 +13,5 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: VEHICLE_CATALOG_URL
+        value: https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@latest/dist/vehicles.json
