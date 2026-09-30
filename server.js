@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const { Pool } = require('pg');
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -53,6 +54,14 @@ CREATE TABLE IF NOT EXISTS sessions (
  id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT UNIQUE NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  expires_at TIMESTAMPTZ NOT NULL, user_agent TEXT DEFAULT '', ip_hash TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT UNIQUE NOT NULL,
+ expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS email_verifications (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT UNIQUE NOT NULL,
+ expires_at TIMESTAMPTZ NOT NULL, verified_at TIMESTAMPTZ
 );`;
 
 async function dbReady(){
@@ -68,7 +77,8 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS negotiable BOOLEAN DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS show_phone BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT',
-  'CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_unique_idx ON users(nickname) WHERE nickname IS NOT NULL'
+  'CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_unique_idx ON users(nickname) WHERE nickname IS NOT NULL',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE'
  ];
  for(const q of migrations) await pool.query(q);
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
@@ -104,6 +114,7 @@ function admin(req,res,next){if(req.user.role!=='admin')return res.status(403).j
 function requireDb(req,res,next){if(!pool)return res.status(503).json({error:'DATABASE_NOT_CONFIGURED',message:'Configurează DATABASE_URL în Render.'});next();}
 function norm(s=''){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 function slugify(s=''){return norm(s).replace(/\s+/g,'-').slice(0,120);}
+function escapeHtml(s=''){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 
 function normalizeCatalog(raw){
  const out=[];
@@ -193,6 +204,44 @@ app.get('/api/me',async(req,res)=>{
   res.json({user:u});
  }catch{res.json({user:null});}
 });
+async function sendMail(to,subject,text,html){
+ const host=process.env.SMTP_HOST, user=process.env.SMTP_USER, pass=process.env.SMTP_PASS;
+ if(!host||!user||!pass) throw new Error('EMAIL_NOT_CONFIGURED');
+ const transporter=nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT||587),secure:String(process.env.SMTP_SECURE||'false')==='true',auth:{user,pass}});
+ await transporter.sendMail({from:process.env.SMTP_FROM||user,to,subject,text,html});
+}
+function appBaseUrl(req){return (process.env.APP_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');}
+
+app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
+ try{
+  const em=String(req.body.email||'').trim().toLowerCase();
+  if(!em)return res.status(400).json({error:'EMAIL_REQUIRED'});
+  const r=await pool.query('SELECT id,email,name FROM users WHERE email=$1 LIMIT 1',[em]);
+  if(r.rowCount){
+   const raw=crypto.randomBytes(32).toString('base64url');
+   await pool.query('DELETE FROM password_resets WHERE user_id=$1 OR expires_at<NOW()',[r.rows[0].id]);
+   await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[r.rows[0].id,hashToken(raw)]);
+   const link=`${appBaseUrl(req)}/#/reset-password?token=${encodeURIComponent(raw)}`;
+   await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href="${link}">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+  }
+  res.json({ok:true,message:'Dacă adresa există, am trimis instrucțiunile de resetare pe email.'});
+ }catch(e){console.error(e);if(e.message==='EMAIL_NOT_CONFIGURED')return res.status(503).json({error:'EMAIL_NOT_CONFIGURED'});res.status(500).json({error:'SERVER_ERROR'});}
+});
+
+app.post('/api/auth/reset-password',requireDb,async(req,res)=>{
+ try{
+  const token=String(req.body.token||''), password=String(req.body.password||'');
+  if(!token||password.length<8)return res.status(400).json({error:'DATE_INVALIDE'});
+  const r=await pool.query('SELECT id,user_id FROM password_resets WHERE token_hash=$1 AND expires_at>NOW() AND used_at IS NULL LIMIT 1',[hashToken(token)]);
+  if(!r.rowCount)return res.status(400).json({error:'RESET_EXPIRED'});
+  const hash=await bcrypt.hash(password,12);
+  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[hash,r.rows[0].user_id]);
+  await pool.query('UPDATE password_resets SET used_at=NOW() WHERE id=$1',[r.rows[0].id]);
+  await pool.query('DELETE FROM sessions WHERE user_id=$1',[r.rows[0].user_id]);
+  res.json({ok:true});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+
 app.post('/api/auth/register',requireDb,async(req,res)=>{
  try{
   const {name,nickname,email,phone,password,remember=true}=req.body;
@@ -243,6 +292,7 @@ app.get('/api/admin/users',auth,admin,requireDb,async(req,res)=>{const r=await p
 app.patch('/api/admin/users/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['active','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});if(Number(req.params.id)===Number(req.user.id)&&status==='blocked')return res.status(400).json({error:'CANNOT_BLOCK_SELF'});const r=await pool.query('UPDATE users SET status=$1 WHERE id=$2 RETURNING id,name,email,phone,role,status',[status,req.params.id]);await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,status==='blocked'?'block_user':'unblock_user','user',req.params.id,'']);res.json({user:r.rows[0]});});
 app.get('/api/admin/requests',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT r.*,u.name user_name,u.email user_email FROM part_requests r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 500');res.json({requests:r.rows});});
 app.patch('/api/admin/requests/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','matched','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE part_requests SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_request','request',req.params.id,status]);res.json({request:r.rows[0]});});
+app.get('/api/admin/activity',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT a.*,u.name admin_name,u.email admin_email FROM admin_activity a LEFT JOIN users u ON u.id=a.admin_id ORDER BY a.created_at DESC LIMIT 500');res.json({activity:r.rows});});
 app.get('/api/admin/reports',auth,admin,requireDb,async(req,res)=>{const r=await pool.query(`SELECT r.*,l.title listing_title,u.name reporter_name FROM reports r LEFT JOIN listings l ON l.id=r.listing_id LEFT JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`);res.json({reports:r.rows});});
 app.patch('/api/admin/reports/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','reviewed','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE reports SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);res.json({report:r.rows[0]});});
 app.post('/api/reports',auth,requireDb,async(req,res)=>{const {listing_id,reason,details}=req.body;if(!listing_id||!reason)return res.status(400).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO reports(listing_id,reporter_id,reason,details) VALUES($1,$2,$3,$4) RETURNING *',[listing_id,req.user.id,reason,details||'']);res.status(201).json({report:r.rows[0]});});

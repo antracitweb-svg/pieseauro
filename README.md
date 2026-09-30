@@ -41,3 +41,16 @@ Dacă repository-ul este conectat la Render, commit-ul declanșează deploy-ul. 
 - verificare că toate asset-urile locale referite există;
 - verificare că meniul, căutarea, categoriile și acțiunile principale au handler-ele necesare în JavaScript;
 - PostgreSQL, autentificarea și API-urile rămân în `server.js` și nu sunt înlocuite de localStorage.
+
+## Email securizat – recuperare parolă
+
+Pentru ca „Ai uitat parola?” să trimită emailuri reale, configurează în Render:
+- `SMTP_HOST`
+- `SMTP_PORT` (de regulă 587)
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM` (opțional; implicit SMTP_USER)
+- `SMTP_SECURE` (`false` pentru 587, `true` pentru 465)
+- `APP_URL` = adresa publică AutoPiese, de exemplu `https://pieseauto-dez.onrender.com`
+
+Linkurile de resetare sunt token-uri aleatorii, stocate doar hash-uit în baza de date, expiră după 30 de minute și sunt invalidate după folosire. La resetarea parolei, sesiunile existente ale utilizatorului sunt revocate.
