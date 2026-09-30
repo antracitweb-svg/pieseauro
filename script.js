@@ -26,7 +26,7 @@ function norm(s=''){ return String(s).normalize('NFD').replace(/[\u0300-\u036f]/
 function tokens(s){ return norm(s).split(/\s+/).filter(x=>x.length>1); }
 
 async function api(url, options={}){
- const r=await fetch(url,{method:options.method||'GET',headers:{'Content-Type':'application/json',...(options.headers||{})},body:options.body?JSON.stringify(options.body):undefined});
+ const r=await fetch(url,{method:options.method||'GET',credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},body:options.body?JSON.stringify(options.body):undefined});
  let d={}; try{d=await r.json()}catch{}
  if(!r.ok){const map={AUTH_REQUIRED:'Trebuie să te autentifici.',EMAIL_EXISTS:'Există deja un cont cu acest email.',INVALID_LOGIN:'Email sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată încă.',ADMIN_ONLY:'Acces permis doar administratorului.',DATE_INVALIDE:'Completează corect câmpurile.',STARE_INVALIDE:'Alege Nouă sau Second-hand.'}; throw new Error(map[d.error]||d.message||'A apărut o eroare.');}
  return d;
@@ -122,9 +122,10 @@ $('#registerForm')?.addEventListener('submit',async e=>{e.preventDefault();try{c
 async function loadUser(){try{const r=await api('/api/me');currentUser=r.user||null;updateUserUI();}catch{}}
 function updateUserUI(){
  if($('#loginBtn'))$('#loginBtn').textContent=currentUser?(currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name):'Autentificare';
- $('#adminBarLinks')?.classList.toggle('hidden',!(currentUser&&currentUser.role==='admin'));
+ if($('#adminBarLinks')) $('#adminBarLinks').classList.add('hidden');
  if($('#accountMenuTitle')) $('#accountMenuTitle').textContent=currentUser?(currentUser.role==='admin'?'Contul meu · Administrator':'Contul meu'):'Contul meu';
  if($('#accountFavCount')) $('#accountFavCount').textContent=favorites.length;
+ renderMobileMenu();
 }
 function openAdminBar(tab='dashboard'){
  if(!currentUser||currentUser.role!=='admin'){openModal('authModal');toast('Autentifică-te cu contul de administrator.');return;}
@@ -200,7 +201,22 @@ async function adminReportStatus(id,status){try{await api('/api/admin/reports/'+
 async function openAdmin(){try{const m=await api('/api/me');currentUser=m.user||currentUser;if(!currentUser||currentUser.role!=='admin'){openModal('authModal');toast('Autentifică-te cu contul de administrator.');return;}openModal('adminModal');renderAdmin('dashboard')}catch{toast('Panoul de administrare necesită baza de date.')}}
 $$('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>{$$('[data-admin-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderAdmin(b.dataset.adminTab);}));
 $('#adminContent')?.addEventListener('click',e=>{const b=e.target.closest('[data-admin-action], [data-admin-open-listings]');if(!b)return;const tab='listings';$$('[data-admin-tab]').forEach(x=>{x.classList.toggle('active',x.dataset.adminTab===tab)});renderAdmin(tab);});
-$('#menuBtn')?.addEventListener('click',()=>$('#mobileNav')?.classList.toggle('hidden'));
+function closeMobileMenu(){const m=$('#mobileNav');if(m)m.classList.add('hidden');$('#menuBtn')?.setAttribute('aria-expanded','false');}
+function openMobileMenu(){renderMobileMenu();const m=$('#mobileNav');if(m)m.classList.remove('hidden');$('#menuBtn')?.setAttribute('aria-expanded','true');}
+function renderMobileMenu(){
+ const list=$('#mobileMenuList'); if(!list)return;
+ const accountItems=currentUser?[['📋','Anunțurile mele','listings'],['♡','Favorite','favorites'],['💬','Mesaje','messages'],['📩','Cererile mele','requests'],['🔔','Căutări salvate','saved'],['⚙️','Setări cont','settings']]:[];
+ const base=[['🏠','Acasă','anchor:#home'],['🔧','Piese auto','anchor:#piese'],['🔍','Caută o piesă','focus-search'],['📢','Cere o piesă','request'],['➕','Publică anunț','publish'],['❤️','Favorite','favorites']];
+ let html=base.map(x=>`<button type="button" data-mobile-action="${x[2]}"><span class="mobile-menu-icon">${x[0]}</span><span>${x[1]}</span><b>›</b></button>`).join('');
+ if(currentUser){html+=`<div class="mobile-menu-section">Contul meu · ${esc(currentUser.name||'utilizator')}</div>`;html+=accountItems.map(x=>`<button type="button" data-account-action="${x[2]}"><span class="mobile-menu-icon">${x[0]}</span><span>${x[1]}</span><b>›</b></button>`).join('');}else{html+=`<div class="mobile-menu-section">Cont</div><button type="button" data-mobile-action="login"><span class="mobile-menu-icon">👤</span><span>Autentificare / Creează cont</span><b>›</b></button>`;}
+ if(currentUser?.role==='admin'){html+=`<div class="mobile-menu-section">Administrare</div>`+[['📊','Dashboard','dashboard'],['📋','Anunțuri','admin-listings'],['👥','Utilizatori','admin-users'],['🚩','Raportări','admin-reports'],['⚙️','Administrare','admin-settings']].map(x=>`<button type="button" data-mobile-action="${x[2]}"><span class="mobile-menu-icon">${x[0]}</span><span>${x[1]}</span><b>›</b></button>`).join('');}
+ if(currentUser)html+=`<button type="button" class="mobile-menu-danger" data-mobile-action="logout"><span class="mobile-menu-icon">🚪</span><span>Delogare</span><b>›</b></button>`;
+ list.innerHTML=html;
+ $$('#mobileMenuList [data-mobile-action]').forEach(b=>b.onclick=()=>{const a=b.dataset.mobileAction;closeMobileMenu();if(a.startsWith('anchor:')){location.hash=a.slice(7);return;}if(a==='focus-search'){$('#searchInput')?.focus();return;}if(a==='request'){$('#requestBtn')?.click();return;}if(a==='publish'){$('#publishBtn')?.click();return;}if(a==='favorites'){$('#favoritesBtn')?.click();return;}if(a==='login'){openModal('authModal');return;}if(a==='logout'){$('#accountLogoutMenu')?.click();return;}if(a.startsWith('admin-')){openAdminBar(a.replace('admin-',''));return;}if(a==='dashboard'){openAdminBar('dashboard');}});
+ $$('#mobileMenuList [data-account-action]').forEach(b=>b.onclick=()=>{const kind=b.dataset.accountAction;closeMobileMenu();showAccountSection(kind);});
+}
+$('#menuBtn')?.addEventListener('click',()=>{const m=$('#mobileNav');if(m?.classList.contains('hidden'))openMobileMenu();else closeMobileMenu();});
+$('#menuClose')?.addEventListener('click',closeMobileMenu);
 $('#saveSearchBtn')?.addEventListener('click',async()=>{if(!(await ensureUser()))return;const saved=JSON.parse(localStorage.getItem('autopiese_saved_searches')||'[]');const item={q:$('#searchInput').value.trim(),make:$('#make').value,model:$('#model').value,year:$('#year').value,condition:$('#condition').value,county:$('#county').value,created_at:new Date().toISOString()}; if(!item.q&&!item.make&&!item.model&&!item.year&&!item.condition&&!item.county){toast('Completează cel puțin un criteriu de căutare.');return;} saved.unshift(item);localStorage.setItem('autopiese_saved_searches',JSON.stringify(saved.slice(0,20)));toast('Căutarea a fost salvată.');});
 $('#clearSearch')?.addEventListener('click',()=>{['#searchInput','#make','#model','#year','#condition','#county','#filterType','#filterCondition','#maxPrice','#filterCategory','#filterSeller','#sortListings'].forEach(id=>{const e=$(id);if(e)e.value=id==='#filterType'?'all':id==='#sortListings'?'relevance':''});if($('#withDelivery'))$('#withDelivery').checked=false;$('.chip.active')?.classList.remove('active');document.querySelector('.chip[data-type="all"]')?.classList.add('active');renderListings();});
 ['#filterCategory','#filterSeller','#sortListings'].forEach(id=>$(id)?.addEventListener('change',renderListings));

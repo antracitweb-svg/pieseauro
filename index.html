@@ -11,26 +11,13 @@
 <header class="header">
   <div class="container nav">
     <a class="logo" href="#home" aria-label="AutoPiese acasă"><span>AUTO</span>PIESE</a>
-    <nav class="desktop-nav"><a href="#piese">Piese</a><a href="#dezmembrari">Dezmembrări</a><a href="#cerere">Cere o piesă</a><a href="#parcuri">Parcuri</a><a href="#magazine">Magazine</a></nav>
-    <div class="nav-actions"><button class="icon-btn" id="favoritesBtn" title="Favorite">♡ <span id="favCount">0</span></button><button class="link-btn" id="loginBtn">Contul meu</button><button class="btn primary" id="publishBtn">+ Publică anunț</button><button class="menu-btn" id="menuBtn" aria-label="Deschide meniul"><span></span><span></span><span></span></button></div>
+    <nav class="desktop-nav" aria-hidden="true"></nav>
+    <div class="nav-actions"><button class="icon-btn" id="favoritesBtn" title="Favorite">♡ <span id="favCount">0</span></button><button class="link-btn" id="loginBtn">Autentificare</button><button class="btn primary" id="publishBtn">+ Publică anunț</button><button class="menu-btn" id="menuBtn" aria-label="Deschide meniul" aria-expanded="false"><span></span><span></span><span></span></button></div>
   </div>
-  <div class="quickbar-wrap">
-    <nav class="quickbar" id="quickbar" aria-label="Navigare principală">
-      <a href="#home">Acasă</a>
-      <a href="#piese">Piese</a>
-      <a href="#dezmembrari">Dezmembrări</a>
-      <a href="#cerere">Cere o piesă</a>
-      <a href="#anunturi">Anunțuri</a><a href="#parcuri">Parcuri</a><a href="#magazine">Magazine</a><a href="#service">Service</a>
-      <span class="admin-bar hidden" id="adminBarLinks">
-        <button type="button" data-bar-admin="dashboard">Dashboard</button>
-        <button type="button" data-bar-admin="listings">Anunțuri</button>
-        <button type="button" data-bar-admin="users">Utilizatori</button>
-        <button type="button" data-bar-admin="reports">Raportări</button>
-        <button type="button" data-bar-admin="settings">Administrare</button>
-      </span>
-    </nav>
+  <div class="mobile-nav hidden" id="mobileNav" aria-label="Meniu principal">
+    <div class="mobile-menu-head"><div><strong>AutoPiese</strong><small>Marketplace auto</small></div><button type="button" id="menuClose" aria-label="Închide meniul">×</button></div>
+    <div class="mobile-menu-list" id="mobileMenuList"></div>
   </div>
-  <div class="mobile-nav hidden" id="mobileNav"></div>
 </header>
 
 <main id="home">
