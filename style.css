@@ -43,3 +43,12 @@
 .password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:#61758c;cursor:pointer;font-size:17px;display:grid;place-items:center}
 .password-toggle:hover{background:#eef5fb;color:#0b70c9}
 .error-message{color:#b42318!important;font-weight:700}
+
+.home-subtitle{
+  margin:-8px auto 20px;
+  text-align:center;
+  color:#6f8296;
+  font-size:13px;
+  font-weight:650;
+  letter-spacing:.8px;
+}
