@@ -1,0 +1,43 @@
+# AutoPiese – FUTURE v15
+
+Această versiune pornește de la backend-ul existent și adaugă catalog auto + identificare din text + fundație SEO.
+
+## Ce este nou
+- catalog de mărci și modele din VehiclesDB;
+- fallback local dacă sursa catalogului nu răspunde;
+- Marcă → Model încărcate din backend;
+- anii 1980–2026;
+- publicarea permite text liber în titlu;
+- identificarea automată a mărcii/modelului/anului din titlu;
+- câmpuri PostgreSQL pentru generație, motor, fuel, vehicle_id, cantitate și negociabil;
+- căutare după cuvinte multiple în titlu, OEM, descriere, marcă, model, generație și motor;
+- URL-uri individuale `/piese/...`;
+- `robots.txt` și `sitemap.xml`;
+- date structurate Product pe paginile individuale de anunț;
+- autentificarea și panoul admin existente sunt păstrate.
+
+## Sursa catalogului
+Datele de identitate ale vehiculelor provin din VehiclesDB și sunt folosite conform CC-BY 4.0, cu atribuire vizibilă în interfață.
+
+## Instalare pe GitHub
+Înlocuiește fișierele existente cu cele din acest pachet, păstrând repository-ul și branch-ul `main`. Nu încărca ZIP-ul ca fișier în proiect.
+
+## Render
+Dacă repository-ul este conectat la Render, commit-ul declanșează deploy-ul. Verifică existența `DATABASE_URL`, `JWT_SECRET`, `ADMIN_EMAIL` și `ADMIN_PASSWORD`. `VEHICLE_CATALOG_URL` este deja setat în `render.yaml`.
+
+
+## Interfață v15
+- header dark, logo AutoPiese și meniu hamburger unic;
+- hero albastru cu imagine locală de piese auto;
+- căutare + filtre vehicul în cardul principal;
+- 10 categorii populare cu iconografie;
+- bandă de încredere: plăți, livrare, suport, piese verificate;
+- layout responsive pentru telefon și desktop;
+- funcțiile existente de autentificare, publicare, cereri, favorite și admin sunt păstrate.
+
+## Verificări efectuate înainte de arhivare
+- `node --check` pentru `script.js` și `server.js`;
+- verificare structurală HTML și a formularelor/ID-urilor;
+- verificare că toate asset-urile locale referite există;
+- verificare că meniul, căutarea, categoriile și acțiunile principale au handler-ele necesare în JavaScript;
+- PostgreSQL, autentificarea și API-urile rămân în `server.js` și nu sunt înlocuite de localStorage.
