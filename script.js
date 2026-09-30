@@ -3,7 +3,7 @@ const $$ = s => [...document.querySelectorAll(s)];
 
 const STORAGE = 'autopiese_listings_v3';
 const FALLBACK_MAKES = ['Abarth','Alfa Romeo','Audi','BMW','Chevrolet','Citroën','Dacia','Fiat','Ford','Honda','Hyundai','Jaguar','Jeep','Kia','Land Rover','Lexus','Mazda','Mercedes-Benz','Mitsubishi','Nissan','Opel','Peugeot','Porsche','Renault','Seat','Skoda','Subaru','Suzuki','Tesla','Toyota','Volkswagen','Volvo'];
-const FALLBACK_MODELS = {BMW:['Seria 1','Seria 2','Seria 3','Seria 4','Seria 5','Seria 7','X1','X3','X5'],Volkswagen:['Golf','Passat','Polo','Tiguan','Touareg','Caddy'],Audi:['A3','A4','A5','A6','A8','Q3','Q5','Q7'],Dacia:['Logan','Duster','Sandero','Spring'],'Mercedes-Benz':['A-Class','C-Class','E-Class','S-Class','Sprinter'],Ford:['Fiesta','Focus','Mondeo','Kuga','Transit'],Opel:['Astra','Corsa','Insignia','Zafira'],Skoda:['Fabia','Octavia','Superb','Kodiaq']};
+const FALLBACK_MODELS = {BMW:['Seria 1','Seria 2','Seria 3','Seria 4','Seria 5','Seria 7','X1','X3','X5'],Volkswagen:['Golf','Passat','Polo','Tiguan','Touareg','Caddy'],Audi:['A3','A4','A5','A6','A8','Q3','Q5','Q7'],Dacia:['Bigster','Duster','Logan','Sandero','Spring','Jogger'],'Mercedes-Benz':['A-Class','C-Class','E-Class','S-Class','Sprinter'],Ford:['Fiesta','Focus','Mondeo','Kuga','Transit'],Opel:['Astra','Corsa','Insignia','Zafira'],Skoda:['Fabia','Octavia','Superb','Kodiaq']};
 let vehicleCatalog = [];
 let listings = JSON.parse(localStorage.getItem(STORAGE) || 'null') || [
  {id:1,type:'piesa',title:'Far dreapta BMW Seria 3 E90',price:450,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',county:'Cluj',category:'Caroserie',oem:'E90-63117161678',delivery:true,description:'Far original, verificat, stare bună.',icon:'💡'},

@@ -66,14 +66,57 @@ function norm(s=''){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g
 function slugify(s=''){return norm(s).replace(/\s+/g,'-').slice(0,120);}
 
 function normalizeCatalog(raw){
- let arr=Array.isArray(raw)?raw:(raw?.vehicles||raw?.models||raw?.data||[]);
- return arr.map(v=>{
-  const make=v.make?.name||v.make_name||v.make||v.brand?.name||v.brand||'';
-  const model=v.model?.name||v.model_name||v.model||'';
-  const generation=v.generation?.name||v.generation_name||v.generation||'';
-  const years=Array.isArray(v.years)?v.years:(Array.isArray(v.production_years)?v.production_years:[]);
-  return {id:v.id||'',name:v.name||model,make,model,generation,years,kind:v.kind||'car',engine:v.engine||v.engine_name||'',fuel:v.fuel||v.fuel_type||'',raw:v};
- }).filter(v=>v.make&&v.model);
+ const out=[];
+ const push=(make,model,meta={})=>{
+  if(!make||!model)return;
+  const kind=String(meta.kind||'car').toLowerCase();
+  if(!['car','van'].includes(kind))return;
+  const years=Array.isArray(meta.years)?meta.years:(Array.isArray(meta.production_years)?meta.production_years:[]);
+  out.push({
+   id:meta.id||meta.slug||`catalog/${slugify(make)}/${slugify(model)}`,
+   name:model, make:String(make), model:String(model),
+   generation:meta.generation?.name||meta.generation_name||meta.generation||'',
+   years, kind, engine:meta.engine||meta.engine_name||'', fuel:meta.fuel||meta.fuel_type||'', raw:meta
+  });
+ };
+ const walk=(data, inheritedMake='')=>{
+  if(Array.isArray(data)){
+   for(const item of data){
+    if(!item||typeof item!=='object')continue;
+    const make=item.make?.name||item.make_name||item.make||item.brand?.name||item.brand||inheritedMake;
+    const model=item.model?.name||item.model_name||item.model||item.name||'';
+    if(make&&model)push(make,model,item);
+    else if(inheritedMake && item.name)push(inheritedMake,item.name,item);
+    else walk(item,inheritedMake);
+   }
+   return;
+  }
+  if(!data||typeof data!=='object')return;
+  // Flat datasets: {vehicles:[...]} / {models:[...]}
+  for(const key of ['vehicles','models','data']) if(Array.isArray(data[key])){walk(data[key],inheritedMake);return;}
+  // VehiclesDB dist/vehicles.json is a nested make -> models projection.
+  for(const [make,value] of Object.entries(data)){
+   if(['version','meta','manifest'].includes(make))continue;
+   if(Array.isArray(value)){
+    for(const item of value){
+     if(typeof item==='string')push(make,item,{});
+     else if(Array.isArray(item))push(make,String(item[0]||''),item[1]&&typeof item[1]==='object'?item[1]:{});
+     else if(item&&typeof item==='object')push(make,item.name||item.model||'',item);
+    }
+   }else if(value&&typeof value==='object'){
+    // Accept {make:{model:{...}}} and {make:{models:[...]}} forms.
+    if(Array.isArray(value.models))walk(value.models,make);
+    else for(const [model,meta] of Object.entries(value)){
+     if(model==='models'||model==='name')continue;
+     if(typeof meta==='object')push(make,meta.name||meta.model||model,meta);
+     else push(make,model,{});
+    }
+   }
+  }
+ };
+ walk(raw);
+ const seen=new Set();
+ return out.filter(v=>{const k=`${norm(v.make)}|${norm(v.model)}`;if(seen.has(k))return false;seen.add(k);return true;});
 }
 async function getCatalog(){
  if(catalogCache && Date.now()-catalogLoadedAt<6*60*60*1000)return catalogCache;
@@ -81,9 +124,9 @@ async function getCatalog(){
   const r=await fetch(CATALOG_URL,{headers:{'User-Agent':'AutoPiese/1.0'}}); if(!r.ok)throw new Error('catalog '+r.status);
   catalogCache=normalizeCatalog(await r.json()); catalogLoadedAt=Date.now(); return catalogCache;
  }catch(e){
-  if(catalogCache)return catalogCache;
+  if(catalogCache && catalogCache.length)return catalogCache;
   catalogCache=[
-   ...Object.entries({BMW:['Seria 1','Seria 2','Seria 3','Seria 4','Seria 5','Seria 7','X1','X3','X5'],Volkswagen:['Golf','Passat','Polo','Tiguan','Touareg','Caddy'],Audi:['A3','A4','A5','A6','A8','Q3','Q5','Q7'],Dacia:['Logan','Duster','Sandero','Spring'],'Mercedes-Benz':['A-Class','C-Class','E-Class','S-Class','Sprinter'],Ford:['Fiesta','Focus','Mondeo','Kuga','Transit'],Opel:['Astra','Corsa','Insignia','Zafira'],Skoda:['Fabia','Octavia','Superb','Kodiaq']}).flatMap(([make,models])=>models.map(model=>({id:`fallback/${slugify(make)}/${slugify(model)}`,name:model,make,model,generation:'',years:[],kind:'car',engine:'',fuel:'',raw:{}})))];
+   ...Object.entries({BMW:['Seria 1','Seria 2','Seria 3','Seria 4','Seria 5','Seria 7','X1','X3','X5'],Volkswagen:['Golf','Passat','Polo','Tiguan','Touareg','Caddy'],Audi:['A3','A4','A5','A6','A8','Q3','Q5','Q7'],Dacia:['Bigster','Duster','Logan','Sandero','Spring','Jogger'],'Mercedes-Benz':['A-Class','C-Class','E-Class','S-Class','Sprinter'],Ford:['Fiesta','Focus','Mondeo','Kuga','Transit'],Opel:['Astra','Corsa','Insignia','Zafira'],Skoda:['Fabia','Octavia','Superb','Kodiaq']}).flatMap(([make,models])=>models.map(model=>({id:`fallback/${slugify(make)}/${slugify(model)}`,name:model,make,model,generation:'',years:[],kind:'car',engine:'',fuel:'',raw:{}})))];
   return catalogCache;
  }
 }
@@ -93,9 +136,9 @@ function resolveText(catalog,q){
  if(!scored.length)return null; const x=scored[0].v; return {...x,confidence:scored[0].score};
 }
 
-app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'vehiclesdb'}));
-app.get('/api/catalog/makes',async(req,res)=>{const c=await getCatalog();const makes=[...new Set(c.map(x=>x.make))].sort((a,b)=>a.localeCompare(b,'ro'));res.json({makes:makes.map(name=>({name}))});});
-app.get('/api/catalog/models',async(req,res)=>{const make=String(req.query.make||'');const c=await getCatalog();const models=[...new Set(c.filter(x=>norm(x.make)===norm(make)).map(x=>x.model))].sort((a,b)=>a.localeCompare(b,'ro'));res.json({models:models.map(name=>({name}))});});
+app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'vehiclesdb',catalogLoaded:Array.isArray(catalogCache),catalogCount:Array.isArray(catalogCache)?catalogCache.length:0}));
+app.get('/api/catalog/makes',async(req,res)=>{const c=await getCatalog();const makes=[...new Set(c.map(x=>x.make))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({makes:makes.map(name=>({name})),count:makes.length});});
+app.get('/api/catalog/models',async(req,res)=>{const make=String(req.query.make||'');const c=await getCatalog();const models=[...new Set(c.filter(x=>norm(x.make)===norm(make)).map(x=>x.model))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({models:models.map(name=>({name})),count:models.length});});
 app.get('/api/catalog/resolve',async(req,res)=>{const q=String(req.query.q||'').trim();if(!q)return res.json({match:null});const c=await getCatalog();const match=resolveText(c,q);res.json({match});});
 
 app.get('/api/me',async(req,res)=>{if(!pool)return res.json({user:null,mode:'prototype'});try{const t=req.cookies.session;if(!t)return res.json({user:null});const p=jwt.verify(t,JWT_SECRET);const r=await pool.query('SELECT id,name,email,phone,role,status FROM users WHERE id=$1',[p.id]);res.json({user:r.rows[0]||null});}catch{res.json({user:null});}});
