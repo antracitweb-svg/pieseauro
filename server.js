@@ -5,7 +5,6 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const { Pool } = require('pg');
 const path = require('path');
-const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -62,6 +61,15 @@ CREATE TABLE IF NOT EXISTS password_resets (
 CREATE TABLE IF NOT EXISTS email_verifications (
  id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT UNIQUE NOT NULL,
  expires_at TIMESTAMPTZ NOT NULL, verified_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS user_phones (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, phone TEXT NOT NULL,
+ is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE, verified BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(user_id, phone)
+);
+CREATE TABLE IF NOT EXISTS email_change_requests (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL,
+ token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ
 );`;
 
 async function dbReady(){
@@ -78,12 +86,15 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS show_phone BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT',
   'CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_unique_idx ON users(nickname) WHERE nickname IS NOT NULL',
-  'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE'
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE',
+  'CREATE TABLE IF NOT EXISTS user_phones (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, phone TEXT NOT NULL, is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE, verified BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id, phone))',
+  'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)'
  ];
  for(const q of migrations) await pool.query(q);
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
  await pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
  if(adminEmail&&adminPass){const r=await pool.query('SELECT id FROM users WHERE email=$1',[adminEmail.toLowerCase()]);if(!r.rowCount){const hash=await bcrypt.hash(adminPass,12);await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'admin')",['Administrator',adminEmail.toLowerCase(),hash]);}}
+ await pool.query("INSERT INTO user_phones(user_id,phone,verified) SELECT id,phone,email_verified FROM users WHERE phone IS NOT NULL AND phone<>'' AND NOT EXISTS (SELECT 1 FROM user_phones p WHERE p.user_id=users.id AND p.phone=users.phone)");
  return true;
 }
 function hashToken(token){return crypto.createHash('sha256').update(token).digest('hex');}
@@ -205,11 +216,14 @@ app.get('/api/me',async(req,res)=>{
  }catch{res.json({user:null});}
 });
 async function sendMail(to,subject,text,html){
- const host=process.env.SMTP_HOST, user=process.env.SMTP_USER, pass=process.env.SMTP_PASS;
- if(!host||!user||!pass) throw new Error('EMAIL_NOT_CONFIGURED');
- const transporter=nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT||587),secure:String(process.env.SMTP_SECURE||'false')==='true',auth:{user,pass}});
- await transporter.sendMail({from:process.env.SMTP_FROM||user,to,subject,text,html});
+ const apiKey=process.env.RESEND_API_KEY;
+ if(!apiKey) throw new Error('RESEND_API_KEY is not configured');
+ const from=process.env.RESEND_FROM||'AutoPiese <onboarding@resend.dev>';
+ const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to,subject,text,html})});
+ if(!response.ok){ const body=await response.text(); throw new Error(`Resend error ${response.status}: ${body}`); }
+ return response.json();
 }
+
 function appBaseUrl(req){return (process.env.APP_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');}
 
 app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
@@ -238,6 +252,80 @@ app.post('/api/auth/reset-password',requireDb,async(req,res)=>{
   await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[hash,r.rows[0].user_id]);
   await pool.query('UPDATE password_resets SET used_at=NOW() WHERE id=$1',[r.rows[0].id]);
   await pool.query('DELETE FROM sessions WHERE user_id=$1',[r.rows[0].user_id]);
+  res.json({ok:true});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+
+app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
+ try{
+  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified FROM users WHERE id=$1',[req.user.id])).rows[0];
+  const phones=(await pool.query('SELECT id,phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id',[req.user.id])).rows;
+  res.json({user:u,phones});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+app.patch('/api/account/profile',requireDb,auth,async(req,res)=>{
+ try{
+  const name=String(req.body.name||'').trim(), nickname=String(req.body.nickname||'').trim();
+  if(!name||nickname.length<3||nickname.length>30)return res.status(400).json({error:'DATE_INVALIDE'});
+  const exists=await pool.query('SELECT id FROM users WHERE LOWER(nickname)=LOWER($1) AND id<>$2',[nickname,req.user.id]);
+  if(exists.rowCount)return res.status(409).json({error:'NICKNAME_EXISTS'});
+  const r=await pool.query('UPDATE users SET name=$1,nickname=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,email_verified',[name,nickname,req.user.id]);
+  res.json({user:r.rows[0]});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+app.post('/api/account/email-change',requireDb,auth,async(req,res)=>{
+ try{
+  const em=String(req.body.email||'').trim().toLowerCase();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))return res.status(400).json({error:'EMAIL_REQUIRED'});
+  const exists=await pool.query('SELECT id FROM users WHERE email=$1 AND id<>$2',[em,req.user.id]);
+  if(exists.rowCount)return res.status(409).json({error:'EMAIL_EXISTS'});
+  const raw=crypto.randomBytes(32).toString('base64url');
+  await pool.query('DELETE FROM email_change_requests WHERE user_id=$1 OR expires_at<NOW()',[req.user.id]);
+  await pool.query("INSERT INTO email_change_requests(user_id,new_email,token_hash,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '30 minutes')",[req.user.id,em,hashToken(raw)]);
+  const link=`${appBaseUrl(req)}/#/verify-email-change?token=${encodeURIComponent(raw)}`;
+  await sendMail(em,'AutoPiese – confirmă noua adresă de email',`Ai cerut schimbarea adresei de email pentru contul AutoPiese. Confirmă în 30 de minute: ${link}`,
+   `<p>Ai cerut schimbarea adresei de email pentru contul AutoPiese.</p><p><a href="${link}">Confirmă noua adresă de email</a></p><p>Linkul este valabil 30 de minute.</p>`);
+  res.json({ok:true,message:'Ți-am trimis un link de confirmare pe noua adresă de email.'});
+ }catch(e){console.error(e);if(e.message==='EMAIL_NOT_CONFIGURED')return res.status(503).json({error:'EMAIL_NOT_CONFIGURED'});res.status(500).json({error:'SERVER_ERROR'});}
+});
+app.post('/api/account/email-change/confirm',requireDb,async(req,res)=>{
+ try{
+  const token=String(req.body.token||'');
+  const r=await pool.query('SELECT id,user_id,new_email FROM email_change_requests WHERE token_hash=$1 AND expires_at>NOW() AND used_at IS NULL LIMIT 1',[hashToken(token)]);
+  if(!r.rowCount)return res.status(400).json({error:'RESET_EXPIRED'});
+  const exists=await pool.query('SELECT id FROM users WHERE email=$1 AND id<>$2',[r.rows[0].new_email,r.rows[0].user_id]);
+  if(exists.rowCount)return res.status(409).json({error:'EMAIL_EXISTS'});
+  await pool.query('UPDATE users SET email=$1,email_verified=TRUE WHERE id=$2',[r.rows[0].new_email,r.rows[0].user_id]);
+  await pool.query('UPDATE email_change_requests SET used_at=NOW() WHERE id=$1',[r.rows[0].id]);
+  await pool.query('DELETE FROM sessions WHERE user_id=$1',[r.rows[0].user_id]);
+  res.json({ok:true,message:'Adresa de email a fost schimbată. Autentifică-te din nou.'});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+app.post('/api/account/phones',requireDb,auth,async(req,res)=>{
+ try{
+  const phone=String(req.body.phone||'').trim().replace(/\s+/g,' '), whatsapp=Boolean(req.body.is_whatsapp);
+  if(!phone)return res.status(400).json({error:'DATE_INVALIDE'});
+  const count=await pool.query('SELECT COUNT(*)::int AS n FROM user_phones WHERE user_id=$1',[req.user.id]);
+  if(count.rows[0].n>=4)return res.status(400).json({error:'MAX_PHONES'});
+  const dup=await pool.query('SELECT id FROM user_phones WHERE user_id=$1 AND phone=$2',[req.user.id,phone]);
+  if(dup.rowCount)return res.status(409).json({error:'PHONE_EXISTS'});
+  const r=await pool.query('INSERT INTO user_phones(user_id,phone,is_whatsapp,verified) VALUES($1,$2,$3,FALSE) RETURNING id,phone,is_whatsapp,verified',[req.user.id,phone,whatsapp]);
+  res.status(201).json({phone:r.rows[0],message:'Numărul a fost adăugat. Verificarea prin SMS poate fi conectată cu un furnizor SMS.'});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+app.patch('/api/account/phones/:id',requireDb,auth,async(req,res)=>{
+ try{
+  const id=Number(req.params.id), whatsapp=Boolean(req.body.is_whatsapp);
+  const r=await pool.query('UPDATE user_phones SET is_whatsapp=$1 WHERE id=$2 AND user_id=$3 RETURNING id,phone,is_whatsapp,verified',[whatsapp,id,req.user.id]);
+  if(!r.rowCount)return res.status(404).json({error:'DATE_INVALIDE'});
+  res.json({phone:r.rows[0]});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+app.delete('/api/account/phones/:id',requireDb,auth,async(req,res)=>{
+ try{
+  const id=Number(req.params.id);
+  const r=await pool.query('DELETE FROM user_phones WHERE id=$1 AND user_id=$2 RETURNING id',[id,req.user.id]);
+  if(!r.rowCount)return res.status(404).json({error:'DATE_INVALIDE'});
   res.json({ok:true});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
 });
