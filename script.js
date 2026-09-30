@@ -1,36 +1,62 @@
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-const modal=$("#modal");
-function openModal(){modal.classList.remove("hidden")}
-function closeModal(){modal.classList.add("hidden")}
-$("#openModal").onclick=openModal; $("#openModal2").onclick=openModal; $("#closeModal").onclick=closeModal;
-modal.addEventListener("click",e=>{if(e.target===modal)closeModal()});
-
-function search(value){
-  const q=value.trim().toLowerCase();
-  const cards=$$(".listing");
-  let shown=0;
-  cards.forEach(c=>{
-    const ok=!q || c.dataset.title.toLowerCase().includes(q);
-    c.style.display=ok?"":"none"; if(ok)shown++;
-  });
-  $("#noResults").classList.toggle("hidden",shown!==0);
-  location.hash="anunturi";
+const STORAGE='autopiese_listings_v2';
+const seed=[
+{id:1,type:'piesa',title:'Far dreapta BMW Seria 3 E90',price:450,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',county:'Cluj',category:'Caroserie',oem:'E90-63117161678',delivery:true,desc:'Far original, verificat, stare bună.',icon:'💡'},
+{id:2,type:'piesa',title:'Motor 1.5 dCi Dacia',price:3200,condition:'Second-hand',make:'Dacia',model:'Logan',year:'2012',county:'București',category:'Motor',oem:'K9K',delivery:true,desc:'Motor complet, verificat.',icon:'⚙️'},
+{id:3,type:'masina',title:'Volkswagen Golf 7 1.6 TDI',price:10900,condition:'Second-hand',make:'Volkswagen',model:'Golf',year:'2017',county:'Timiș',category:'Mașină',delivery:false,desc:'Diesel, manuală, acte în regulă.',icon:'🚗'},
+{id:4,type:'piesa',title:'Jante aliaj Audi 18 inch',price:2000,condition:'Second-hand',make:'Audi',model:'A4',year:'2017',county:'Cluj',category:'Roți',delivery:true,desc:'Set 4 bucăți, stare bună.',icon:'⭕'},
+{id:5,type:'piesa',title:'Alternator BMW 320d',price:750,condition:'Nouă',make:'BMW',model:'Seria 3',year:'2010',county:'Brașov',category:'Electrică',oem:'12317802619',delivery:true,desc:'Piesă nouă, ambalată.',icon:'⚡'},
+{id:6,type:'dezmembrari',title:'Dezmembrez BMW Seria 3 E90 320d',price:0,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',county:'Cluj',category:'Dezmembrări',delivery:true,desc:'Motor, cutie, caroserie, interior și electronice disponibile.',icon:'♻️'},
+{id:7,type:'piesa',title:'Cutie viteze VW Golf 6',price:1850,condition:'Second-hand',make:'Volkswagen',model:'Golf',year:'2010',county:'Iași',category:'Transmisie',delivery:true,desc:'Cutie manuală, verificată.',icon:'◈'},
+{id:8,type:'piesa',title:'Amortizoare față Dacia Logan',price:420,condition:'Nouă',make:'Dacia',model:'Logan',year:'2019',county:'București',category:'Suspensie',delivery:true,desc:'Set amortizoare față, noi.',icon:'⌁'}];
+let listings=JSON.parse(localStorage.getItem(STORAGE)||'null')||seed;
+let favorites=JSON.parse(localStorage.getItem('autopiese_fav')||'[]');
+function save(){localStorage.setItem(STORAGE,JSON.stringify(listings));localStorage.setItem('autopiese_fav',JSON.stringify(favorites));}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.classList.add('hidden'),2600)}
+function money(n){return n?new Intl.NumberFormat('ro-RO').format(n)+' lei':'La cerere'}
+function typeLabel(t){return t==='masina'?'MAȘINĂ':t==='dezmembrari'?'DEZMEMBRARE':'PIESĂ'}
+function renderListings(){
+ const q=$('#searchInput').value.trim().toLowerCase(), make=$('#make').value, model=$('#model').value, year=$('#year').value, condition=$('#condition').value, county=$('#county').value;
+ const ftype=$('#filterType').value, fcond=$('#filterCondition').value, max=Number($('#maxPrice').value)||Infinity, fcounty=$('#filterCounty').value, delivery=$('#withDelivery').checked;
+ const activeType=$('.chip.active')?.dataset.type||'all'; const grid=$('#listingGrid'); grid.innerHTML=''; let shown=0;
+ listings.forEach(x=>{const hay=[x.title,x.make,x.model,x.category,x.oem,x.desc].join(' ').toLowerCase();const ok=(!q||hay.includes(q))&&(!make||x.make===make)&&(!model||x.model===model)&&(!year||x.year===year)&&(!condition||x.condition===condition)&&(!county||x.county===county)&&(ftype==='all'||x.type===ftype)&&(!fcond||x.condition===fcond)&&x.price<=max&&(!fcounty||x.county===fcounty)&&(!delivery||x.delivery)&&(activeType==='all'||x.type===activeType);if(!ok)return;shown++;grid.appendChild(card(x));});
+ $('#resultCount').textContent=`${shown} anunț${shown===1?'':'uri'}`;$('#noResults').classList.toggle('hidden',shown!==0);$('#favCount').textContent=favorites.length;
 }
-$("#searchBtn").onclick=()=>search($("#searchInput").value);
-$("#searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")search(e.target.value)});
-$$("[data-search]").forEach(b=>b.onclick=()=>{$("#searchInput").value=b.dataset.search;search(b.dataset.search)});
+function card(x){const a=document.createElement('article');a.className='listing';a.innerHTML=`<div class="listing-visual"><span class="visual-icon">${x.icon||'🔧'}</span><span class="visual-code">${x.make||''} ${x.model||''}</span></div><div class="listing-body"><div class="meta"><span class="tag ${x.condition==='Nouă'?'green':''}">${typeLabel(x.type)} · ${x.condition}</span><span>${x.county||'România'}</span></div><h3>${esc(x.title)}</h3><p>${esc(x.desc||'Anunț publicat de vânzător.')}</p><div class="price-row"><span class="price">${money(x.price)}</span><button class="heart" data-fav="${x.id}" aria-label="Favorite">${favorites.includes(x.id)?'♥':'♡'}</button></div></div>`;a.querySelector('.heart').onclick=e=>{e.stopPropagation();toggleFav(x.id)};a.onclick=()=>openDetail(x);return a}
+function toggleFav(id){favorites=favorites.includes(id)?favorites.filter(x=>x!==id):[...favorites,id];save();renderListings();toast(favorites.includes(id)?'Adăugat la favorite.':'Eliminat din favorite.')}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function search(){renderListings();location.hash='anunturi'}
+$('#searchBtn').onclick=search;$('#searchInput').onkeydown=e=>{if(e.key==='Enter')search()};['make','model','year','condition','county','filterType','filterCondition','maxPrice','filterCounty','withDelivery'].forEach(id=>$('#'+id).addEventListener('change',renderListings));
+$$('[data-quick]').forEach(b=>b.onclick=()=>{$('#searchInput').value=b.dataset.quick;search()});
+$$('.category').forEach(b=>b.onclick=()=>{$('#searchInput').value=b.dataset.search;search()});
+$$('.vehicle-card').forEach(b=>b.onclick=()=>{$('#searchInput').value=b.dataset.search;search()});
+$$('.chip').forEach(b=>b.onclick=()=>{$$('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#filterType').value='all';renderListings()});
+$('#advancedBtn').onclick=()=>$('#advancedPanel').scrollIntoView({behavior:'smooth',block:'center'});
+$('#clearFilters').onclick=()=>{['make','model','year','condition','county','filterCondition','maxPrice','filterCounty'].forEach(id=>$('#'+id).value='');$('#filterType').value='all';$('#withDelivery').checked=false;$$('.chip').forEach(x=>x.classList.remove('active'));$('.chip').classList.add('active');renderListings()};
 
-$$(".filter").forEach(btn=>btn.onclick=()=>{
-  $$(".filter").forEach(x=>x.classList.remove("active")); btn.classList.add("active");
-  const f=btn.dataset.filter; let shown=0;
-  $$(".listing").forEach(c=>{const ok=f==="all"||c.dataset.type===f;c.style.display=ok?"":"none";if(ok)shown++});
-  $("#noResults").classList.toggle("hidden",shown!==0);
-});
+function openModal(id){$('#'+id).classList.remove('hidden')}function closeModal(id){$('#'+id).classList.add('hidden')}
+$('#publishBtn').onclick=()=>{openModal('publishModal');resetPublish()};$('#requestBtn').onclick=()=>openModal('requestModal');$('#loginBtn').onclick=()=>toast('Autentificarea va fi conectată la backend.');$('#footerLogin').onclick=()=>toast('Autentificarea va fi conectată la backend.');$('#footerPublish').onclick=()=>{$('#publishBtn').click()};
+$$('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));$$('.modal').forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.add('hidden')});
+function resetPublish(){$('#publishStep1').classList.remove('hidden');$('#publishForm').classList.add('hidden');$('#publishStep3').classList.add('hidden');$$('.stepper span').forEach((s,i)=>s.classList.toggle('active',i===0))}
+$$('[data-publish-type]').forEach(b=>b.onclick=()=>{const t=b.dataset.publishType;$('#pubType').value=t;$('#conditionWrap').classList.toggle('hidden',t==='masina'||t==='dezmembrari');$('#publishStep1').classList.add('hidden');$('#publishForm').classList.remove('hidden');$$('.stepper span').forEach((s,i)=>s.classList.toggle('active',i<2))});
+$('#backPublish').onclick=resetPublish;
+$('#publishForm').onsubmit=e=>{e.preventDefault();const t=$('#pubType').value;const x={id:Date.now(),type:t,title:$('#pubTitle').value.trim(),price:Number($('#pubPrice').value)||0,condition:t==='masina'?'Second-hand':t==='dezmembrari'?'Second-hand':$('#pubCondition').value,make:$('#pubMake').value.trim(),model:$('#pubModel').value.trim(),year:$('#pubYear').value,county:$('#pubCounty').value,category:t==='masina'?'Mașină':t==='dezmembrari'?'Dezmembrări':'Piese',oem:$('#pubOem').value.trim(),delivery:$('#pubDelivery').checked,desc:$('#pubDescription').value.trim()||'Anunț nou',icon:t==='masina'?'🚗':t==='dezmembrari'?'♻️':'🔧'};listings.unshift(x);save();renderListings();$('#publishForm').classList.add('hidden');$('#publishStep3').classList.remove('hidden');$$('.stepper span').forEach((s,i)=>s.classList.toggle('active',i<3));toast('Anunț adăugat în prototip.')};
+$('#requestForm').onsubmit=e=>{e.preventDefault();closeModal('requestModal');toast('Cererea a fost înregistrată în prototip.')};
+function openDetail(x){$('#detailContent').innerHTML=`<div class="detail-visual"><span class="tag">${typeLabel(x.type)} · ${x.condition}</span><b>${x.icon||'🔧'}</b><strong>${esc(x.make||'')} ${esc(x.model||'')} ${esc(x.year||'')}</strong></div><h2>${esc(x.title)}</h2><div class="detail-grid"><div class="detail-info"><small>Preț</small><b>${money(x.price)}</b></div><div class="detail-info"><small>Locație</small><b>${esc(x.county||'România')}</b></div><div class="detail-info"><small>Cod OEM</small><b>${esc(x.oem||'—')}</b></div><div class="detail-info"><small>Livrare</small><b>${x.delivery?'Da':'Ridicare / discută cu vânzătorul'}</b></div></div><p>${esc(x.desc||'')}</p><button class="btn primary" onclick="toast('Mesajul către vânzător va fi conectat la backend.')">Contactează vânzătorul</button>`;openModal('detailModal')}
+$('#favoritesBtn').onclick=()=>{if(!favorites.length)return toast('Nu ai anunțuri favorite.');$('#searchInput').value='';$$('.chip').forEach(x=>x.classList.remove('active'));$('.chip').classList.add('active');const old=listings;const grid=$('#listingGrid');grid.innerHTML='';old.filter(x=>favorites.includes(x.id)).forEach(x=>grid.appendChild(card(x)));$('#resultCount').textContent=`${favorites.length} favorite`;location.hash='anunturi'};
 
-$("#listingForm").onsubmit=e=>{
-  e.preventDefault();
-  const type=$("#type").value, title=$("#title").value, price=$("#price").value, desc=$("#description").value||"Anunț nou";
-  const article=document.createElement("article"); article.className="listing"; article.dataset.type=type; article.dataset.title=title;
-  article.innerHTML=`<div class="listing-photo">${type==="masina"?"🚗":"🔧"}</div><div class="listing-body"><span class="tag ${type==="masina"?"car":""}">${type==="masina"?"MAȘINĂ":"PIESĂ"}</span><h3>${title}</h3><p>${desc}</p><strong>${price}</strong></div>`;
-  $("#listingGrid").prepend(article); closeModal(); e.target.reset(); location.hash="anunturi";
-};
+// Admin panel — mobile-first prototype, ready to connect to a real API/auth system.
+const adminTabs={dashboard:()=>`<h3>Dashboard</h3><div class="stat-grid"><div class="stat"><small>Anunțuri</small><b>${listings.length}</b></div><div class="stat"><small>Favorite</small><b>${favorites.length}</b></div><div class="stat"><small>Cereri</small><b>12</b></div><div class="stat"><small>Raportări</small><b>2</b></div></div><div class="admin-box"><h3>Activitate recentă</h3><p>• ${listings.length} anunțuri în prototip</p><p>• Panoul este responsive și poate fi accesat de pe telefon</p><p>• Următorul pas: autentificare + bază de date + notificări reale</p></div>`,
+listings:()=>`<h3>Gestionare anunțuri</h3><table class="admin-table"><thead><tr><th>Anunț</th><th>Tip</th><th>Preț</th><th>Acțiune</th></tr></thead><tbody>${listings.map(x=>`<tr><td>${esc(x.title)}</td><td>${typeLabel(x.type)}</td><td>${money(x.price)}</td><td><button data-admin-delete="${x.id}">Șterge</button></td></tr>`).join('')}</tbody></table>`,
+users:()=>`<h3>Utilizatori</h3><table class="admin-table"><thead><tr><th>Utilizator</th><th>Tip</th><th>Status</th></tr></thead><tbody><tr><td>demo@autopiese.ro</td><td>Administrator</td><td>Activ</td></tr><tr><td>AutoDez Cluj</td><td>Firmă</td><td>Activ</td></tr><tr><td>Utilizator demo</td><td>Persoană</td><td>Activ</td></tr></tbody></table>`,
+requests:()=>`<h3>Cereri de piese</h3><table class="admin-table"><thead><tr><th>Cerere</th><th>Mașină</th><th>Status</th></tr></thead><tbody><tr><td>Alternator</td><td>BMW E90 320d</td><td>Nouă</td></tr><tr><td>Far stânga</td><td>Golf 7</td><td>În lucru</td></tr></tbody></table>`,
+reports:()=>`<h3>Raportări</h3><table class="admin-table"><thead><tr><th>Anunț</th><th>Motiv</th><th>Acțiune</th></tr></thead><tbody><tr><td>Exemplu anunț</td><td>Informații incorecte</td><td><button onclick="toast('Raport marcat pentru verificare.')">Verifică</button></td></tr><tr><td>Alt anunț</td><td>Spam</td><td><button onclick="toast('Raport marcat pentru verificare.')">Verifică</button></td></tr></tbody></table>`,
+categories:()=>`<h3>Categorii</h3><div class="admin-box"><p>Motor · Caroserie · Electrică · Frâne · Suspensie · Transmisie · Interior · Roți & anvelope</p><button class="btn primary" onclick="toast('În versiunea backend vei putea edita categoriile.')">Adaugă categorie</button></div>`,
+settings:()=>`<h3>Setări</h3><div class="admin-box"><p><b>Notificări</b><br>Configurabile după conectarea backend-ului.</p><p><b>Moderare</b><br>Poți aproba sau bloca anunțuri înainte de publicare.</p><p><b>Securitate</b><br>Adminul real va avea autentificare separată de utilizatori.</p></div>`};
+function renderAdmin(tab='dashboard'){$('#adminContent').innerHTML=adminTabs[tab]();$$('[data-admin-delete]').forEach(b=>b.onclick=()=>{const id=Number(b.dataset.adminDelete);listings=listings.filter(x=>x.id!==id);save();renderAdmin('listings');renderListings();toast('Anunț șters.')})}
+function openAdmin(){openModal('adminModal');renderAdmin('dashboard')}
+$('#footerAdmin').onclick=openAdmin;$('#mobileAdmin').onclick=openAdmin;
+$$('[data-admin-tab]').forEach(b=>b.onclick=()=>{$$('[data-admin-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderAdmin(b.dataset.adminTab)});
+$('#menuBtn').onclick=()=>$('#mobileNav').classList.toggle('hidden');
+window.addEventListener('hashchange',()=>{if(location.hash==='#admin')openAdmin()});
+renderListings();
