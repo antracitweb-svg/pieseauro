@@ -1,0 +1,11 @@
+AutoPiese – versiunea extinsă
+
+Pornită direct de la pieseauto_real_backend.zip.
+- Catalog auto dependent marcă -> model, alimentat din VehiclesDB.
+- Ani 1980–2026 în căutare și publicare.
+- Câmpuri noi pentru anunț: motorizare, tip vânzător, cantitate, preț negociabil.
+- API catalog + migrare PostgreSQL pentru bazele de date existente.
+- Filtrare după motorizare și tip vânzător.
+- Atribuire vizibilă pentru datele VehiclesDB.
+
+Sursa catalogului: VehiclesDB, datasetul curent disponibil la momentul construirii. Licență CC-BY 4.0; creditul este păstrat în site.
