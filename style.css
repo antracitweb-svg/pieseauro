@@ -37,3 +37,9 @@
 .admin-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.admin-tabs .active{box-shadow:0 0 0 2px currentColor inset}.admin-list{display:grid;gap:12px}.admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.admin-actions .btn{min-width:110px}@media(max-width:680px){.admin-tabs{display:grid;grid-template-columns:1fr 1fr}.admin-tabs .btn{width:100%}.admin-actions{display:grid;grid-template-columns:1fr 1fr}.admin-actions .btn{width:100%}}
 
 .settings-grid{display:grid;gap:14px}.settings-card{background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:18px;padding:16px}.settings-card summary{cursor:pointer;font-weight:800;list-style:none}.settings-card summary::-webkit-details-marker{display:none}.settings-actions{display:flex;gap:8px;flex-wrap:wrap}.phone-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line,#e5e7eb)}.danger-text{color:#b42318}@media(max-width:680px){.phone-row{align-items:flex-start;flex-direction:column}.settings-actions .btn{width:100%}}
+
+.password-wrap{position:relative;display:flex;align-items:center}
+.password-wrap input{padding-right:46px!important}
+.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:#61758c;cursor:pointer;font-size:17px;display:grid;place-items:center}
+.password-toggle:hover{background:#eef5fb;color:#0b70c9}
+.error-message{color:#b42318!important;font-weight:700}
