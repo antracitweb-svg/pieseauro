@@ -217,17 +217,13 @@ app.get('/api/me',async(req,res)=>{
 });
 async function sendMail(to,subject,text,html){
  const apiKey=process.env.RESEND_API_KEY;
- if(!apiKey) throw new Error('EMAIL_NOT_CONFIGURED');
- const from=process.env.RESEND_FROM || 'AutoPiese <onboarding@resend.dev>';
- const resp=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
- let data={}; try{data=await resp.json();}catch{}
- if(!resp.ok){
-   console.error('Resend error',resp.status,JSON.stringify(data));
-   if(resp.status===403) throw new Error('EMAIL_TEST_ONLY');
-   throw new Error('EMAIL_SEND_FAILED');
- }
- return data;
+ if(!apiKey) throw new Error('RESEND_API_KEY is not configured');
+ const from=process.env.RESEND_FROM||'AutoPiese <onboarding@resend.dev>';
+ const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to,subject,text,html})});
+ if(!response.ok){ const body=await response.text(); throw new Error(`Resend error ${response.status}: ${body}`); }
+ return response.json();
 }
+
 function appBaseUrl(req){return (process.env.APP_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');}
 
 app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{

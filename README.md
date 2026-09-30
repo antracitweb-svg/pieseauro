@@ -45,11 +45,11 @@ Dacă repository-ul este conectat la Render, commit-ul declanșează deploy-ul. 
 ## Email securizat – recuperare parolă
 
 Pentru ca „Ai uitat parola?” să trimită emailuri reale, configurează în Render:
-- `SMTP_HOST`
-- `SMTP_PORT` (de regulă 587)
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM` (opțional; implicit SMTP_USER)
+- `RESEND_API_KEY`
+- `RESEND_FROM` (de regulă 587)
+- ``
+- ``
+- `` (opțional; implicit )
 - `SMTP_SECURE` (`false` pentru 587, `true` pentru 465)
 - `APP_URL` = adresa publică AutoPiese, de exemplu `https://pieseauto-dez.onrender.com`
 
@@ -57,7 +57,7 @@ Linkurile de resetare sunt token-uri aleatorii, stocate doar hash-uit în baza d
 
 
 ## Email SMTP pentru recuperare parolă
-Configurează în Render Environment Variables: `SMTP_HOST`, `SMTP_PORT` (de regulă 587), `SMTP_SECURE` (`false` pentru STARTTLS/587 sau `true` pentru SSL), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` și `APP_URL` (adresa publică AutoPiese). Fără aceste variabile, fluxul de recuperare răspunde că emailul nu este configurat.
+Configurează în Render Environment Variables: `RESEND_API_KEY`, `RESEND_FROM` (de regulă 587), `SMTP_SECURE` (`false` pentru STARTTLS/587 sau `true` pentru SSL), ``, ``, `` și `APP_URL` (adresa publică AutoPiese). Fără aceste variabile, fluxul de recuperare răspunde că emailul nu este configurat.
 
 ## Setări cont
 Utilizatorii pot modifica numele/nickname-ul, pot cere schimbarea emailului prin link de confirmare și pot avea maximum 4 numere de telefon. Fiecare număr poate fi marcat pentru WhatsApp.
