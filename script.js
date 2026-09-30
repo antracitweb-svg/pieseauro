@@ -1,12 +1,12 @@
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const STORAGE='autopiese_listings_v2';
 const seed=[
-{id:1,type:'piesa',title:'Far dreapta BMW Seria 3 E90',price:450,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',engine:'2.0d 163 CP',county:'Cluj',category:'Caroserie',oem:'E90-63117161678',delivery:true,desc:'Far original, verificat, stare bună.',icon:'💡'},
-{id:2,type:'piesa',title:'Motor 1.5 dCi Dacia',price:3200,condition:'Second-hand',make:'Dacia',model:'Logan',year:'2012',engine:'1.5 dCi',county:'București',category:'Motor',oem:'K9K',delivery:true,desc:'Motor complet, verificat.',icon:'⚙️'},
+{id:1,type:'piesa',title:'Far dreapta BMW Seria 3 E90',price:450,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',county:'Cluj',category:'Caroserie',oem:'E90-63117161678',delivery:true,desc:'Far original, verificat, stare bună.',icon:'💡'},
+{id:2,type:'piesa',title:'Motor 1.5 dCi Dacia',price:3200,condition:'Second-hand',make:'Dacia',model:'Logan',year:'2012',county:'București',category:'Motor',oem:'K9K',delivery:true,desc:'Motor complet, verificat.',icon:'⚙️'},
 {id:3,type:'masina',title:'Volkswagen Golf 7 1.6 TDI',price:10900,condition:'Second-hand',make:'Volkswagen',model:'Golf',year:'2017',county:'Timiș',category:'Mașină',delivery:false,desc:'Diesel, manuală, acte în regulă.',icon:'🚗'},
 {id:4,type:'piesa',title:'Jante aliaj Audi 18 inch',price:2000,condition:'Second-hand',make:'Audi',model:'A4',year:'2017',county:'Cluj',category:'Roți',delivery:true,desc:'Set 4 bucăți, stare bună.',icon:'⭕'},
 {id:5,type:'piesa',title:'Alternator BMW 320d',price:750,condition:'Nouă',make:'BMW',model:'Seria 3',year:'2010',county:'Brașov',category:'Electrică',oem:'12317802619',delivery:true,desc:'Piesă nouă, ambalată.',icon:'⚡'},
-{id:6,type:'dezmembrari',title:'Dezmembrez BMW Seria 3 E90 320d',price:0,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',engine:'2.0d 163 CP',county:'Cluj',category:'Dezmembrări',delivery:true,desc:'Motor, cutie, caroserie, interior și electronice disponibile.',icon:'♻️'},
+{id:6,type:'dezmembrari',title:'Dezmembrez BMW Seria 3 E90 320d',price:0,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',county:'Cluj',category:'Dezmembrări',delivery:true,desc:'Motor, cutie, caroserie, interior și electronice disponibile.',icon:'♻️'},
 {id:7,type:'piesa',title:'Cutie viteze VW Golf 6',price:1850,condition:'Second-hand',make:'Volkswagen',model:'Golf',year:'2010',county:'Iași',category:'Transmisie',delivery:true,desc:'Cutie manuală, verificată.',icon:'◈'},
 {id:8,type:'piesa',title:'Amortizoare față Dacia Logan',price:420,condition:'Nouă',make:'Dacia',model:'Logan',year:'2019',county:'București',category:'Suspensie',delivery:true,desc:'Set amortizoare față, noi.',icon:'⌁'}];
 let listings=JSON.parse(localStorage.getItem(STORAGE)||'null')||seed;
@@ -16,62 +16,16 @@ function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.remove('hi
 function money(n){return n?new Intl.NumberFormat('ro-RO').format(n)+' lei':'La cerere'}
 function typeLabel(t){return t==='masina'?'MAȘINĂ':t==='dezmembrari'?'DEZMEMBRARE':'PIESĂ'}
 function renderListings(){
- const q=$('#searchInput').value.trim().toLowerCase(), make=$('#make').value, model=$('#model').value, year=$('#year').value, engine=($('#engineSearch')?.value||'').trim().toLowerCase(), condition=$('#condition').value, county=$('#county').value;
+ const q=$('#searchInput').value.trim().toLowerCase(), make=$('#make').value, model=$('#model').value, year=$('#year').value, condition=$('#condition').value, county=$('#county').value;
  const ftype=$('#filterType').value, fcond=$('#filterCondition').value, max=Number($('#maxPrice').value)||Infinity, fcounty=$('#filterCounty').value, delivery=$('#withDelivery').checked;
  const activeType=$('.chip.active')?.dataset.type||'all'; const grid=$('#listingGrid'); grid.innerHTML=''; let shown=0;
- listings.forEach(x=>{const hay=[x.title,x.make,x.model,x.category,x.oem,x.desc].join(' ').toLowerCase();const ok=(!q||hay.includes(q))&&(!make||x.make===make)&&(!model||x.model===model)&&(!year||x.year===year)&&(!engine||String(x.engine||'').toLowerCase().includes(engine))&&(!condition||x.condition===condition)&&(!county||x.county===county)&&(ftype==='all'||x.type===ftype)&&(!fcond||x.condition===fcond)&&x.price<=max&&(!fcounty||x.county===fcounty)&&(!delivery||x.delivery)&&(activeType==='all'||x.type===activeType);if(!ok)return;shown++;grid.appendChild(card(x));});
+ listings.forEach(x=>{const hay=[x.title,x.make,x.model,x.category,x.oem,x.desc].join(' ').toLowerCase();const ok=(!q||hay.includes(q))&&(!make||x.make===make)&&(!model||x.model===model)&&(!year||x.year===year)&&(!condition||x.condition===condition)&&(!county||x.county===county)&&(ftype==='all'||x.type===ftype)&&(!fcond||x.condition===fcond)&&x.price<=max&&(!fcounty||x.county===fcounty)&&(!delivery||x.delivery)&&(activeType==='all'||x.type===activeType);if(!ok)return;shown++;grid.appendChild(card(x));});
  $('#resultCount').textContent=`${shown} anunț${shown===1?'':'uri'}`;$('#noResults').classList.toggle('hidden',shown!==0);$('#favCount').textContent=favorites.length;
 }
-function card(x){const a=document.createElement('article');a.className='listing';a.innerHTML=`<div class="listing-visual"><span class="visual-icon">${x.icon||'🔧'}</span><span class="visual-code">${x.make||''} ${x.model||''}</span></div><div class="listing-body"><div class="meta"><span class="tag ${x.condition==='Nouă'?'green':''}">${typeLabel(x.type)} · ${x.condition}</span><span>${x.county||'România'}</span></div><h3>${esc(x.title)}</h3><p>${esc(x.desc||'Anunț publicat de vânzător.')}</p><small class="listing-spec">${esc(x.engine||'')} ${x.oem?' · OEM '+esc(x.oem):''} ${x.negotiable?' · negociabil':''}</small><div class="price-row"><span class="price">${money(x.price)}</span><button class="heart" data-fav="${x.id}" aria-label="Favorite">${favorites.includes(x.id)?'♥':'♡'}</button></div></div>`;a.querySelector('.heart').onclick=e=>{e.stopPropagation();toggleFav(x.id)};a.onclick=()=>openDetail(x);return a}
+function card(x){const a=document.createElement('article');a.className='listing';a.innerHTML=`<div class="listing-visual"><span class="visual-icon">${x.icon||'🔧'}</span><span class="visual-code">${x.make||''} ${x.model||''}</span></div><div class="listing-body"><div class="meta"><span class="tag ${x.condition==='Nouă'?'green':''}">${typeLabel(x.type)} · ${x.condition}</span><span>${x.county||'România'}</span></div><h3>${esc(x.title)}</h3><p>${esc(x.desc||'Anunț publicat de vânzător.')}</p><div class="price-row"><span class="price">${money(x.price)}</span><button class="heart" data-fav="${x.id}" aria-label="Favorite">${favorites.includes(x.id)?'♥':'♡'}</button></div></div>`;a.querySelector('.heart').onclick=e=>{e.stopPropagation();toggleFav(x.id)};a.onclick=()=>openDetail(x);return a}
 function toggleFav(id){favorites=favorites.includes(id)?favorites.filter(x=>x!==id):[...favorites,id];save();
 let currentUser=null;
 async function api(url,options={}){const r=await fetch(url,{method:options.method||'GET',headers:{'Content-Type':'application/json',...(options.headers||{})},body:options.body?JSON.stringify(options.body):undefined});let d={};try{d=await r.json()}catch{}if(!r.ok){const map={AUTH_REQUIRED:'Trebuie să te autentifici.',EMAIL_EXISTS:'Există deja un cont cu acest email.',INVALID_LOGIN:'Email sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată încă.',ADMIN_ONLY:'Acces permis doar administratorului.',DATE_INVALIDE:'Completează corect câmpurile.',STARE_INVALIDE:'Alege Nouă sau Second-hand.'};throw new Error(map[d.error]||d.message||'A apărut o eroare.')}return d}
-
-// Vehicle catalog — dependent make → model picker, refreshed from VehiclesDB.
-const YEAR_MAX=2026, YEAR_MIN=1980;
-function fillYears(selector,includeBlank=true){
- const el=$(selector); if(!el) return;
- const first=includeBlank?'<option value="">Alege anul</option>':'';
- el.innerHTML=first+Array.from({length:YEAR_MAX-YEAR_MIN+1},(_,i)=>YEAR_MAX-i).map(y=>`<option>${y}</option>`).join('');
-}
-function fillSelect(el,items,placeholder){
- if(!el)return;
- el.innerHTML=`<option value="">${placeholder}</option>`+items.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
-}
-async function catalogMakes(kind='car'){
- const r=await api('/api/catalog/makes?kind='+encodeURIComponent(kind));
- return r.makes||[];
-}
-async function catalogModels(make,kind='car'){
- if(!make)return [];
- const r=await api('/api/catalog/models?kind='+encodeURIComponent(kind)+'&make='+encodeURIComponent(make));
- return r.models||[];
-}
-async function initVehicleCatalog(){
- fillYears('#year'); fillYears('#pubYear');
- const searchMake=$('#make'), pubMake=$('#pubMake');
- try{
-  const makes=await catalogMakes('car');
-  fillSelect(searchMake,makes.map(x=>x.name),'Marca');
-  fillSelect(pubMake,makes.map(x=>x.name),'Alege marca');
-  const updateModels=async (make,target,placeholder)=>{
-   const models=await catalogModels(make,'car');
-   fillSelect(target,models.map(x=>x.name),placeholder);
-  };
-  searchMake.onchange=()=>{updateModels(searchMake.value,$('#model'),'Model'); renderListings();};
-  pubMake.onchange=()=>updateModels(pubMake.value,$('#pubModel'),'Alege modelul');
-  $('#model').onchange=renderListings;
-  $('#year').onchange=renderListings;
-  $('#engineSearch').oninput=renderListings;
-  const status=await api('/api/catalog/status');
-  document.documentElement.dataset.catalogVersion=status.version||'';
- }catch(e){
-  // Keep the site usable if the external catalogue is temporarily unavailable.
-  fillSelect(searchMake,['BMW','Volkswagen','Audi','Dacia','Mercedes-Benz','Ford','Opel','Skoda'],'Marca');
-  fillSelect(pubMake,['BMW','Volkswagen','Audi','Dacia','Mercedes-Benz','Ford','Opel','Skoda'],'Alege marca');
- }
-}
-
 async function loadUser(){try{const r=await api('/api/me');currentUser=r.user||null;if(currentUser){$('#loginBtn').textContent=currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name;}}catch{}}
 async function syncListings(){try{const r=await api('/api/listings');if(Array.isArray(r.listings)&&r.listings.length){listings=r.listings.map(x=>({...x,price:Number(x.price)||0,desc:x.description||x.desc||'',icon:x.type==='masina'?'🚗':x.type==='dezmembrari'?'♻️':'🔧'}));renderListings();}}catch{}}
 async function ensureUser(){await loadUser();if(currentUser)return true;openModal('authModal');return false}
@@ -79,7 +33,6 @@ function authMode(register){$('#authTitle').textContent=register?'Creează cont'
 $('#authLoginTab').onclick=()=>authMode(false);$('#authRegisterTab').onclick=()=>authMode(true);
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#authMessage').textContent='';try{const r=await api('/api/auth/login',{method:'POST',body:{email:$('#loginEmail').value,password:$('#loginPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name;toast('Te-ai autentificat.')}catch(err){$('#authMessage').textContent=err.message}};
 $('#registerForm').onsubmit=async e=>{e.preventDefault();$('#registerMessage').textContent='';try{const r=await api('/api/auth/register',{method:'POST',body:{name:$('#regName').value,email:$('#regEmail').value,phone:$('#regPhone').value,password:$('#regPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.name;toast('Cont creat cu succes.')}catch(err){$('#registerMessage').textContent=err.message}};
-initVehicleCatalog();
 loadUser();
 syncListings();
 renderListings();toast(favorites.includes(id)?'Adăugat la favorite.':'Eliminat din favorite.')}
@@ -94,7 +47,6 @@ function authMode(register){$('#authTitle').textContent=register?'Creează cont'
 $('#authLoginTab').onclick=()=>authMode(false);$('#authRegisterTab').onclick=()=>authMode(true);
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#authMessage').textContent='';try{const r=await api('/api/auth/login',{method:'POST',body:{email:$('#loginEmail').value,password:$('#loginPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name;toast('Te-ai autentificat.')}catch(err){$('#authMessage').textContent=err.message}};
 $('#registerForm').onsubmit=async e=>{e.preventDefault();$('#registerMessage').textContent='';try{const r=await api('/api/auth/register',{method:'POST',body:{name:$('#regName').value,email:$('#regEmail').value,phone:$('#regPhone').value,password:$('#regPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.name;toast('Cont creat cu succes.')}catch(err){$('#registerMessage').textContent=err.message}};
-initVehicleCatalog();
 loadUser();
 syncListings();
 renderListings();location.hash='anunturi'}
@@ -110,9 +62,43 @@ function openModal(id){$('#'+id).classList.remove('hidden')}function closeModal(
 $('#publishBtn').onclick=async()=>{if(!(await ensureUser()))return;openModal('publishModal');resetPublish()};$('#requestBtn').onclick=async()=>{if(!(await ensureUser()))return;openModal('requestModal')};$('#loginBtn').onclick=()=>openModal('authModal');$('#footerLogin').onclick=()=>openModal('authModal');$('#footerPublish').onclick=()=>$('#publishBtn').click();
 $$('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));$$('.modal').forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.add('hidden')});
 function resetPublish(){$('#publishStep1').classList.remove('hidden');$('#publishForm').classList.add('hidden');$('#publishStep3').classList.add('hidden');$$('.stepper span').forEach((s,i)=>s.classList.toggle('active',i===0))}
-$$('[data-publish-type]').forEach(b=>b.onclick=()=>{const t=b.dataset.publishType;$('#pubType').value=t;$('#conditionWrap').classList.toggle('hidden',t==='masina'||t==='dezmembrari');$('#publishStep1').classList.add('hidden');$('#publishForm').classList.remove('hidden');$$('.stepper span').forEach((s,i)=>s.classList.toggle('active',i<2))});
+initVehicleYears(); $('#pubTitle').addEventListener('input',detectVehicleFromTitle); $$('[data-publish-type]').forEach(b=>b.onclick=()=>{const t=b.dataset.publishType;$('#pubType').value=t;$('#conditionWrap').classList.toggle('hidden',t==='masina'||t==='dezmembrari');$('#publishStep1').classList.add('hidden');$('#publishForm').classList.remove('hidden');$$('.stepper span').forEach((s,i)=>s.classList.toggle('active',i<2))});
+
+function initVehicleYears(){
+ const y=$('#pubYear'); if(!y || y.options.length>2)return;
+ const now=2026;
+ for(let n=now;n>=1980;n--){const o=document.createElement('option');o.value=String(n);o.textContent=String(n);y.appendChild(o);}
+}
+let vehicleSuggestTimer=null;
+async function detectVehicleFromTitle(){
+ const input=$('#pubTitle'), box=$('#vehicleDetected'); if(!input||!box)return;
+ const text=input.value.trim(); if(text.length<3){box.classList.add('hidden');return;}
+ clearTimeout(vehicleSuggestTimer);
+ vehicleSuggestTimer=setTimeout(async()=>{
+   try{
+     const r=await api('/api/catalog/resolve?q='+encodeURIComponent(text));
+     const m=r.matches?.[0];
+     const year=(text.match(/\b(19[89]\d|20[0-2]\d)\b/)||[])[1]||'';
+     const engine=(text.match(/\b(?:\d(?:\.\d)?\s?(?:tdi|tdci|dci|hdi|cdti|tsi|tfsi|d|td|tce|mpi|fsi|gdi|hybrid|phev|ev)|\d(?:\.\d)?\s?l(?:\s?(?:diesel|benzina|benzin))?)\b/i)||[])[0]||'';
+     if(m){
+       $('#pubMake').value=m.make||'';
+       $('#pubModel').value=m.name||'';
+       $('#pubVehicleId').value=(m.kind||'car')+'/'+String(m.make||'').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'/'+String(m.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-');
+       if(year)$('#pubYear').value=year;
+       if(engine)$('#pubEngine').value=engine;
+       box.innerHTML=`<b>Am identificat:</b> ${esc(m.make)} · ${esc(m.name)}${year?' · '+esc(year):''}${engine?' · '+esc(engine):''} <button type="button" id="acceptVehicle">Folosește</button>`;
+       box.classList.remove('hidden');
+       $('#acceptVehicle').onclick=()=>{box.innerHTML='✓ Datele auto au fost completate automat.';};
+     }else{
+       box.innerHTML='Nu am identificat încă mașina. Poți continua să scrii titlul sau completa câmpurile manual.';
+       box.classList.remove('hidden');
+     }
+   }catch{box.classList.add('hidden')}
+ },280);
+}
+
 $('#backPublish').onclick=resetPublish;
-$('#publishForm').onsubmit=async e=>{e.preventDefault();const t=$('#pubType').value;const x={type:t,title:$('#pubTitle').value.trim(),price:Number($('#pubPrice').value)||0,condition:t==='masina'?'Second-hand':t==='dezmembrari'?'Second-hand':$('#pubCondition').value,make:$('#pubMake').value.trim(),model:$('#pubModel').value.trim(),year:$('#pubYear').value,engine:$('#pubEngine').value.trim(),seller_type:$('#pubSellerType').value,county:$('#pubCounty').value,category:t==='masina'?'Mașină':t==='dezmembrari'?'Dezmembrări':'Piese',oem:$('#pubOem').value.trim(),negotiable:$('#pubNegotiable').checked,quantity:Number($('#pubQuantity').value)||1,delivery:$('#pubDelivery').checked,description:$('#pubDescription').value.trim()||'Anunț nou'};try{const r=await api('/api/listings',{method:'POST',body:x});const n=r.listing;n.id=n.id;n.desc=n.description;n.icon=t==='masina'?'🚗':t==='dezmembrari'?'♻️':'🔧';listings.unshift(n);save();
+$('#publishForm').onsubmit=async e=>{e.preventDefault();const t=$('#pubType').value;const x={type:t,title:$('#pubTitle').value.trim(),price:Number($('#pubPrice').value)||0,condition:t==='masina'?'Second-hand':t==='dezmembrari'?'Second-hand':$('#pubCondition').value,make:$('#pubMake').value.trim(),model:$('#pubModel').value.trim(),year:$('#pubYear').value,county:$('#pubCounty').value,category:t==='masina'?'Mașină':t==='dezmembrari'?'Dezmembrări':'Piese',oem:$('#pubOem').value.trim(),engine:$('#pubEngine').value.trim(),generation:$('#pubGeneration').value.trim(),vehicle_id:$('#pubVehicleId').value.trim(),delivery:$('#pubDelivery').checked,description:$('#pubDescription').value.trim()||'Anunț nou'};try{const r=await api('/api/listings',{method:'POST',body:x});const n=r.listing;n.id=n.id;n.desc=n.description;n.icon=t==='masina'?'🚗':t==='dezmembrari'?'♻️':'🔧';listings.unshift(n);save();
 let currentUser=null;
 async function api(url,options={}){const r=await fetch(url,{method:options.method||'GET',headers:{'Content-Type':'application/json',...(options.headers||{})},body:options.body?JSON.stringify(options.body):undefined});let d={};try{d=await r.json()}catch{}if(!r.ok){const map={AUTH_REQUIRED:'Trebuie să te autentifici.',EMAIL_EXISTS:'Există deja un cont cu acest email.',INVALID_LOGIN:'Email sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată încă.',ADMIN_ONLY:'Acces permis doar administratorului.',DATE_INVALIDE:'Completează corect câmpurile.',STARE_INVALIDE:'Alege Nouă sau Second-hand.'};throw new Error(map[d.error]||d.message||'A apărut o eroare.')}return d}
 async function loadUser(){try{const r=await api('/api/me');currentUser=r.user||null;if(currentUser){$('#loginBtn').textContent=currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name;}}catch{}}
@@ -122,7 +108,6 @@ function authMode(register){$('#authTitle').textContent=register?'Creează cont'
 $('#authLoginTab').onclick=()=>authMode(false);$('#authRegisterTab').onclick=()=>authMode(true);
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#authMessage').textContent='';try{const r=await api('/api/auth/login',{method:'POST',body:{email:$('#loginEmail').value,password:$('#loginPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name;toast('Te-ai autentificat.')}catch(err){$('#authMessage').textContent=err.message}};
 $('#registerForm').onsubmit=async e=>{e.preventDefault();$('#registerMessage').textContent='';try{const r=await api('/api/auth/register',{method:'POST',body:{name:$('#regName').value,email:$('#regEmail').value,phone:$('#regPhone').value,password:$('#regPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.name;toast('Cont creat cu succes.')}catch(err){$('#registerMessage').textContent=err.message}};
-initVehicleCatalog();
 loadUser();
 syncListings();
 renderListings();$('#publishForm').classList.add('hidden');$('#publishStep3').classList.remove('hidden');$$('.stepper span').forEach((s,i)=>s.classList.toggle('active',i<3));toast('Anunțul a fost trimis spre aprobare.')}catch(err){toast(err.message)}};
@@ -148,7 +133,6 @@ function authMode(register){$('#authTitle').textContent=register?'Creează cont'
 $('#authLoginTab').onclick=()=>authMode(false);$('#authRegisterTab').onclick=()=>authMode(true);
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#authMessage').textContent='';try{const r=await api('/api/auth/login',{method:'POST',body:{email:$('#loginEmail').value,password:$('#loginPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name;toast('Te-ai autentificat.')}catch(err){$('#authMessage').textContent=err.message}};
 $('#registerForm').onsubmit=async e=>{e.preventDefault();$('#registerMessage').textContent='';try{const r=await api('/api/auth/register',{method:'POST',body:{name:$('#regName').value,email:$('#regEmail').value,phone:$('#regPhone').value,password:$('#regPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.name;toast('Cont creat cu succes.')}catch(err){$('#registerMessage').textContent=err.message}};
-initVehicleCatalog();
 loadUser();
 syncListings();
 renderListings();toast('Anunț șters.')})}
@@ -167,7 +151,6 @@ function authMode(register){$('#authTitle').textContent=register?'Creează cont'
 $('#authLoginTab').onclick=()=>authMode(false);$('#authRegisterTab').onclick=()=>authMode(true);
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#authMessage').textContent='';try{const r=await api('/api/auth/login',{method:'POST',body:{email:$('#loginEmail').value,password:$('#loginPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.role==='admin'?'Admin: '+currentUser.name:currentUser.name;toast('Te-ai autentificat.')}catch(err){$('#authMessage').textContent=err.message}};
 $('#registerForm').onsubmit=async e=>{e.preventDefault();$('#registerMessage').textContent='';try{const r=await api('/api/auth/register',{method:'POST',body:{name:$('#regName').value,email:$('#regEmail').value,phone:$('#regPhone').value,password:$('#regPassword').value}});currentUser=r.user;closeModal('authModal');$('#loginBtn').textContent=currentUser.name;toast('Cont creat cu succes.')}catch(err){$('#registerMessage').textContent=err.message}};
-initVehicleCatalog();
 loadUser();
 syncListings();
 renderListings();
