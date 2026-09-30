@@ -1,4 +1,4 @@
-# AutoPiese – versiune extinsă
+# AutoPiese – FUTURE v15
 
 Această versiune pornește de la backend-ul existent și adaugă catalog auto + identificare din text + fundație SEO.
 
@@ -24,3 +24,20 @@ Datele de identitate ale vehiculelor provin din VehiclesDB și sunt folosite con
 
 ## Render
 Dacă repository-ul este conectat la Render, commit-ul declanșează deploy-ul. Verifică existența `DATABASE_URL`, `JWT_SECRET`, `ADMIN_EMAIL` și `ADMIN_PASSWORD`. `VEHICLE_CATALOG_URL` este deja setat în `render.yaml`.
+
+
+## Interfață v15
+- header dark, logo AutoPiese și meniu hamburger unic;
+- hero albastru cu imagine locală de piese auto;
+- căutare + filtre vehicul în cardul principal;
+- 10 categorii populare cu iconografie;
+- bandă de încredere: plăți, livrare, suport, piese verificate;
+- layout responsive pentru telefon și desktop;
+- funcțiile existente de autentificare, publicare, cereri, favorite și admin sunt păstrate.
+
+## Verificări efectuate înainte de arhivare
+- `node --check` pentru `script.js` și `server.js`;
+- verificare structurală HTML și a formularelor/ID-urilor;
+- verificare că toate asset-urile locale referite există;
+- verificare că meniul, căutarea, categoriile și acțiunile principale au handler-ele necesare în JavaScript;
+- PostgreSQL, autentificarea și API-urile rămân în `server.js` și nu sunt înlocuite de localStorage.

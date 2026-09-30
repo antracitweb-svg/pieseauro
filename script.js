@@ -220,7 +220,14 @@ $('#menuClose')?.addEventListener('click',closeMobileMenu);
 $('#saveSearchBtn')?.addEventListener('click',async()=>{if(!(await ensureUser()))return;const saved=JSON.parse(localStorage.getItem('autopiese_saved_searches')||'[]');const item={q:$('#searchInput').value.trim(),make:$('#make').value,model:$('#model').value,year:$('#year').value,condition:$('#condition').value,county:$('#county').value,created_at:new Date().toISOString()}; if(!item.q&&!item.make&&!item.model&&!item.year&&!item.condition&&!item.county){toast('Completează cel puțin un criteriu de căutare.');return;} saved.unshift(item);localStorage.setItem('autopiese_saved_searches',JSON.stringify(saved.slice(0,20)));toast('Căutarea a fost salvată.');});
 $('#clearSearch')?.addEventListener('click',()=>{['#searchInput','#make','#model','#year','#condition','#county','#filterType','#filterCondition','#maxPrice','#filterCategory','#filterSeller','#sortListings'].forEach(id=>{const e=$(id);if(e)e.value=id==='#filterType'?'all':id==='#sortListings'?'relevance':''});if($('#withDelivery'))$('#withDelivery').checked=false;$('.chip.active')?.classList.remove('active');document.querySelector('.chip[data-type="all"]')?.classList.add('active');renderListings();});
 ['#filterCategory','#filterSeller','#sortListings'].forEach(id=>$(id)?.addEventListener('change',renderListings));
-$('#searchInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();location.hash='anunturi';renderListings();}});
+
+// Navigation helpers for the redesigned homepage.
+$$('[data-search-section]').forEach(b=>b.addEventListener('click',()=>{location.hash='anunturi';renderListings();document.getElementById('anunturi')?.scrollIntoView({behavior:'smooth',block:'start'});}));
+$$('[data-type-action]').forEach(b=>b.addEventListener('click',()=>{location.hash='anunturi';const chip=$('.chip[data-type="dezmembrari"]');$$('[data-type]').forEach(x=>x.classList.remove('active'));if(chip)chip.classList.add('active');renderListings();document.getElementById('anunturi')?.scrollIntoView({behavior:'smooth',block:'start'});}));
+$$('[data-demo-detail]').forEach(b=>b.addEventListener('click',()=>openDetail({id:'demo-donor',type:'dezmembrari',title:'BMW Seria 3 E90 320d pentru dezmembrare',price:0,condition:'Second-hand',make:'BMW',model:'Seria 3',year:'2008',county:'Cluj',category:'Dezmembrări',delivery:true,description:'Vehicul donator pentru piese. Motor, cutie, faruri, interior și elemente de caroserie disponibile.',icon:'♻️'})));
+$$('.seller button').forEach(b=>b.addEventListener('click',()=>toast('Profilurile de vânzător vor fi disponibile în modulul de profiluri.')));
+
+$('#searchInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();location.hash='anunturi';renderListings();document.getElementById('anunturi')?.scrollIntoView({behavior:'smooth',block:'start'});}});
 
 
 fillYearSelects(); loadCatalog(); loadUser(); syncListings(); renderListings();
