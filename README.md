@@ -8,6 +8,7 @@ Totul într-un singur folder, fără subfoldere obligatorii:
 - `index.html`, `style.css`, `script.js` – frontend-ul
 - `package.json`, `render.yaml` – configurare Node și Render
 - `assets/` (opțional) – imagini, dacă le adaugi mai târziu
+- `vehicles.json` (opțional) – snapshot local al catalogului auto; serverul îl creează automat după prima sincronizare dacă are acces la sursa VehiclesDB
 
 Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și conținutul din `assets/`. `server.js` și `package.json` nu pot fi descărcate.
 
@@ -27,7 +28,8 @@ Fără `RESEND_*`, „Ai uitat parola?” răspunde că emailul nu este configur
 - Conturi: înregistrare, login cu email sau nickname, sesiuni revocabile, resetare parolă, schimbare email, până la 4 telefoane (cu marcaj WhatsApp).
 - Anunțuri: publicare (intră în moderare), căutare multi-cuvânt, filtre, „Anunțurile mele”, favorite sincronizate pe cont, până la 8 poze per anunț cu comprimare automată și galerie responsive pe telefon/tabletă/laptop/desktop.
 - Cereri de piese, raportări, panou admin cu jurnal de activitate.
-- Catalog mărci/modele din VehiclesDB (CC-BY 4.0, atribuire vizibilă în interfață), cu fallback local.
+- Catalog mărci/modele din VehiclesDB (CC-BY 4.0), cu sincronizare automată și cache local în același folder. Sunt încercate două surse ale catalogului înainte de fallback.
+- Poze pentru anunțuri: până la 8 imagini, comprimate înainte de salvare și păstrate în baza de date.
 - SEO: pagini `/piese/<id>-<slug>`, date structurate Product, `robots.txt`, `sitemap.xml`.
 
 ## Securitate
