@@ -167,10 +167,11 @@ function renderAccountTool(view){
   };
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
   $('#accountToolTitle').textContent=d.title;
-  $('#accountToolText').textContent=d.text;
-  const b=$('#accountToolAction');
-  if(d.action){b.classList.remove('hidden');b.textContent=d.label;b.dataset.action=d.action;}else{b.classList.add('hidden');b.removeAttribute('data-action');}
-  $('#accountToolText2').textContent=d.text;
+  $('#accountToolSub').textContent=d.text;
+  const content=$('#accountToolContent');
+  if(content){
+    content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
+  }
 }
 
 /* ---------- selecturi / catalog ---------- */

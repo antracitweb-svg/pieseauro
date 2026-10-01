@@ -57,7 +57,7 @@ app.use(helmet({
   imgSrc:["'self'","data:"],connectSrc:["'self'"],fontSrc:["'self'","data:"],objectSrc:["'none'"],
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
-app.use(express.json({limit:'100kb'}));
+app.use(express.json({limit:'6mb'}));
 app.use(cookieParser());
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control',f==='index.html'?'no-cache':'public, max-age=300');res.sendFile(path.join(__dirname,f));});
