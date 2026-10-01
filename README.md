@@ -3,11 +3,13 @@
 Marketplace de piese auto (Node.js + Express + PostgreSQL), găzduit pe Render.
 
 ## Structura proiectului
+Totul într-un singur folder, fără subfoldere obligatorii:
 - `server.js` – backend (API, autentificare, admin, SEO)
-- `public/` – tot ce e servit public: `index.html`, `style.css`, `script.js`
-- `render.yaml` – configurarea serviciului Render
+- `index.html`, `style.css`, `script.js` – frontend-ul
+- `package.json`, `render.yaml` – configurare Node și Render
+- `assets/` (opțional) – imagini, dacă le adaugi mai târziu
 
-Doar conținutul din `public/` este accesibil din browser. `server.js`, `package.json` și restul rămân private.
+Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și conținutul din `assets/`. `server.js` și `package.json` nu pot fi descărcate.
 
 ## Variabile de mediu (Render → Environment)
 | Variabilă | Obligatorie | Rol |
@@ -34,4 +36,3 @@ Fără `RESEND_*`, „Ai uitat parola?” răspunde că emailul nu este configur
 
 ## Deploy
 Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în repository.
-Atenție la structură: `index.html`, `style.css` și `script.js` trebuie să fie în `public/`.

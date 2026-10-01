@@ -9,7 +9,8 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV==='production' || !!process.env.RENDER;
-const PUBLIC_DIR = path.join(__dirname,'public');
+const PUBLIC_FILES = ['index.html','style.css','script.js'];
+const ASSETS_DIR = path.join(__dirname,'assets');
 const pool = process.env.DATABASE_URL ? new Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}}) : null;
 const CATALOG_URL = process.env.VEHICLE_CATALOG_URL || 'https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@latest/dist/vehicles.json';
 let catalogCache = null;
@@ -44,7 +45,9 @@ app.param('id',(req,res,next,v)=>/^\d{1,10}$/.test(v)?next():res.status(400).jso
 app.use(helmet({contentSecurityPolicy:false, crossOriginEmbedderPolicy:false}));
 app.use(express.json({limit:'100kb'}));
 app.use(cookieParser());
-app.use(express.static(PUBLIC_DIR,{index:false,dotfiles:'ignore'}));
+// Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
+for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>res.sendFile(path.join(__dirname,f)));
+app.use('/assets',express.static(ASSETS_DIR,{index:false,dotfiles:'ignore'}));
 
 const schema = `
 CREATE TABLE IF NOT EXISTS users (
@@ -489,7 +492,7 @@ function escapeXml(s){return String(s).replace(/[<>&'\"]/g,c=>({'<':'&lt;','>':'
 app.get('/piese/:idSlug',async(req,res,next)=>{if(!pool)return next();const id=Number(String(req.params.idSlug).split('-')[0]);if(!id)return next();try{const r=await pool.query("SELECT l.*,u.name seller_name,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[id]);if(!r.rowCount)return next();const x=r.rows[0];const canonical=`${req.protocol}://${req.get('host')}/piese/${x.id}-${slugify(x.title)}`;const product={"@context":"https://schema.org","@type":"Product",name:x.title,description:x.description||x.title,sku:x.oem||String(x.id),brand:x.make?{"@type":"Brand",name:x.make}:undefined,offers:{"@type":"Offer",price:Number(x.price||0),priceCurrency:'RON',availability:'https://schema.org/InStock',url:canonical}};const clean=JSON.stringify(product).replace(/</g,'\\u003c');res.type('html').send(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(x.title)} | AutoPiese</title><meta name="description" content="${escapeHtml((x.description||x.title).slice(0,155))}"><link rel="canonical" href="${escapeHtml(canonical)}"><script type="application/ld+json">${clean}</script></head><body><main style="font-family:Arial,sans-serif;max-width:900px;margin:40px auto;padding:20px"><h1>${escapeHtml(x.title)}</h1><p><b>${escapeHtml(x.make||'')} ${escapeHtml(x.model||'')}</b> ${escapeHtml(x.year||'')}</p><p>${escapeHtml(x.description||'')}</p><h2>${Number(x.price||0)>0?new Intl.NumberFormat('ro-RO').format(Number(x.price))+' lei':'La cerere'}</h2><p>Vânzător: ${escapeHtml(x.seller_name||'')}</p><p><a href="/">Înapoi la AutoPiese</a></p></main></body></html>`);}catch{return next();}});
 
 app.use('/api',(req,res)=>res.status(404).json({error:'NOT_FOUND'}));
-app.get('*',(req,res)=>res.sendFile(path.join(PUBLIC_DIR,'index.html')));
+app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'index.html')));
 app.use((err,req,res,next)=>{console.error('Unhandled error:',err);if(res.headersSent)return next(err);if(err&&err.type==='entity.too.large')return res.status(413).json({error:'DATE_INVALIDE'});if(err instanceof SyntaxError&&err.status===400)return res.status(400).json({error:'DATE_INVALIDE'});res.status(500).json({error:'SERVER_ERROR'});});
 process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
 (async()=>{try{if(pool)await dbReady();app.listen(PORT,()=>console.log(`PieseAuto running on ${PORT}`));}catch(e){console.error(e);process.exit(1);}})();
