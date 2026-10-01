@@ -54,7 +54,7 @@ app.use(helmet({
   imgSrc:["'self'","data:"],connectSrc:["'self'"],fontSrc:["'self'","data:"],objectSrc:["'none'"],
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
-app.use(express.json({limit:'6mb'}));
+app.use(express.json({limit:'8mb'}));
 app.use(cookieParser());
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control',f==='index.html'?'no-cache':'public, max-age=300');res.sendFile(path.join(__dirname,f));});
@@ -458,12 +458,14 @@ app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
 const LISTING_SELECT="SELECT l.*,COALESCE(u.nickname,u.name) seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id";
-const CATEGORIES=['Motor','Transmisie','Frâne','Iluminare','Caroserie','Suspensie','Roți','Electrică','Interior','Climatizare','Evacuare','Filtre','Altele'];
+const CATEGORIES=['Accesorii auto','Accesorii roți','Car audio','Caroserie','Climatizare','Dezmembrări auto','Direcție','Diverse','Electrică & Electronică Auto','Evacuare','Faruri stopuri lumini','Filtre auto','Frâne','Interioare auto','Întreținere auto','Jante & Anvelope','Navigație GPS','Piese motoare','Pompe și injectoare','Punte și rulmenți','Răcire','Scule auto','Suspensie','Transmisie','Tuning','Turbo','Ulei auto','Xenon'];
 const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
 const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèê','aaisstteee')`;
 app.get('/api/listings/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query("SELECT l.* FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 200",[req.user.id]);
- res.json({listings:r.rows});
+ const limit=Math.min(60,Math.max(30,Number(req.query.limit)||30)), offset=Math.max(0,Number(req.query.offset)||0);
+ const total=(await pool.query('SELECT COUNT(*)::int n FROM listings WHERE user_id=$1',[req.user.id])).rows[0].n;
+ const r=await pool.query('SELECT * FROM listings WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3',[req.user.id,limit,offset]);
+ res.json({listings:r.rows,total,limit,offset});
 });
 app.get('/api/favorites',auth,requireDb,async(req,res)=>{
  const r=await pool.query("SELECT listing_id FROM favorites WHERE user_id=$1",[req.user.id]);
@@ -535,6 +537,28 @@ app.post('/api/listings',auth,requireDb,async(req,res)=>{
  const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending') RETURNING *`,
   [req.user.id,x.type,x.title.trim(),price,clip(x.condition,30),clip(x.make,60),clip(x.model,80),clip(x.generation,80),clip(x.year,10),clip(x.engine,80),clip(x.fuel,30),clip(x.vehicle_id,120),clip(x.seller_type,30),Math.min(9999,Math.max(1,Number(x.quantity)||1)),!!x.negotiable,clip(x.county,60),clip(x.category,60),clip(x.oem,60),!!x.delivery,String(x.description||'').slice(0,5000),images]);
  res.status(201).json({listing:r.rows[0]});
+});
+app.patch('/api/listings/:id',auth,requireDb,async(req,res)=>{
+ const x=req.body||{}; const id=Number(req.params.id); if(!Number.isInteger(id)||id<1)return res.status(400).json({error:'DATE_INVALIDE'});
+ const own=await pool.query('SELECT id,type FROM listings WHERE id=$1 AND user_id=$2',[id,req.user.id]); if(!own.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ if(own.rows[0].type!=='piesa'||typeof x.title!=='string'||x.title.trim().length<3||x.title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});
+ if(!['Nouă','Second-hand'].includes(x.condition))return res.status(400).json({error:'STARE_INVALIDA'});
+ const price=Number(x.price)||0; if(price<0||price>10000000)return res.status(400).json({error:'DATE_INVALIDE'});
+ if(x.category&&!CATEGORIES.includes(x.category))return res.status(400).json({error:'DATE_INVALIDE'});
+ const images=Array.isArray(x.images)?x.images.filter(v=>typeof v==='string') : [];
+ if(images.length>8)return res.status(400).json({error:'PREA_MULTE_POZE'});
+ const imageRe=/^data:image\/(?:jpeg|jpg|webp|png);base64,[A-Za-z0-9+/=]+$/;
+ if(images.some(v=>v.length>500000||!imageRe.test(v))||images.join('').length>4500000)return res.status(400).json({error:'POZE_INVALIDE'});
+ const r=await pool.query(`UPDATE listings SET title=$1,price=$2,condition=$3,make=$4,model=$5,year=$6,oem=$7,county=$8,category=$9,description=$10,delivery=$11,negotiable=$12,images=$13,status='pending' WHERE id=$14 AND user_id=$15 RETURNING *`,[x.title.trim(),price,clip(x.condition,30),clip(x.make,60),clip(x.model,80),clip(x.year,10),clip(x.oem,60),clip(x.county,60),clip(x.category,60),String(x.description||'').slice(0,5000),!!x.delivery,!!x.negotiable,images,id,req.user.id]);
+ res.json({listing:r.rows[0]});
+});
+app.post('/api/listings/:id/up',auth,requireDb,async(req,res)=>{
+ const r=await pool.query('SELECT id FROM listings WHERE id=$1 AND user_id=$2',[Number(req.params.id),req.user.id]); if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ res.json({ok:true,message:'Funcția UP este pregătită și va putea fi activată când stabilim sistemul de promovare.'});
+});
+app.post('/api/listings/:id/promote',auth,requireDb,async(req,res)=>{
+ const r=await pool.query('SELECT id FROM listings WHERE id=$1 AND user_id=$2',[Number(req.params.id),req.user.id]); if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ res.json({ok:true,message:'Promovarea va fi disponibilă când activăm pachetele de promovare.'});
 });
 app.get('/api/requests',requireDb,async(req,res)=>{
  const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.description,r.created_at,COALESCE(u.nickname,u.name) user_name FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
