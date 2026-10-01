@@ -50,3 +50,11 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Pozele sunt salvate în PostgreSQL în coloana `listings.images`, fără folder nou în proiect.
 - Prima poză apare în cardul anunțului, iar pagina de detaliu afișează galerie cu miniaturi.
 - Interfața folosește grile diferite pentru desktop/laptop, tabletă și telefon.
+
+## V26 — Contul meu și fluxuri noi
+- Butoanele din Contul meu pentru oferte, comenzi, mesaje, notificări și financiar au rute și interfețe funcționale.
+- Backend PostgreSQL pentru oferte, comenzi, mesaje, notificări, portofel de credite, tranzacții și facturi.
+- Acceptarea unei oferte creează automat o comandă și actualizează cererea.
+- Notificări pentru oferte, comenzi și mesaje.
+- Săgețile din secțiunile Contului sunt aliniate la dreapta și se rotesc la deschidere.
+- Formularul „Trimite o ofertă” este disponibil din cererile publice.

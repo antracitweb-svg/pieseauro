@@ -110,6 +110,40 @@ CREATE TABLE IF NOT EXISTS user_phones (
 CREATE TABLE IF NOT EXISTS email_change_requests (
  id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL,
  token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS offers (
+ id SERIAL PRIMARY KEY, request_id INTEGER REFERENCES part_requests(id) ON DELETE CASCADE,
+ seller_id INTEGER REFERENCES users(id) ON DELETE SET NULL, buyer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ price NUMERIC(12,2) NOT NULL DEFAULT 0, message TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS orders (
+ id SERIAL PRIMARY KEY, offer_id INTEGER UNIQUE REFERENCES offers(id) ON DELETE SET NULL,
+ buyer_id INTEGER REFERENCES users(id) ON DELETE SET NULL, seller_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ status TEXT NOT NULL DEFAULT 'new', total NUMERIC(12,2) NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS messages (
+ id SERIAL PRIMARY KEY, sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ recipient_id INTEGER REFERENCES users(id) ON DELETE SET NULL, subject TEXT DEFAULT '', body TEXT NOT NULL,
+ read_at TIMESTAMPTZ, archived BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS notifications (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT DEFAULT '', link TEXT DEFAULT '', read_at TIMESTAMPTZ,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS wallets (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, balance INTEGER NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS credit_transactions (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+ amount INTEGER NOT NULL, reason TEXT NOT NULL, reference TEXT DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS invoices (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+ order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL, number TEXT UNIQUE NOT NULL,
+ amount NUMERIC(12,2) NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'issued', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );`;
 
 async function dbReady(){
@@ -128,7 +162,14 @@ async function dbReady(){
   'CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_unique_idx ON users(nickname) WHERE nickname IS NOT NULL',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE',
   'CREATE TABLE IF NOT EXISTS user_phones (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, phone TEXT NOT NULL, is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE, verified BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id, phone))',
-  'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)'
+  'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)',
+  "CREATE TABLE IF NOT EXISTS offers (id SERIAL PRIMARY KEY, request_id INTEGER REFERENCES part_requests(id) ON DELETE CASCADE, seller_id INTEGER REFERENCES users(id) ON DELETE SET NULL, buyer_id INTEGER REFERENCES users(id) ON DELETE SET NULL, price NUMERIC(12,2) NOT NULL DEFAULT 0, message TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  "CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, offer_id INTEGER UNIQUE REFERENCES offers(id) ON DELETE SET NULL, buyer_id INTEGER REFERENCES users(id) ON DELETE SET NULL, seller_id INTEGER REFERENCES users(id) ON DELETE SET NULL, status TEXT NOT NULL DEFAULT 'new', total NUMERIC(12,2) NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL, recipient_id INTEGER REFERENCES users(id) ON DELETE SET NULL, subject TEXT DEFAULT '', body TEXT NOT NULL, read_at TIMESTAMPTZ, archived BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  "CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT DEFAULT '', link TEXT DEFAULT '', read_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  "CREATE TABLE IF NOT EXISTS wallets (user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, balance INTEGER NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  "CREATE TABLE IF NOT EXISTS credit_transactions (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, reason TEXT NOT NULL, reference TEXT DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  "CREATE TABLE IF NOT EXISTS invoices (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL, number TEXT UNIQUE NOT NULL, amount NUMERIC(12,2) NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'issued', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
  ];
  migrations.push(
   'CREATE INDEX IF NOT EXISTS listings_status_created_idx ON listings(status,created_at DESC)',
@@ -137,7 +178,13 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS listings_make_model_idx ON listings(make,model)',
   'CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)',
   'CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at)',
-  'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)'
+  'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS offers_buyer_idx ON offers(buyer_id,status,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS offers_seller_idx ON offers(seller_id,status,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS credit_transactions_user_idx ON credit_transactions(user_id,created_at DESC)'
  );
  for(const q of migrations) await pool.query(q);
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
@@ -553,6 +600,22 @@ app.delete('/api/requests/:id',auth,requireDb,async(req,res)=>{
 });
 app.post('/api/requests',auth,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000)]);res.status(201).json({request:r.rows[0]});});
 
+/* ---------- oferte, comenzi, mesagerie, notificări și financiar ---------- */
+async function notifyUser(userId,kind,title,body='',link=''){if(!userId)return;await pool.query('INSERT INTO notifications(user_id,kind,title,body,link) VALUES($1,$2,$3,$4,$5)',[userId,kind,title,body,link]);}
+app.get('/api/offers/incoming',auth,requireDb,async(req,res)=>{const r=await pool.query(`SELECT o.*,r.title request_title,r.make,r.model,r.year,COALESCE(u.nickname,u.name) buyer_name FROM offers o JOIN part_requests r ON r.id=o.request_id LEFT JOIN users u ON u.id=o.buyer_id WHERE o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 300`,[req.user.id]);res.json({offers:r.rows});});
+app.get('/api/offers/received',auth,requireDb,async(req,res)=>{const r=await pool.query(`SELECT o.*,r.title request_title,r.make,r.model,r.year,COALESCE(u.nickname,u.name) seller_name FROM offers o JOIN part_requests r ON r.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE o.buyer_id=$1 ORDER BY o.created_at DESC LIMIT 300`,[req.user.id]);res.json({offers:r.rows});});
+app.post('/api/offers',auth,requireDb,async(req,res)=>{const {request_id,price,message}=req.body||{},n=Number(price);if(!Number.isInteger(Number(request_id))||!Number.isFinite(n)||n<0||n>999999999)return res.status(400).json({error:'DATE_INVALIDE'});const q=await pool.query("SELECT id,user_id,title,status FROM part_requests WHERE id=$1",[request_id]);if(!q.rowCount||q.rows[0].status!=='open')return res.status(404).json({error:'NOT_FOUND'});if(Number(q.rows[0].user_id)===Number(req.user.id))return res.status(400).json({error:'DATE_INVALIDE'});const exists=await pool.query("SELECT id FROM offers WHERE request_id=$1 AND seller_id=$2 AND status='pending'",[request_id,req.user.id]);if(exists.rowCount)return res.status(409).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO offers(request_id,seller_id,buyer_id,price,message) VALUES($1,$2,$3,$4,$5) RETURNING *',[request_id,req.user.id,q.rows[0].user_id,n,String(message||'').slice(0,2000)]);await notifyUser(q.rows[0].user_id,'offer','Ofertă nouă',`Ai primit o ofertă pentru „${q.rows[0].title}”.`,'#/offers-received');res.status(201).json({offer:r.rows[0]});});
+app.patch('/api/offers/:id',auth,requireDb,async(req,res)=>{const status=String(req.body?.status||'');if(!['accepted','rejected','cancelled'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const q=await pool.query('SELECT * FROM offers WHERE id=$1',[req.params.id]);if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});const o=q.rows[0];if(Number(o.buyer_id)!==Number(req.user.id)&&Number(o.seller_id)!==Number(req.user.id))return res.status(403).json({error:'AUTH_REQUIRED'});if(status==='accepted'&&Number(o.buyer_id)===Number(req.user.id)){const c=await pool.query('SELECT id FROM orders WHERE offer_id=$1',[o.id]);if(c.rowCount)return res.json({offer:o,order_id:c.rows[0].id});const up=await pool.query("UPDATE offers SET status='accepted',updated_at=NOW() WHERE id=$1 RETURNING *",[o.id]);await pool.query("UPDATE offers SET status='rejected',updated_at=NOW() WHERE request_id=$1 AND id<>$2 AND status='pending'",[o.request_id,o.id]);await pool.query("UPDATE part_requests SET status='matched' WHERE id=$1",[o.request_id]);const ord=await pool.query('INSERT INTO orders(offer_id,buyer_id,seller_id,total) VALUES($1,$2,$3,$4) RETURNING *',[o.id,o.buyer_id,o.seller_id,o.price]);await notifyUser(o.seller_id,'order','Ofertă acceptată',`Oferta ta a fost acceptată. Comanda #${ord.rows[0].id}.`,'#/orders-seller');return res.json({offer:up.rows[0],order_id:ord.rows[0].id});}if(status==='rejected'&&Number(o.buyer_id)!==Number(req.user.id))return res.status(403).json({error:'AUTH_REQUIRED'});const r=await pool.query('UPDATE offers SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *',[status,o.id]);const other=Number(req.user.id)===Number(o.buyer_id)?o.seller_id:o.buyer_id;await notifyUser(other,'offer',status==='rejected'?'Oferta a fost respinsă':'Oferta a fost anulată',`Oferta #${o.id} a fost actualizată.`,'#/offers-received');res.json({offer:r.rows[0]});});
+app.get('/api/orders',auth,requireDb,async(req,res)=>{const role=req.query.role==='seller'?'seller':'buyer',field=role==='seller'?'seller_id':'buyer_id';const other=role==='seller'?'buyer_id':'seller_id';const r=await pool.query(`SELECT o.*,of.price offer_price,r.title request_title,COALESCE(u.nickname,u.name) other_name FROM orders o LEFT JOIN offers of ON of.id=o.offer_id LEFT JOIN part_requests r ON r.id=of.request_id LEFT JOIN users u ON u.id=o.${other} WHERE o.${field}=$1 ORDER BY o.created_at DESC LIMIT 300`,[req.user.id]);res.json({orders:r.rows});});
+app.patch('/api/orders/:id',auth,requireDb,async(req,res)=>{const status=String(req.body?.status||'');if(!['new','preparing','shipped','completed','cancelled'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const q=await pool.query('SELECT * FROM orders WHERE id=$1',[req.params.id]);if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});const o=q.rows[0];if(Number(o.buyer_id)!==Number(req.user.id)&&Number(o.seller_id)!==Number(req.user.id))return res.status(403).json({error:'AUTH_REQUIRED'});const r=await pool.query('UPDATE orders SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *',[status,o.id]);const other=Number(req.user.id)===Number(o.buyer_id)?o.seller_id:o.buyer_id;const viewerRole=Number(req.user.id)===Number(o.seller_id)?'seller':'buyer';await notifyUser(other,'order','Comanda actualizată',`Comanda #${o.id} este acum „${status}”.`,viewerRole==='seller'?'#/orders':'#/orders-seller');res.json({order:r.rows[0]});});
+app.get('/api/messages',auth,requireDb,async(req,res)=>{const r=await pool.query(`SELECT m.*,COALESCE(s.nickname,s.name) sender_name,COALESCE(t.nickname,t.name) recipient_name FROM messages m LEFT JOIN users s ON s.id=m.sender_id LEFT JOIN users t ON t.id=m.recipient_id WHERE m.sender_id=$1 OR m.recipient_id=$1 ORDER BY m.created_at DESC LIMIT 300`,[req.user.id]);res.json({messages:r.rows});});
+app.post('/api/messages',auth,requireDb,async(req,res)=>{const to=Number(req.body?.recipient_id),body=String(req.body?.body||'').trim(),subject=String(req.body?.subject||'').trim();if(!Number.isInteger(to)||to===Number(req.user.id)||!body||body.length>5000)return res.status(400).json({error:'DATE_INVALIDE'});const u=await pool.query("SELECT id FROM users WHERE id=$1 AND status='active'",[to]);if(!u.rowCount)return res.status(404).json({error:'NOT_FOUND'});const r=await pool.query('INSERT INTO messages(sender_id,recipient_id,subject,body) VALUES($1,$2,$3,$4) RETURNING *',[req.user.id,to,subject.slice(0,150),body]);await notifyUser(to,'message','Mesaj nou',`Ai primit un mesaj de la ${req.user.name||'un utilizator'}.`,'#/messages');res.status(201).json({message:r.rows[0]});});
+app.patch('/api/messages/:id/read',auth,requireDb,async(req,res)=>{const r=await pool.query('UPDATE messages SET read_at=COALESCE(read_at,NOW()) WHERE id=$1 AND recipient_id=$2 RETURNING *',[req.params.id,req.user.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});res.json({message:r.rows[0]});});
+app.get('/api/notifications',auth,requireDb,async(req,res)=>{const r=await pool.query('SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 300',[req.user.id]);res.json({notifications:r.rows});});
+app.patch('/api/notifications/:id/read',auth,requireDb,async(req,res)=>{const r=await pool.query('UPDATE notifications SET read_at=COALESCE(read_at,NOW()) WHERE id=$1 AND user_id=$2 RETURNING *',[req.params.id,req.user.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});res.json({notification:r.rows[0]});});
+app.get('/api/credits',auth,requireDb,async(req,res)=>{await pool.query('INSERT INTO wallets(user_id) VALUES($1) ON CONFLICT(user_id) DO NOTHING',[req.user.id]);const w=await pool.query('SELECT * FROM wallets WHERE user_id=$1',[req.user.id]);const t=await pool.query('SELECT * FROM credit_transactions WHERE user_id=$1 ORDER BY created_at DESC LIMIT 300',[req.user.id]);res.json({balance:w.rows[0].balance,transactions:t.rows});});
+app.get('/api/transactions',auth,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,amount,reason,reference,created_at FROM credit_transactions WHERE user_id=$1 ORDER BY created_at DESC LIMIT 300',[req.user.id]);res.json({transactions:r.rows});});
+app.get('/api/invoices',auth,requireDb,async(req,res)=>{const r=await pool.query('SELECT * FROM invoices WHERE user_id=$1 ORDER BY created_at DESC LIMIT 300',[req.user.id]);res.json({invoices:r.rows});});
 app.get('/api/admin/overview',auth,admin,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'")},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.get('/api/admin/listings',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.*,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
 app.patch('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['pending','approved','rejected','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE listings SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_listing','listing',req.params.id,status]);res.json({listing:r.rows[0]});});

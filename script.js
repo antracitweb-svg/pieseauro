@@ -21,8 +21,8 @@ const CATEGORIES = [['Motor','⚙️'],['Transmisie','🔧'],['Frâne','🛑'],[
 const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],rejected:['Respins','bad'],blocked:['Blocat','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
-const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
-const AUTH_ROUTES = new Set(['cont','cerere','vinde','settings','admin']);
+const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','offers-incoming':'page-account-tool','offers-received':'page-account-tool','orders-seller':'page-account-tool',orders:'page-account-tool',messages:'page-account-tool',notifications:'page-account-tool',credits:'page-account-tool',transactions:'page-account-tool',invoices:'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
+const AUTH_ROUTES = new Set(['cont','cerere','vinde','settings','admin','offers-incoming','offers-received','orders-seller','orders','messages','notifications','credits','transactions','invoices']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',maxPrice:'maxPrice',filterSeller:'seller_type',sortListings:'sort'};
 
 /* ---------- utilitare ---------- */
@@ -84,6 +84,7 @@ function route(){
   else if(name==='stores') loadStores(params.get('t')==='parks');
   else if(name==='saved') renderSaved();
   else if(name==='cont') renderAccount();
+  else if(['offers-incoming','offers-received','orders-seller','orders','messages','notifications','credits','transactions','invoices'].includes(name)) safe(()=>loadAccountTool(name))();
   else if(name==='settings') safe(loadSettings)();
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
   else if(name==='admin') safe(loadAdmin)();
@@ -363,7 +364,7 @@ async function loadRequests(mine){
       <b>${esc([x.make,x.model,x.year].filter(Boolean).join(' · ')||'Orice mașină')}</b><h3>${esc(x.title)}</h3>
       ${x.description?`<p>${esc(x.description.slice(0,160))}${x.description.length>160?'…':''}</p>`:''}
       <p class="muted">${esc(mine ? (x.status==='open'?'Deschisă':x.status) : (x.user_name||'Cumpărător'))} · ${fmtDate(x.created_at)}</p>
-      <div class="contact-slot">${mine?`<button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:`<button class="btn ghost small" data-req-contact="${x.id}">Contactează</button>`}</div></article>`).join('');
+      <div class="contact-slot">${mine?`<button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:`<button class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button><button class="btn ghost small" data-req-contact="${x.id}">Contactează</button>`}</div></article>`).join('');
     $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -479,6 +480,7 @@ async function resetPasswordSubmit(e){
 }
 
 /* ---------- formulare ---------- */
+async function submitOffer(e){e.preventDefault();const msg=$('#offerMessageStatus');setMsg(msg,'');try{await api('/api/offers',{method:'POST',body:JSON.stringify({request_id:Number($('#offerRequestId').value),price:Number($('#offerPrice').value),message:$('#offerMessage').value.trim()})});$('#offerModal').classList.add('hidden');toast('Oferta a fost trimisă.');}catch(err){setMsg(msg,err.message,'error');}}
 async function submitRequest(e){
   e.preventDefault(); const msg = $('#requestMessage'); setMsg(msg,'');
   const year = $('#reqYear').value.trim();
@@ -591,12 +593,25 @@ function doAction(a){
   else if(a==='admin') navigate('admin');
 }
 function accountAction(a){
-  if(a==='settings') navigate('settings');
-  else if(a==='listings') navigate('rezultate?mode=mine');
-  else if(a==='favorites') navigate('rezultate?mode=fav');
-  else if(a==='requests') navigate('requests?t=mine');
-  else if(a==='saved') navigate('saved');
+  const map={settings:'settings',listings:'rezultate?mode=mine',favorites:'rezultate?mode=fav',requests:'requests?t=mine',saved:'saved',offers:'offers-incoming','orders-seller':'orders-seller','offers-received':'offers-received',orders:'orders',messages:'messages',notifications:'notifications',credits:'credits',transactions:'transactions',invoices:'invoices'};
+  if(map[a]) navigate(map[a]);
 }
+
+function accountToolMeta(name){
+ const m={'offers-incoming':['VÂNZĂTOR','Oferte la cereri','Vezi și gestionează ofertele primite pentru cererile tale.'],'offers-received':['CUMPĂRĂTOR','Ofertele primite','Ofertele trimise de vânzători pentru cererile tale.'],'orders-seller':['VÂNZĂTOR','Comenzi din oferte','Comenzile rezultate din ofertele acceptate.'],orders:['CUMPĂRĂTOR','Comenzile mele','Urmărește comenzile create din ofertele acceptate.'],messages:['MESAGERIE','Mesaje','Mesaje primite și trimise.'],notifications:['UTILE','Notificări','Alerte și actualizări despre contul tău.'],credits:['FINANCIAR','Credite','Soldul de credite și istoricul lor.'],transactions:['FINANCIAR','Tranzacții','Istoricul operațiunilor financiare ale contului.'],invoices:['FINANCIAR','Facturi','Facturile asociate contului.']}; return m[name]||['CONT','Secțiune cont',''];
+}
+function renderAccountToolShell(name){const [e,t,sub]=accountToolMeta(name);$('#accountToolEyebrow').textContent=e;$('#accountToolTitle').textContent=t;$('#accountToolSub').textContent=sub;$('#accountToolContent').innerHTML='<div class="empty">Se încarcă…</div>';}
+async function loadAccountTool(name){
+ renderAccountToolShell(name); const box=$('#accountToolContent');
+ if(name==='offers-incoming'||name==='offers-received'){const r=await api('/api/offers/'+(name==='offers-incoming'?'incoming':'received'));const mine=name==='offers-incoming';box.innerHTML=r.offers.length?r.offers.map(o=>`<article class="info-card account-tool-card"><span class="badge">${esc(o.status)}</span><h3>${esc(o.request_title)}</h3><p>${esc([o.make,o.model,o.year].filter(Boolean).join(' · ')||'Orice mașină')}</p><p><b>${money(o.price)}</b> · ${esc(o.seller_name||o.buyer_name||'Utilizator')}</p>${o.message?`<p>${esc(o.message)}</p>`:''}<small>${fmtDate(o.created_at)}</small><div class="tool-actions">${!mine&&o.status==='pending'?`<button class="btn primary small" data-offer-status="${o.id}" data-status="accepted">Acceptă oferta</button><button class="btn ghost small" data-offer-status="${o.id}" data-status="rejected">Respinge</button>`:''}${mine&&o.status==='pending'?`<button class="btn danger small" data-offer-status="${o.id}" data-status="cancelled">Retrage</button>`:''}</div></article>`).join(''):'<div class="empty">Nu există oferte aici.</div>';}
+ else if(name==='orders-seller'||name==='orders'){const r=await api('/api/orders?role='+(name==='orders-seller'?'seller':'buyer'));box.innerHTML=r.orders.length?r.orders.map(o=>`<article class="info-card account-tool-card"><span class="badge">${esc(o.status)}</span><h3>Comanda #${o.id}</h3><p>${esc(o.request_title||'Comandă')}</p><p><b>${money(o.total)}</b> · ${esc(o.other_name||'Utilizator')}</p><small>${fmtDate(o.created_at)}</small><div class="tool-actions">${['new','preparing','shipped'].includes(o.status)&&name==='orders-seller'?`<button class="btn ghost small" data-order-status="${o.id}" data-status="${o.status==='new'?'preparing':'shipped'}">${o.status==='new'?'În pregătire':'Marchează expediată'}</button>`:''}${o.status==='shipped'&&name==='orders'?`<button class="btn primary small" data-order-status="${o.id}" data-status="completed">Confirmă primirea</button>`:''}</div></article>`).join(''):'<div class="empty">Nu există comenzi.</div>';}
+ else if(name==='messages'){const r=await api('/api/messages');box.innerHTML=`<div class="clean-form"><h3>Mesaje</h3><p class="form-note">Mesajele primite și trimise apar aici.</p></div>`+(r.messages.length?r.messages.map(m=>`<article class="info-card account-tool-card"><b>${m.sender_id===currentUser.id?'Trimis către':'Primit de la'} ${esc(m.sender_id===currentUser.id?m.recipient_name:m.sender_name)}</b><p>${esc(m.subject||'Fără subiect')}</p><p>${esc(m.body)}</p><small>${fmtDate(m.created_at)} ${m.read_at?'· citit':''}</small>${m.recipient_id===currentUser.id&&!m.read_at?`<button class="btn ghost small" data-message-read="${m.id}">Marchează citit</button>`:''}</article>`).join(''):'<div class="empty">Nu ai mesaje.</div>');}
+ else if(name==='notifications'){const r=await api('/api/notifications');box.innerHTML=r.notifications.length?r.notifications.map(n=>`<article class="info-card account-tool-card"><b>${esc(n.title)}</b><p>${esc(n.body)}</p><small>${fmtDate(n.created_at)}${n.read_at?' · citită':' · necitită'}</small>${!n.read_at?`<button class="btn ghost small" data-notification-read="${n.id}">Marchează citită</button>`:''}</article>`).join(''):'<div class="empty">Nu ai notificări.</div>';}
+ else if(name==='credits'){const r=await api('/api/credits');box.innerHTML=`<div class="info-card"><span class="eyebrow">SOLD</span><h2>${Number(r.balance||0)} credite</h2><p class="form-note">Încărcarea creditelor va fi legată de sistemul de plăți.</p></div>`+(r.transactions.length?r.transactions.map(t=>`<article class="info-card account-tool-card"><b>${Number(t.amount)>0?'+':''}${esc(t.amount)} credite</b><p>${esc(t.reason)}</p><small>${fmtDate(t.created_at)}</small></article>`).join(''):'');}
+ else if(name==='transactions'){const r=await api('/api/transactions');box.innerHTML=r.transactions.length?r.transactions.map(t=>`<article class="info-card account-tool-card"><b>${Number(t.amount)>0?'+':''}${esc(t.amount)} credite</b><p>${esc(t.reason)}</p><small>${fmtDate(t.created_at)}${t.reference?' · '+esc(t.reference):''}</small></article>`).join(''):'<div class="empty">Nu există tranzacții.</div>';}
+ else if(name==='invoices'){const r=await api('/api/invoices');box.innerHTML=r.invoices.length?r.invoices.map(i=>`<article class="info-card account-tool-card"><b>${esc(i.number)}</b><p>${money(i.amount)} · ${esc(i.status)}</p><small>${fmtDate(i.created_at)}</small></article>`).join(''):'<div class="empty">Nu există facturi.</div>';}
+}
+
 
 document.addEventListener('click', e=>{
   const t = e.target;
@@ -617,6 +632,11 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-del-phone]'))){ const id=el.dataset.delPhone; if(confirm('Ștergi acest număr?')) safe(async()=>{ await api('/api/account/phones/'+id,{method:'DELETE'}); await loadSettings(); })(); return; }
   if((el=t.closest('[data-admin-tab]'))){ adminTab=el.dataset.adminTab; renderAdmin(); return; }
   if((el=t.closest('[data-admin]'))){ safe(adminAction)(el); return; }
+  if((el=t.closest('[data-offer-request]'))){ if(!currentUser){openAuth('requests');return;} $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
+  if((el=t.closest('[data-offer-status]'))){ safe(async()=>{await api('/api/offers/'+el.dataset.offerStatus,{method:'PATCH',body:JSON.stringify({status:el.dataset.status})}); await loadAccountTool(parseHash().name); toast('Oferta a fost actualizată.');})(); return; }
+  if((el=t.closest('[data-order-status]'))){ safe(async()=>{await api('/api/orders/'+el.dataset.orderStatus,{method:'PATCH',body:JSON.stringify({status:el.dataset.status})}); await loadAccountTool(parseHash().name);})(); return; }
+  if((el=t.closest('[data-message-read]'))){ safe(async()=>{await api('/api/messages/'+el.dataset.messageRead+'/read',{method:'PATCH'}); await loadAccountTool('messages');})(); return; }
+  if((el=t.closest('[data-notification-read]'))){ safe(async()=>{await api('/api/notifications/'+el.dataset.notificationRead+'/read',{method:'PATCH'}); await loadAccountTool('notifications');})(); return; }
   if((el=t.closest('[data-action]'))){ doAction(el.dataset.action); return; }
   if((el=t.closest('[data-account]'))){ accountAction(el.dataset.account); return; }
   if((el=t.closest('[data-go]'))){ navigate(el.dataset.go); return; }
@@ -669,6 +689,7 @@ function wire(){
   $('#forgotForm').addEventListener('submit', forgotPassword);
   $('#resetPasswordForm').addEventListener('submit', resetPasswordSubmit);
   $('#requestForm').addEventListener('submit', submitRequest);
+  $('#offerForm').addEventListener('submit', submitOffer);
   $('#sellForm').addEventListener('submit', submitSell);
   $('#profileSettingsForm').addEventListener('submit', saveProfile);
   $('#emailChangeForm').addEventListener('submit', requestEmailChange);
