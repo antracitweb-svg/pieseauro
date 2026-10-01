@@ -1,6 +1,15 @@
-# AutoPiese – FUTURE v15
+# AutoPiese – V24
 
 Această versiune pornește de la backend-ul existent și adaugă catalog auto + identificare din text + fundație SEO.
+
+## V24 – autentificare robustă
+- protecție la încercări repetate de autentificare;
+- protecție la cereri repetate de recuperare a parolei;
+- tokenurile de resetare sunt unice, hash-uite și expiră după 30 de minute;
+- tokenul este șters dacă trimiterea emailului eșuează;
+- gestionare explicită pentru erorile Resend și limitările de trimitere;
+- resetarea parolei revocă sesiunile existente;
+- răspunsurile de recuperare nu dezvăluie dacă o adresă există în baza de date.
 
 ## Ce este nou
 - catalog de mărci și modele din VehiclesDB;

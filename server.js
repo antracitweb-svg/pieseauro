@@ -14,6 +14,21 @@ const CATALOG_URL = process.env.VEHICLE_CATALOG_URL || 'https://cdn.jsdelivr.net
 let catalogCache = null;
 let catalogLoadedAt = 0;
 
+// Lightweight in-memory throttling for authentication/recovery endpoints.
+// This protects the app from accidental brute-force/recovery abuse without
+// requiring another service. Entries expire automatically.
+const authAttempts = new Map();
+const recoveryAttempts = new Map();
+function throttle(map,key,limit,windowMs){
+ const now=Date.now();
+ const old=map.get(key)||[];
+ const fresh=old.filter(t=>now-t<windowMs);
+ if(fresh.length>=limit){ map.set(key,fresh); return false; }
+ fresh.push(now); map.set(key,fresh); return true;
+}
+function clientIp(req){return String(req.ip||req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();}
+function normalizeIdentifier(value){return String(value||'').trim();}
+
 app.set('trust proxy', 1);
 app.use(helmet({contentSecurityPolicy:false, crossOriginEmbedderPolicy:false}));
 app.use(express.json({limit:'4mb'}));
@@ -217,14 +232,18 @@ app.get('/api/me',async(req,res)=>{
 });
 async function sendMail(to,subject,text,html){
  const apiKey=process.env.RESEND_API_KEY;
+ const from=String(process.env.RESEND_FROM||'').trim();
  if(!apiKey) throw new Error('EMAIL_NOT_CONFIGURED');
- const from=process.env.RESEND_FROM || 'AutoPiese <onboarding@resend.dev>';
+ if(!from) throw new Error('EMAIL_SENDER_NOT_CONFIGURED');
+ if(!from.includes('@')) throw new Error('EMAIL_SENDER_INVALID');
  const resp=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
  let data={}; try{data=await resp.json();}catch{}
  if(!resp.ok){
    console.error('Resend error',resp.status,JSON.stringify(data));
-   if(resp.status===401) throw new Error('EMAIL_AUTH_FAILED');
-   if(resp.status===403 || resp.status===422) throw new Error('EMAIL_SENDER_NOT_VERIFIED');
+   const msg=String(data?.message||data?.error||'').toLowerCase();
+   if(resp.status===403 && /(domain|sender|from|verified|verify)/.test(msg)) throw new Error('EMAIL_SENDER_NOT_VERIFIED');
+   if(resp.status===403) throw new Error('EMAIL_PROVIDER_FORBIDDEN');
+   if(resp.status===429) throw new Error('EMAIL_RATE_LIMIT');
    throw new Error('EMAIL_SEND_FAILED');
  }
  return data;
@@ -235,37 +254,55 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
  try{
   const em=String(req.body.email||'').trim().toLowerCase();
   if(!em)return res.status(400).json({error:'EMAIL_REQUIRED'});
-  const r=await pool.query('SELECT id,email,name FROM users WHERE email=$1 LIMIT 1',[em]);
-  if(r.rowCount){
-   const raw=crypto.randomBytes(32).toString('base64url');
-   await pool.query('DELETE FROM password_resets WHERE user_id=$1 OR expires_at<NOW()',[r.rows[0].id]);
-   await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[r.rows[0].id,hashToken(raw)]);
-   const link=`${appBaseUrl(req)}/#/reset-password?token=${encodeURIComponent(raw)}`;
-   await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href="${link}">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+  const key=`${clientIp(req)}:${em}`;
+  if(!throttle(recoveryAttempts,key,3,15*60*1000))return res.status(429).json({error:'RECOVERY_RATE_LIMIT'});
+  const r=await pool.query('SELECT id,email,name FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1',[em]);
+  // Always use the same success response for unknown addresses.
+  if(!r.rowCount)return res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
+
+  const raw=crypto.randomBytes(32).toString('base64url');
+  const userId=r.rows[0].id;
+  await pool.query('DELETE FROM password_resets WHERE user_id=$1 OR expires_at<NOW()',[userId]);
+  await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[userId,hashToken(raw)]);
+  const link=`${appBaseUrl(req)}/#/reset-password?token=${encodeURIComponent(raw)}`;
+  try{
+   await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href=\"${link}\">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+  }catch(mailErr){
+   // Never leave a valid reset token behind when delivery failed.
+   await pool.query('DELETE FROM password_resets WHERE user_id=$1',[userId]);
+   throw mailErr;
   }
-  res.json({ok:true,message:'Dacă adresa există, am trimis instrucțiunile de resetare pe email.'});
+  res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
  }catch(e){
-  console.error('forgot-password:',e);
-  if(e.message==='EMAIL_NOT_CONFIGURED')return res.status(503).json({error:'EMAIL_NOT_CONFIGURED'});
-  if(e.message==='EMAIL_SENDER_NOT_VERIFIED')return res.status(502).json({error:'EMAIL_SENDER_NOT_VERIFIED'});
-  if(e.message==='EMAIL_AUTH_FAILED')return res.status(502).json({error:'EMAIL_AUTH_FAILED'});
-  if(e.message==='EMAIL_SEND_FAILED')return res.status(502).json({error:'EMAIL_SEND_FAILED'});
+  console.error('Password recovery error:',e);
+  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT'];
+  if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});
+  if(e.message==='RECOVERY_RATE_LIMIT')return res.status(429).json({error:e.message});
   res.status(500).json({error:'SERVER_ERROR'});
  }
 });
 
 app.post('/api/auth/reset-password',requireDb,async(req,res)=>{
+ const client=await pool.connect();
  try{
-  const token=String(req.body.token||''), password=String(req.body.password||'');
+  const token=String(req.body.token||'').trim();
+  const password=String(req.body.password||'');
   if(!token||password.length<8)return res.status(400).json({error:'DATE_INVALIDE'});
-  const r=await pool.query('SELECT id,user_id FROM password_resets WHERE token_hash=$1 AND expires_at>NOW() AND used_at IS NULL LIMIT 1',[hashToken(token)]);
-  if(!r.rowCount)return res.status(400).json({error:'RESET_EXPIRED'});
+  await client.query('BEGIN');
+  const r=await client.query('SELECT id,user_id FROM password_resets WHERE token_hash=$1 AND expires_at>NOW() AND used_at IS NULL LIMIT 1 FOR UPDATE',[hashToken(token)]);
+  if(!r.rowCount){await client.query('ROLLBACK');return res.status(400).json({error:'RESET_EXPIRED'});}
   const hash=await bcrypt.hash(password,12);
-  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[hash,r.rows[0].user_id]);
-  await pool.query('UPDATE password_resets SET used_at=NOW() WHERE id=$1',[r.rows[0].id]);
-  await pool.query('DELETE FROM sessions WHERE user_id=$1',[r.rows[0].user_id]);
+  await client.query('UPDATE users SET password_hash=$1 WHERE id=$2',[hash,r.rows[0].user_id]);
+  await client.query('UPDATE password_resets SET used_at=NOW() WHERE id=$1',[r.rows[0].id]);
+  await client.query('DELETE FROM password_resets WHERE user_id=$1 AND id<>$2',[r.rows[0].user_id,r.rows[0].id]);
+  await client.query('DELETE FROM sessions WHERE user_id=$1',[r.rows[0].user_id]);
+  await client.query('COMMIT');
   res.json({ok:true});
- }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+ }catch(e){
+  try{await client.query('ROLLBACK');}catch{}
+  console.error('Password reset error:',e);
+  res.status(500).json({error:'SERVER_ERROR'});
+ }finally{client.release();}
 });
 
 app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
@@ -359,10 +396,15 @@ app.post('/api/auth/register',requireDb,async(req,res)=>{
 });
 app.post('/api/auth/login',requireDb,async(req,res)=>{
  try{
-  const {identifier,password,remember=true}=req.body; const id=String(identifier||'').trim();
+  const {identifier,password,remember=true}=req.body;
+  const id=normalizeIdentifier(identifier);
+  if(!id||!String(password||''))return res.status(400).json({error:'DATE_INVALIDE'});
+  const key=`${clientIp(req)}:${id.toLowerCase()}`;
+  if(!throttle(authAttempts,key,8,15*60*1000))return res.status(429).json({error:'LOGIN_RATE_LIMIT'});
   const r=await pool.query("SELECT * FROM users WHERE LOWER(email)=LOWER($1) OR LOWER(COALESCE(nickname,''))=LOWER($1) LIMIT 1",[id]);
-  if(!r.rowCount||!(await bcrypt.compare(password||'',r.rows[0].password_hash)))return res.status(401).json({error:'INVALID_LOGIN'});
+  if(!r.rowCount||!(await bcrypt.compare(String(password),r.rows[0].password_hash)))return res.status(401).json({error:'INVALID_LOGIN'});
   if(r.rows[0].status!=='active')return res.status(403).json({error:'ACCOUNT_BLOCKED'});
+  authAttempts.delete(key);
   const u=r.rows[0]; const session=await createSession(u,req,remember!==false);
   res.cookie('session',session.token,safeCookieOptions(session.maxAge));
   res.json({user:{id:u.id,name:u.name,nickname:u.nickname,email:u.email,phone:u.phone,show_phone:u.show_phone,role:u.role,status:u.status}});
