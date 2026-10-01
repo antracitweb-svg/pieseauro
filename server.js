@@ -54,7 +54,7 @@ app.use(helmet({
   imgSrc:["'self'","data:"],connectSrc:["'self'"],fontSrc:["'self'","data:"],objectSrc:["'none'"],
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
-app.use(express.json({limit:'100kb'}));
+app.use(express.json({limit:'6mb'}));
 app.use(cookieParser());
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control',f==='index.html'?'no-cache':'public, max-age=300');res.sendFile(path.join(__dirname,f));});
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS listings (
  price NUMERIC(12,2) DEFAULT 0, condition TEXT, make TEXT, model TEXT, generation TEXT, year TEXT,
  engine TEXT, fuel TEXT, vehicle_id TEXT, seller_type TEXT, quantity INTEGER DEFAULT 1, negotiable BOOLEAN DEFAULT FALSE,
  county TEXT, category TEXT, oem TEXT, delivery BOOLEAN DEFAULT FALSE, description TEXT DEFAULT '',
- status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+ status TEXT NOT NULL DEFAULT 'pending', images TEXT[] NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS favorites (
  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, listing_id INTEGER REFERENCES listings(id) ON DELETE CASCADE,
@@ -120,6 +120,7 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS engine TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS fuel TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS vehicle_id TEXT',
+  "ALTER TABLE listings ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS seller_type TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS negotiable BOOLEAN DEFAULT FALSE',
@@ -525,10 +526,14 @@ app.post('/api/listings',auth,requireDb,async(req,res)=>{
  const price=Number(x.price)||0; if(price<0||price>10000000)return res.status(400).json({error:'DATE_INVALIDE'});
  if(x.category&&!CATEGORIES.includes(x.category))return res.status(400).json({error:'DATE_INVALIDE'});
  if(x.seller_type&&!SELLER_TYPES.includes(x.seller_type))return res.status(400).json({error:'DATE_INVALIDE'});
+ const images=Array.isArray(x.images)?x.images.filter(v=>typeof v==='string'):[];
+ if(images.length>8)return res.status(400).json({error:'PREA_MULTE_POZE'});
+ const imageRe=/^data:image\/(?:jpeg|jpg|webp|png);base64,[A-Za-z0-9+/=]+$/;
+ if(images.some(v=>v.length>500000||!imageRe.test(v))||images.join('').length>4500000)return res.status(400).json({error:'POZE_INVALIDE'});
  const pending=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status='pending'",[req.user.id]);
  if(pending.rows[0].n>=20)return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});
- const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'pending') RETURNING *`,
-  [req.user.id,x.type,x.title.trim(),price,clip(x.condition,30),clip(x.make,60),clip(x.model,80),clip(x.generation,80),clip(x.year,10),clip(x.engine,80),clip(x.fuel,30),clip(x.vehicle_id,120),clip(x.seller_type,30),Math.min(9999,Math.max(1,Number(x.quantity)||1)),!!x.negotiable,clip(x.county,60),clip(x.category,60),clip(x.oem,60),!!x.delivery,String(x.description||'').slice(0,5000)]);
+ const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pending') RETURNING *`,
+  [req.user.id,x.type,x.title.trim(),price,clip(x.condition,30),clip(x.make,60),clip(x.model,80),clip(x.generation,80),clip(x.year,10),clip(x.engine,80),clip(x.fuel,30),clip(x.vehicle_id,120),clip(x.seller_type,30),Math.min(9999,Math.max(1,Number(x.quantity)||1)),!!x.negotiable,clip(x.county,60),clip(x.category,60),clip(x.oem,60),!!x.delivery,String(x.description||'').slice(0,5000),images]);
  res.status(201).json({listing:r.rows[0]});
 });
 app.get('/api/requests',requireDb,async(req,res)=>{

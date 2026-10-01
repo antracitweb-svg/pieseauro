@@ -12,7 +12,7 @@ const ERR = {
   EMAIL_PROVIDER_FORBIDDEN:'Serviciul de email a refuzat trimiterea. Verifică cheia API și expeditorul.',EMAIL_RATE_LIMIT:'Prea multe cereri către serviciul de email. Încearcă peste câteva minute.',
   EMAIL_SEND_FAILED:'Emailul nu a putut fi trimis. Încearcă din nou.',RECOVERY_RATE_LIMIT:'Ai cerut prea multe resetări. Încearcă peste 15 minute.',
   LOGIN_RATE_LIMIT:'Prea multe încercări. Încearcă din nou mai târziu.',RESET_EXPIRED:'Linkul a expirat sau a fost deja folosit.',
-  EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
+  EMAIL_REQUIRED:'Introdu o adresă de email validă.',PREA_MULTE_POZE:'Poți încărca maximum 8 poze.',POZE_INVALIDE:'Pozele sunt prea mari sau au un format neacceptat.',SERVER_ERROR:'A apărut o eroare pe server.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
   PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',ADMIN_ONLY:'Doar administratorul are acces.',
   STATUS_INVALIDE:'Status invalid.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.'
@@ -41,6 +41,7 @@ let currentUser = null;
 let favorites = readJSON('autopiese_fav', []).map(Number).filter(Number.isFinite);
 const modelCache = new Map();
 const state = { mode:'search', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{} };
+let sellImages = null;
 
 async function api(url, opt={}){
   let r;
@@ -163,12 +164,17 @@ async function loadModels(make, selectId, first='Alege modelul'){
 }
 
 /* ---------- carduri ---------- */
+function imageUrl(v){ return typeof v==='string' && /^data:image\//.test(v) ? v : ''; }
+function listingThumb(x){
+  const src = Array.isArray(x.images) && imageUrl(x.images[0]);
+  return src ? `<img class="listing-photo" src="${esc(src)}" alt="${esc(x.title||'Poză anunț')}" loading="lazy">` : (x.type==='dezmembrari'?'🚗':'⚙️');
+}
 function card(x, o={}){
   const fav = favorites.includes(x.id);
   const meta = [x.make,x.model,x.year].filter(Boolean).join(' · ') || (x.category || 'Piesă auto');
   const st = o.mine ? (STATUS_LABEL[x.status]||['',''] ) : null;
   return `<article class="listing" data-open="${x.id}" tabindex="0">
-    <div class="listing-thumb">${x.type==='dezmembrari'?'🚗':'⚙️'}</div>
+    <div class="listing-thumb">${listingThumb(x)}</div>
     <div class="listing-body">
       <div class="listing-top"><h3>${esc(x.title)}</h3>${o.mine?'':`<button class="listing-fav" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'}</button>`}</div>
       <div class="listing-meta">${esc(meta)}${x.category?` · ${esc(x.category)}`:''}</div>
@@ -326,9 +332,11 @@ function contactHtml(phones, who){
 }
 function detailHtml(x, phones, canContact){
   const fav = favorites.includes(x.id);
+  const imgs = Array.isArray(x.images) ? x.images.filter(imageUrl).slice(0,8) : [];
+  const gallery = imgs.length ? `<div class="detail-gallery"><div class="detail-main-image"><img id="detailMainImage" src="${esc(imgs[0])}" alt="${esc(x.title||'Poză anunț')}"></div><div class="detail-thumbs">${imgs.map((im,i)=>`<button type="button" class="detail-thumb ${i===0?'active':''}" data-gallery="${esc(im)}"><img src="${esc(im)}" alt="Poză ${i+1}" loading="lazy"></button>`).join('')}</div></div>` : '';
   const rows = [['Stare',x.condition],['Categorie',x.category],['Marcă',x.make],['Model',x.model],['An',x.year],['Generație',x.generation],['Motor',x.engine],['Cod OEM',x.oem],['Județ',x.county],['Livrare',x.delivery?'Da':'Nu'],['Vânzător',x.seller_name],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)]].filter(r=>r[1]);
   return `<div class="detail-top"><span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
-  <h2>${esc(x.title)}</h2>
+  ${gallery}<h2>${esc(x.title)}</h2>
   <div class="detail-price">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
   <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
   ${x.description?`<p class="detail-desc">${esc(x.description)}</p>`:''}
@@ -514,13 +522,47 @@ async function submitRequest(e){
     setMsg(msg,'Cererea a fost trimisă. O găsești în Cererile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
+function bytesToDataUrl(blob){ return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=reject;r.readAsDataURL(blob);}); }
+async function compressImage(file){
+  if(!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) throw new Error('Formatul pozei trebuie să fie JPG, PNG sau WebP.');
+  if(file.size>12*1024*1024) throw new Error('O poză poate avea maximum 12 MB înainte de comprimare.');
+  const bitmap=await createImageBitmap(file); const max=1600; const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
+  const w=Math.max(1,Math.round(bitmap.width*scale)), h=Math.max(1,Math.round(bitmap.height*scale));
+  const c=document.createElement('canvas'); c.width=w; c.height=h; const ctx=c.getContext('2d'); ctx.drawImage(bitmap,0,0,w,h); bitmap.close();
+  for(const quality of [.78,.68,.58,.48]){
+    const blob=await new Promise(resolve=>c.toBlob(resolve,'image/webp',quality));
+    if(blob && blob.size<=360000) return await bytesToDataUrl(blob);
+  }
+  const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.55));
+  if(!blob || blob.size>500000) throw new Error('Poza nu a putut fi comprimată suficient.');
+  return await bytesToDataUrl(blob);
+}
+async function prepareSellImages(){
+  if(Array.isArray(sellImages))return sellImages;
+  const input=$('#sellImages'); if(!input||!input.files.length)return [];
+  if(input.files.length>8) throw new Error('Poți încărca maximum 8 poze.');
+  sellImages=[];
+  for(const file of input.files) sellImages.push(await compressImage(file));
+  return sellImages;
+}
+function renderSellPreview(){
+  const box=$('#sellImagePreview'); if(!box)return;
+  const list=Array.isArray(sellImages)?sellImages:[];
+  box.innerHTML=list.map((src,i)=>`<div class="sell-preview"><img src="${esc(src)}" alt="Poză ${i+1}"><button type="button" class="sell-preview-remove" data-remove-sell-image="${i}" aria-label="Șterge poza">×</button></div>`).join('');
+  $('#sellImageCount').textContent=list.length?`${list.length}/8 poze pregătite`:'';
+}
+async function handleSellImages(e){
+  const msg=$('#sellMessage'); setMsg(msg,'');
+  try{ sellImages=[]; await prepareSellImages(); renderSellPreview(); }catch(err){sellImages=[]; e.target.value=''; renderSellPreview(); setMsg(msg,err.message,'error');}
+}
 async function submitSell(e){
   e.preventDefault(); const msg = $('#sellMessage'); setMsg(msg,'');
   const year = $('#sellYear').value.trim(), type = $('#sellType').value;
   if(year && !/^\d{4}$/.test(year)){ setMsg(msg,'Anul trebuie să aibă 4 cifre.','error'); return; }
   try{
-    await api('/api/listings',{method:'POST',body:JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked})});
-    e.target.reset(); $('#sellDelivery').checked = true; await loadModels('','sellModel'); $('#sellConditionWrap').classList.remove('hidden');
+    const images=await prepareSellImages();
+    await api('/api/listings',{method:'POST',body:JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images})});
+    e.target.reset(); sellImages=null; renderSellPreview(); $('#sellDelivery').checked = true; await loadModels('','sellModel'); $('#sellConditionWrap').classList.remove('hidden');
     setMsg(msg,'Anunțul a fost trimis pentru verificare. Îl vezi în Anunțurile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
@@ -631,6 +673,7 @@ document.addEventListener('click', e=>{
   const t = e.target;
   if(t.classList && t.classList.contains('modal')){ closeModal(t); return; }
   let el;
+  if((el=t.closest('[data-gallery]'))){ const main=$('#detailMainImage'); if(main){main.src=el.dataset.gallery; $$('.detail-thumb').forEach(b=>b.classList.toggle('active',b===el));} return; }
   if((el=t.closest('[data-fav]'))){ e.stopPropagation(); toggleFavorite(Number(el.dataset.fav)); return; }
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); loadRequests(true); })(); return; }
@@ -705,6 +748,8 @@ function wire(){
   $('#resetPasswordForm').addEventListener('submit', resetPasswordSubmit);
   $('#requestForm').addEventListener('submit', submitRequest);
   $('#sellForm').addEventListener('submit', submitSell);
+  $('#sellImages').addEventListener('change', handleSellImages);
+  document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(!b)return; sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellPreview(); });
   $('#profileSettingsForm').addEventListener('submit', saveProfile);
   $('#emailChangeForm').addEventListener('submit', requestEmailChange);
   $('#phoneAddForm').addEventListener('submit', addPhone);

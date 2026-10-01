@@ -25,7 +25,7 @@ Fără `RESEND_*`, „Ai uitat parola?” răspunde că emailul nu este configur
 ## Funcții
 - Interfață nouă (V26): header cu căutare, sub-meniu, pagină principală cu categorii și anunțuri recente, listă de anunțuri cu filtre, detaliu anunț cu telefon/WhatsApp, raportare anunț, pagini pentru cereri, dezmembrări, magazine și parcuri.
 - Conturi: înregistrare, login cu email sau nickname, sesiuni revocabile, resetare parolă, schimbare email, până la 4 telefoane (cu marcaj WhatsApp).
-- Anunțuri: publicare (intră în moderare), căutare multi-cuvânt, filtre, „Anunțurile mele”, favorite sincronizate pe cont.
+- Anunțuri: publicare (intră în moderare), căutare multi-cuvânt, filtre, „Anunțurile mele”, favorite sincronizate pe cont, până la 8 poze per anunț cu comprimare automată și galerie responsive pe telefon/tabletă/laptop/desktop.
 - Cereri de piese, raportări, panou admin cu jurnal de activitate.
 - Catalog mărci/modele din VehiclesDB (CC-BY 4.0, atribuire vizibilă în interfață), cu fallback local.
 - SEO: pagini `/piese/<id>-<slug>`, date structurate Product, `robots.txt`, `sitemap.xml`.
@@ -43,3 +43,10 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Setare nouă „Afișează telefonul” (Setări cont) – fără ea, telefonul nu apărea niciodată în anunțuri.
 - Securitate: Content-Security-Policy activă (fără scripturi inline), nickname fără `@` (evită confuzia cu emailul la login), limitare la înregistrare și cereri, validare telefon și categorii, ștergerea sesiunilor expirate la intervale regulate.
 - Server: endpointuri noi `GET /api/listings/:id`, `DELETE /api/listings/:id`, `GET /api/requests`, `GET /api/requests/mine`, `GET /api/sellers`, `PATCH /api/account/privacy`; verificări 404 în panoul admin; cache și timeout pentru catalogul de vehicule; oprire curată la SIGTERM; `sitemap.xml` și `robots.txt` folosesc `APP_URL`.
+
+## Poze anunțuri
+- Formularul „Vinde o piesă” acceptă până la 8 imagini JPG, PNG sau WebP de pe telefon, tabletă, laptop și desktop.
+- Imaginile sunt redimensionate și comprimate în browser înainte de trimitere, pentru încărcare mai rapidă.
+- Pozele sunt salvate în PostgreSQL în coloana `listings.images`, fără folder nou în proiect.
+- Prima poză apare în cardul anunțului, iar pagina de detaliu afișează galerie cu miniaturi.
+- Interfața folosește grile diferite pentru desktop/laptop, tabletă și telefon.
