@@ -92,5 +92,12 @@
 <div class="modal hidden" id="forgotModal"><div class="modal-card"><button class="close" data-close>×</button><div class="eyebrow">RECUPERARE CONT</div><h2>Ai uitat parola?</h2><p>Introdu adresa de email și îți trimitem un link securizat pentru resetare.</p><form class="clean-form" id="forgotForm"><label>Email<input id="forgotEmail" type="email" autocomplete="email" required></label><button class="btn primary full">Trimite verificarea</button><p class="form-note" id="forgotMessage"></p></form></div></div>
 
 <div class="modal hidden" id="detailModal"><div class="modal-card wide"><button class="close" data-close>×</button><div id="detailContent"></div></div></div>
+<div class="image-lightbox hidden" id="imageLightbox" aria-hidden="true">
+  <button type="button" class="image-lightbox-close" data-image-close aria-label="Închide">×</button>
+  <button type="button" class="image-lightbox-nav prev" id="imageLightboxPrev" data-image-prev aria-label="Poza anterioară">‹</button>
+  <div class="image-lightbox-stage"><img id="imageLightboxImg" alt="Poza anunțului"></div>
+  <button type="button" class="image-lightbox-nav next" id="imageLightboxNext" data-image-next aria-label="Poza următoare">›</button>
+  <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
+</div>
 <script src="script.js" defer></script>
 </body></html>

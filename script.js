@@ -211,7 +211,10 @@ function card(x, o={}){
   const fav = favorites.includes(x.id);
   const meta = [x.make,x.model,x.year].filter(Boolean).join(' · ') || (x.category || 'Piesă auto');
   const st = o.mine ? (STATUS_LABEL[x.status]||['',''] ) : null;
-  const img = Array.isArray(x.images) && x.images[0] ? `<img src="${esc(x.images[0])}" alt="${esc(x.title)}" loading="lazy">` : `<div class="listing-placeholder">${x.type==='dezmembrari'?'🚗':'⚙️'}</div>`;
+  const firstImage = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
+  const img = firstImage
+    ? `<button type="button" class="listing-image-button" data-lightbox-src="${esc(firstImage)}" data-lightbox-alt="${esc(x.title)}" aria-label="Vezi poza mai mare"><img src="${esc(firstImage)}" alt="${esc(x.title)}" loading="lazy"><span class="image-zoom-hint">⌕</span></button>`
+    : `<div class="listing-placeholder">${x.type==='dezmembrari'?'🚗':'⚙️'}</div>`;
   return `<article class="listing" data-open="${x.id}" tabindex="0">
     <div class="listing-image">${img}</div>
     <div class="listing-body">
@@ -384,6 +387,41 @@ function renderPagination(){
   box.innerHTML=items.join('');
 }
 
+
+/* ---------- vizualizare foto ---------- */
+let lightboxImages = [];
+let lightboxIndex = 0;
+function openLightbox(src, images=[], index=0, alt='Poza anunțului'){
+  const list = Array.isArray(images) && images.length ? images : [src];
+  lightboxImages = list.filter(Boolean);
+  lightboxIndex = Math.max(0, Math.min(Number(index)||0, lightboxImages.length-1));
+  const modal = $('#imageLightbox'), image = $('#imageLightboxImg');
+  if(!modal || !image || !lightboxImages.length) return;
+  image.alt = alt || 'Poza anunțului';
+  modal.classList.remove('hidden');
+  document.body.classList.add('lightbox-open');
+  renderLightbox();
+}
+function renderLightbox(){
+  const modal=$('#imageLightbox'), image=$('#imageLightboxImg'), counter=$('#imageLightboxCounter');
+  if(!modal||!image||!lightboxImages.length) return;
+  image.src=lightboxImages[lightboxIndex];
+  if(counter) counter.textContent=`${lightboxIndex+1} / ${lightboxImages.length}`;
+  const prev=$('#imageLightboxPrev'), next=$('#imageLightboxNext');
+  if(prev) prev.disabled=lightboxImages.length<2;
+  if(next) next.disabled=lightboxImages.length<2;
+}
+function closeLightbox(){
+  const modal=$('#imageLightbox'); if(!modal) return;
+  modal.classList.add('hidden'); document.body.classList.remove('lightbox-open');
+  const image=$('#imageLightboxImg'); if(image) image.removeAttribute('src');
+}
+function moveLightbox(step){
+  if(lightboxImages.length<2) return;
+  lightboxIndex=(lightboxIndex+step+lightboxImages.length)%lightboxImages.length;
+  renderLightbox();
+}
+
 /* ---------- detaliu anunț ---------- */
 function waLink(phone){
   let d = String(phone).replace(/[^\d]/g,'');
@@ -397,7 +435,10 @@ function contactHtml(phones, who){
 function detailHtml(x, phones, canContact){
   const fav = favorites.includes(x.id);
   const rows = [['Stare',x.condition],['Categorie',x.category],['Marcă',x.make],['Model',x.model],['An',x.year],['Generație',x.generation],['Motor',x.engine],['Cod OEM',x.oem],['Județ',x.county],['Livrare',x.delivery?'Da':'Nu'],['Vânzător',x.seller_name],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)]].filter(r=>r[1]);
+  const galleryImages = Array.isArray(x.images) ? x.images.filter(Boolean) : [];
+  const gallery = galleryImages.length ? `<div class="detail-gallery">${galleryImages.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(x.title)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(x.title)} - poza ${i+1}" loading="lazy"></button>`).join('')}</div>` : '';
   return `<div class="detail-top"><span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
+  ${gallery}
   <h2>${esc(x.title)}</h2>
   <div class="detail-price">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
   <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
@@ -740,6 +781,17 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-search-dism]'))){ openSearch({q:el.dataset.searchDism}); return; }
   if((el=t.closest('[data-saved-open]'))){ const s=getSaved()[Number(el.dataset.savedOpen)]; if(s) navigate('rezultate?'+s.qs); return; }
   if((el=t.closest('[data-saved-del]'))){ const list=getSaved(); list.splice(Number(el.dataset.savedDel),1); writeJSON('autopiese_saved_searches',list); renderSaved(); return; }
+  if((el=t.closest('[data-lightbox-src]'))){
+    const src=el.dataset.lightboxSrc;
+    let images=[src], index=0;
+    const gallery=el.closest('.detail-gallery');
+    if(gallery){ images=$$('.detail-gallery-item', gallery).map(b=>b.dataset.lightboxSrc).filter(Boolean); index=Math.max(0, Number(el.dataset.lightboxIndex)||0); }
+    openLightbox(src, images, index, el.dataset.lightboxAlt||'Poza anunțului');
+    return;
+  }
+  if((el=t.closest('[data-image-close]'))){ closeLightbox(); return; }
+  if((el=t.closest('[data-image-prev]'))){ moveLightbox(-1); return; }
+  if((el=t.closest('[data-image-next]'))){ moveLightbox(1); return; }
   if((el=t.closest('[data-copy-link]'))){ copyLink(Number(el.dataset.copyLink)); return; }
   if((el=t.closest('[data-show-report]'))){ $('#reportBox').classList.toggle('hidden'); return; }
   if((el=t.closest('[data-send-report]'))){ safe(sendReport)(Number(el.dataset.sendReport)); return; }
@@ -762,6 +814,11 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); } });
 document.addEventListener('keydown', e=>{
+  if(!$('#imageLightbox')?.classList.contains('hidden')){
+    if(e.key==='Escape'){ e.preventDefault(); closeLightbox(); return; }
+    if(e.key==='ArrowLeft'){ e.preventDefault(); moveLightbox(-1); return; }
+    if(e.key==='ArrowRight'){ e.preventDefault(); moveLightbox(1); return; }
+  }
   if(e.key==='Escape'){ const m=$$('.modal').find(x=>!x.classList.contains('hidden')); if(m) closeModal(m); }
   if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.listing[data-open]')){ e.preventDefault(); openDetail(Number(e.target.dataset.open)); }
 });
