@@ -113,3 +113,81 @@
   .results-layout{grid-template-columns:235px minmax(0,1fr);gap:20px;}
   #page-menu .narrow,#page-account .narrow,#page-request .narrow,#page-sell .narrow,#page-services .narrow,#page-match .narrow{width:calc(100% - 48px);}
 }
+
+/* ---------- Pagina 3: Contul meu - stil compact inspirat de referinta ---------- */
+.account-page-wrap{max-width:760px;padding-top:18px;padding-bottom:42px}
+.account-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.account-close{width:38px;height:38px;border:0;background:transparent;color:var(--ink);font-size:29px;line-height:1;cursor:pointer}
+.account-summary{background:#fff;border:1px solid var(--line);border-radius:15px;overflow:hidden;box-shadow:0 7px 22px rgba(20,53,89,.05);margin-bottom:12px}
+.account-summary-line{display:flex;align-items:center;gap:12px;padding:16px 17px}
+.account-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#eaf3ff;color:#0d5fa5;font-size:22px;border:1px solid #d8e8fb}
+.account-summary-main{min-width:0;flex:1}
+.account-summary-name{font-size:18px;font-weight:900;color:var(--ink);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-summary-type{font-size:12px;color:var(--muted);margin-top:3px}
+.account-chevron{font-size:28px;color:#71859c;line-height:1}
+.account-summary-divider{height:1px;background:#edf1f5}
+.account-credit-row{display:flex;align-items:center;gap:10px;padding:13px 17px;color:#31577f;font-size:14px}
+.account-mini-icon{width:28px;text-align:center;font-size:18px;color:#0d5fa5}
+.account-sections{display:flex!important;flex-direction:column;gap:8px!important}
+.account-sections details,.account-row-link{margin:0!important;border-radius:13px!important;box-shadow:0 5px 16px rgba(20,53,89,.035)!important}
+.account-sections details summary{min-height:58px;padding:14px 15px!important;display:grid!important;grid-template-columns:38px minmax(0,1fr) 24px;align-items:center;gap:10px;color:#163f6b!important;letter-spacing:.5px!important}
+.account-section-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#eaf3ff;color:#174b7f;font-size:18px;font-weight:900;flex:0 0 34px}
+.account-section-title{font-size:16px;font-weight:950}
+.account-section-chevron{font-size:23px;color:#526b85;line-height:1;text-align:center}
+.account-sections details button{min-height:48px;padding:12px 18px 12px 58px!important;background:#fbfdff!important;font-size:14px!important;font-weight:700!important}
+.account-sections details button i,.account-row-link i{font-style:normal;color:#71869d;font-size:22px;font-weight:400}
+.account-row-link{width:100%;min-height:58px;padding:11px 15px;border:1px solid var(--line);background:#fff;display:grid;grid-template-columns:38px minmax(0,1fr) 24px;align-items:center;gap:10px;text-align:left;color:#163f6b;font-size:16px;font-weight:900;cursor:pointer}
+.account-row-link:hover,.account-sections details summary:hover{background:#f9fcff}
+.account-admin-compat{margin-top:8px}
+.account-admin-compat button{border-radius:13px!important;border:1px solid var(--line)!important}
+.account-logout{margin-top:8px!important;min-height:48px}
+
+@media(min-width:801px){
+  #page-account .account-page-wrap{max-width:780px}
+  #page-account .account-sections{display:flex!important;grid-template-columns:none!important}
+}
+
+@media(max-width:800px){
+  #page-account .account-page-wrap{width:calc(100% - 24px);padding-top:8px;padding-bottom:28px}
+  #page-account .page-head{display:none}
+  .account-topbar{margin-bottom:5px}
+  .account-close{width:34px;height:34px;font-size:27px}
+  .account-summary-line{padding:14px 13px}
+  .account-summary-name{font-size:17px}
+  .account-summary-type{font-size:11px}
+  .account-credit-row{padding:11px 13px;font-size:13px}
+  .account-sections details summary{min-height:54px;padding:10px 12px!important;grid-template-columns:36px minmax(0,1fr) 22px;gap:9px}
+  .account-section-icon{width:32px;height:32px;font-size:16px}
+  .account-section-title,.account-row-link{font-size:15px}
+  .account-sections details button{min-height:44px;padding:10px 14px 10px 52px!important;font-size:13px!important}
+  .account-row-link{min-height:54px;padding:10px 12px;grid-template-columns:36px minmax(0,1fr) 22px}
+}
+
+
+/* ---------- Pagina 2: Meniu - structură compactă inspirată de referință ---------- */
+#page-menu .menu-page-head{margin-bottom:14px}
+#page-menu .menu-card{margin:10px 0;border-radius:14px}
+#page-menu .menu-card-primary{margin-top:12px}
+#page-menu .menu-card-primary>button{min-height:72px}
+#page-menu .menu-card-actions>button{min-height:70px}
+#page-menu .menu-card-explore>button{min-height:60px}
+#page-menu .menu-card-explore button small{display:none}
+#page-menu .menu-logout{width:100%;min-height:58px;margin:10px 0 20px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:#fff;color:#8f3943;display:grid;grid-template-columns:minmax(0,1fr) 20px;align-items:center;text-align:left;font-size:15px;font-weight:850;cursor:pointer;box-shadow:0 5px 16px rgba(20,53,89,.035)}
+#page-menu .menu-logout i{font-style:normal;font-size:22px;color:#9b4b55;text-align:center}
+@media(min-width:801px){
+  #page-menu .menu-card-primary,#page-menu .menu-card-explore{display:block!important;grid-template-columns:none!important}
+  #page-menu .menu-card-actions{display:grid;grid-template-columns:1fr 1fr}
+  #page-menu .menu-card-actions>button:first-child{border-right:1px solid #edf1f5}
+  #page-menu .menu-card-explore{display:block}
+}
+@media(max-width:800px){
+  #page-menu .narrow{width:calc(100% - 24px)}
+  #page-menu .menu-page-head{margin-bottom:12px}
+  #page-menu .menu-card{margin:8px 0;border-radius:12px}
+  #page-menu .menu-card-primary>button{min-height:60px;padding:12px 13px}
+  #page-menu .menu-card-actions>button{min-height:60px;padding:12px 13px}
+  #page-menu .menu-card-explore>button{min-height:54px;padding:11px 13px}
+  #page-menu .menu-card-explore button>span{font-size:18px}
+  #page-menu .menu-card-explore button b{font-size:14px}
+  #page-menu .menu-logout{min-height:54px;margin-top:8px;border-radius:12px;font-size:14px}
+}

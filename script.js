@@ -97,11 +97,13 @@ function renderHeader(){
   $('#menuAccountText').textContent = currentUser ? label : 'Intră în cont';
   const isAdmin = !!(currentUser && currentUser.role==='admin');
   $('#adminMenu').classList.toggle('hidden', !isAdmin);
+  const menuLogout = $('#menuLogout'); if(menuLogout) menuLogout.classList.toggle('hidden', !currentUser);
   const ad = $('#accountAdmin'); if(ad) ad.classList.toggle('hidden', !isAdmin);
   $('#favCount').textContent = favorites.length;
 }
 function renderAccount(){
-  $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
+  $('#accountHello').textContent = currentUser.nickname || currentUser.name || currentUser.email || 'Contul meu';
+  $('#accountCredits').textContent = Number.isFinite(Number(currentUser.credits)) ? Number(currentUser.credits) : 0;
   renderHeader();
 }
 
@@ -116,7 +118,8 @@ function renderAccountTool(view){
     notifications:{title:'Notificări',text:'Notificările contului vor apărea aici când există activitate nouă.',action:null,label:null},
     credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
     transactions:{title:'Tranzacții',text:'Istoricul tranzacțiilor va apărea aici după implementarea plăților.',action:null,label:null},
-    invoices:{title:'Facturi',text:'Facturile vor apărea aici după implementarea plăților și facturării.',action:null,label:null}
+    invoices:{title:'Facturi',text:'Facturile vor apărea aici după implementarea plăților și facturării.',action:null,label:null},
+    ratings:{title:'Calificative',text:'Aici vor apărea calificativele primite și istoricul evaluărilor.',action:null,label:null}
   };
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
   $('#accountToolTitle').textContent=d.title;
@@ -611,6 +614,7 @@ function doAction(a){
   else if(a==='services') navigate('servicii');
   else if(a==='match') navigate('match');
   else if(a==='admin') navigate('admin');
+  else if(a==='logout') logout();
   else if(a==='cart') navigate('account-tool?view=cart');
   else if(a==='rezultate') navigate('rezultate');
 }
@@ -620,7 +624,7 @@ function accountAction(a){
   else if(a==='favorites') navigate('rezultate?mode=fav');
   else if(a==='requests') navigate('requests?t=mine');
   else if(a==='saved') navigate('saved');
-  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
+  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices','ratings'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
 }
 
 document.addEventListener('click', e=>{
@@ -684,10 +688,11 @@ function wire(){
   $('#loadMoreBtn').addEventListener('click', safe(()=>loadResults(false)));
   $('#saveSearchBtn').addEventListener('click', saveCurrentSearch);
   $('#favoritesBtn').addEventListener('click', ()=>navigate('rezultate?mode=fav'));
-  $('#accountBtn').addEventListener('click', ()=>doAction('account'));
+  $('#accountBtn').addEventListener('click', ()=>navigate('menu'));
   $('#menuBtn').addEventListener('click', ()=>navigate('menu'));
   $('#closeMenu').addEventListener('click', ()=>navigate('home'));
   $('#logoutBtn').addEventListener('click', logout);
+  $('#menuLogout')?.addEventListener('click', logout);
   $('#logoutAllBtn').addEventListener('click', safe(logoutAll));
   $('#loginForm').addEventListener('submit', login);
   $('#registerForm').addEventListener('submit', register);
