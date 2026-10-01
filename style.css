@@ -1,0 +1,269 @@
+/* AutoPiese V26 — layout de marketplace de piese auto (header cu căutare, sub-meniu, hero, categorii, liste de anunțuri) */
+:root{
+  --brand:#e8590c;--brand-d:#c94a06;--brand-l:#fff1e8;
+  --navy:#0f2742;--navy2:#173a63;--blue:#0b63c9;
+  --ink:#1b2a3b;--muted:#66768a;--line:#dfe5ec;--bg:#f2f5f8;--card:#fff;
+  --ok:#17803d;--ok-bg:#e7f6ec;--warn:#9a6700;--warn-bg:#fff4d6;--bad:#b42318;--bad-bg:#fdecea;
+  --radius:10px;--shadow:0 6px 22px rgba(15,39,66,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.5;overflow-x:hidden}
+a{color:var(--blue)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,h4{line-height:1.2;margin:0}
+.container{width:min(1180px,calc(100% - 32px));margin:0 auto}
+.narrow{width:min(780px,calc(100% - 32px));margin:0 auto;padding:32px 0 56px}
+.hidden{display:none!important}
+.muted{color:var(--muted)}
+.show-sm{display:none!important}
+
+/* ---------- Header ---------- */
+.topbar{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(15,39,66,.05)}
+.topbar-in{display:flex;align-items:center;gap:18px;min-height:64px}
+.logo{font-size:26px;font-weight:900;letter-spacing:-1px;text-decoration:none;white-space:nowrap}
+.logo-a{color:var(--navy)}.logo-b{color:var(--brand)}
+.top-search{flex:1;display:flex;max-width:520px;border:2px solid var(--navy);border-radius:var(--radius);overflow:hidden;background:#fff}
+.top-search input{flex:1;min-width:0;border:0;outline:0;padding:0 14px;height:42px;background:transparent}
+.top-search button{border:0;background:var(--navy);color:#fff;font-weight:800;padding:0 20px}
+.top-search button:hover{background:var(--navy2)}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+.icon-btn{position:relative;border:0;background:none;display:flex;align-items:center;gap:6px;padding:8px;border-radius:8px;color:var(--navy);font-weight:700}
+.icon-btn:hover{background:var(--bg)}
+.icon-btn .ico{font-size:22px;line-height:1}
+.icon-btn .count{font-size:11px;font-weight:800;background:var(--brand);color:#fff;border-radius:10px;padding:1px 6px;min-width:18px;text-align:center}
+.acc-label{font-size:14px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-btn{width:44px;height:42px;border:1px solid var(--line);border-radius:10px;background:#fff;display:grid;place-content:center;gap:4px}
+.menu-btn i{display:block;width:20px;height:2px;border-radius:2px;background:var(--navy)}
+.subnav{background:var(--navy)}
+.subnav-in{display:flex;gap:6px;overflow-x:auto}
+.subnav a{color:#dbe7f5;text-decoration:none;font-weight:700;font-size:14px;padding:11px 14px;white-space:nowrap}
+.subnav a:hover{background:var(--navy2);color:#fff}
+
+/* ---------- Butoane ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:2px solid transparent;border-radius:var(--radius);padding:10px 18px;font-weight:800;text-decoration:none;white-space:nowrap;transition:.15s}
+.btn.primary{background:var(--brand);color:#fff}.btn.primary:hover{background:var(--brand-d)}
+.btn.outline{background:#fff;border-color:var(--brand);color:var(--brand)}.btn.outline:hover{background:var(--brand-l)}
+.btn.dark{background:var(--navy);color:#fff}.btn.dark:hover{background:var(--navy2)}
+.btn.outline-light{background:transparent;border-color:#fff;color:#fff}.btn.outline-light:hover{background:rgba(255,255,255,.12)}
+.btn.ghost{background:#eaf2fb;color:#17497f}.btn.ghost:hover{background:#dbe9f8}
+.btn.danger{background:var(--bad-bg);color:var(--bad)}
+.btn.small{padding:6px 12px;font-size:13px;border-radius:8px}
+.btn:disabled{opacity:.55;cursor:default}
+.full{width:100%}
+.link,.text-btn,.back,.link-light{border:0;background:none;padding:0;font-weight:800;color:var(--blue)}
+.link:hover,.text-btn:hover,.back:hover{text-decoration:underline}
+.text-btn{display:block;margin:10px auto 0;font-size:14px}
+.back{padding:6px 0;font-size:14px;white-space:nowrap}
+.link-light{color:#fff;opacity:.92}.link-light:hover{text-decoration:underline;opacity:1}
+
+/* ---------- Pagini ---------- */
+.page{display:none;min-height:60vh}
+.page.active{display:block}
+.page-container{padding:22px 0 56px}
+.page-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:22px}
+.page-head h2,.narrow>h2,.results-head h2{font-size:30px;letter-spacing:-.5px}
+.page-head p{margin:4px 0 0}
+.crumbs{font-size:13px;color:var(--muted);margin:0 0 12px}
+.crumbs a{text-decoration:none}
+.section{padding:30px 0 6px}
+.section-head{display:flex;justify-content:space-between;align-items:baseline}
+.section-title{font-size:22px;margin-bottom:16px;letter-spacing:-.3px}
+
+/* ---------- Hero ---------- */
+.hero{background:linear-gradient(135deg,var(--navy),#1d4a7c);color:#fff;padding:46px 0 40px}
+.hero h1{font-size:clamp(30px,4.6vw,46px);letter-spacing:-1.2px;max-width:760px}
+.hero-sub{max-width:640px;color:#d3e2f3;margin:12px 0 22px;font-size:17px}
+.hero-search{display:flex;gap:8px;max-width:760px;background:#fff;padding:7px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.2)}
+.hero-search input{flex:1;min-width:0;border:0;outline:0;padding:0 12px;height:46px;font-size:16px;background:transparent;color:var(--ink)}
+.hero-search .btn{padding:0 28px}
+.hero-vehicle{display:flex;gap:8px;max-width:760px;margin-top:12px;flex-wrap:wrap}
+.hero-vehicle select{flex:1;min-width:150px;height:44px;border-radius:var(--radius);border:0;padding:0 12px;background:#fff;color:var(--ink)}
+.hero-links{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:22px}
+
+/* ---------- Categorii, pași ---------- */
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.cat{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 10px;text-align:center;font-weight:800;color:var(--navy);transition:.15s}
+.cat:hover{border-color:var(--brand);box-shadow:var(--shadow);transform:translateY(-2px)}
+.cat span{display:block;font-size:28px;margin-bottom:6px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.step{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.step b{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;margin-bottom:10px}
+.step h3{font-size:17px;margin-bottom:6px}.step p{margin:0;color:var(--muted)}
+
+/* ---------- Rezultate ---------- */
+.results-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+.results-head p{margin:4px 0 0}
+.results-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.results-tools select,.result-search input,.filters select,.filters input[type=number]{border:1px solid var(--line);border-radius:8px;background:#fff;height:42px;padding:0 10px}
+.result-search{display:flex;gap:8px;margin-bottom:16px}
+.result-search input{flex:1;min-width:0;height:46px}
+.results-layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:22px;align-items:start}
+.filters{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.filter-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.filters label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:800;margin:12px 0}
+.filters select,.filters input[type=number]{width:100%}
+.check{flex-direction:row!important;align-items:center;gap:8px!important;font-weight:600!important}
+.check input{width:auto;height:auto}
+.listing-list{display:grid;gap:12px}
+.listing{display:flex;gap:14px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:14px;cursor:pointer;transition:.15s;position:relative}
+.listing:hover{border-color:var(--brand);box-shadow:var(--shadow)}
+.listing-thumb{flex:0 0 96px;height:96px;border-radius:8px;background:linear-gradient(135deg,#eaf2fb,#fff1e8);display:grid;place-items:center;font-size:34px}
+.listing-body{flex:1;min-width:0;display:flex;flex-direction:column}
+.listing-top{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+.listing h3{font-size:16px;color:var(--navy);word-break:break-word}
+.listing-meta{color:var(--muted);font-size:13px;margin:4px 0}
+.listing-desc{color:var(--muted);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0}
+.listing-bottom{margin-top:auto;padding-top:8px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.listing-price{font-size:20px;font-weight:900;color:var(--navy)}
+.listing-location{font-size:12px;color:var(--muted)}
+.listing-fav{border:0;background:transparent;color:var(--brand);font-size:22px;line-height:1;padding:2px 4px}
+.badge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:3px 8px;white-space:nowrap;background:#eaf2fb;color:#17497f}
+.badge.new{background:var(--ok-bg);color:var(--ok)}
+.badge.pending{background:var(--warn-bg);color:var(--warn)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.listing-actions{display:flex;gap:8px}
+.empty{text-align:center;padding:40px 20px;background:#fff;border:1px dashed var(--line);border-radius:var(--radius);color:var(--muted)}
+.more-wrap{text-align:center;margin-top:16px}
+
+/* ---------- Meniu / cont ---------- */
+.menu-page-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.close-menu{border:1px solid var(--line);background:#fff;width:38px;height:38px;border-radius:10px;font-size:24px;line-height:1}
+.menu-card,.account-sections details{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:12px 0}
+.menu-card>button,.menu-row{width:100%;border:0;border-bottom:1px solid #edf1f5;background:#fff;padding:14px 16px;display:grid;grid-template-columns:32px 1fr 20px;gap:10px;text-align:left;align-items:center}
+.menu-card>button:last-child{border-bottom:0}
+.menu-card>button:hover{background:#f8fafc}
+.menu-card button>span{font-size:20px;text-align:center}
+.menu-card button div{display:flex;flex-direction:column}
+.menu-card button small{color:var(--muted);font-size:12px}
+.menu-card button i{font-style:normal;font-size:22px;color:#8092a8}
+.menu-label{font-size:11px;font-weight:900;color:var(--muted);letter-spacing:1.5px;margin:22px 4px 8px;text-transform:uppercase}
+.account-sections summary{list-style:none;padding:16px 18px;font-weight:900;color:var(--navy);cursor:pointer;display:flex;justify-content:space-between;text-transform:uppercase;letter-spacing:.8px;font-size:13px}
+.account-sections summary::-webkit-details-marker{display:none}
+.account-sections details button{width:100%;padding:14px 18px;border:0;border-top:1px solid #edf1f5;background:#fff;text-align:left;display:flex;justify-content:space-between;font-weight:700}
+.account-sections details button:hover{background:#f8fafc}
+.account-sections details button i{font-style:normal;color:#8194a9;font-size:20px}
+.saved-row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid #edf1f5}
+.saved-row:last-child{border-bottom:0}
+
+/* ---------- Formulare ---------- */
+.clean-form{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.clean-form.flat{border:0;padding:0;background:transparent}
+.clean-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:800;margin:12px 0}
+.clean-form input:not([type=checkbox]),.clean-form select,.clean-form textarea{width:100%;border:1px solid #cfd8e3;border-radius:8px;padding:10px 11px;background:#fff}
+.clean-form input:focus,.clean-form select:focus,.clean-form textarea:focus,.filters select:focus,.results-tools select:focus,.result-search input:focus{outline:2px solid rgba(232,89,12,.35);border-color:var(--brand)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-note{font-size:13px;color:var(--muted);min-height:18px;margin:6px 0}
+.error-message{color:var(--bad)!important;font-weight:700}
+.ok-message{color:var(--ok)!important;font-weight:700}
+.password-wrap{position:relative;display:flex;align-items:center}
+.password-wrap input{padding-right:46px!important}
+.password-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:#61758c;font-size:17px}
+.password-toggle:hover{background:#eef3f8}
+
+/* ---------- Carduri informative ---------- */
+.info-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.info-card h3{font-size:18px;margin:4px 0 6px}
+.info-card p{margin:4px 0;color:var(--muted)}
+.request-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.request-grid .info-card{display:flex;flex-direction:column;gap:6px}
+.request-grid .info-card .btn{margin-top:auto;align-self:flex-start}
+
+/* ---------- Modale ---------- */
+.modal{position:fixed;inset:0;z-index:100;background:rgba(8,20,35,.6);display:grid;place-items:center;padding:16px}
+.modal-card{width:min(460px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:14px;padding:24px;position:relative}
+.modal-card.wide{width:min(780px,100%)}
+.modal-card h2{font-size:24px;margin:0 28px 14px 0}
+.close{position:absolute;right:10px;top:8px;border:0;background:none;font-size:28px;line-height:1;width:36px;height:36px;color:var(--muted)}
+.toast{position:fixed;right:16px;bottom:16px;left:16px;margin-left:auto;max-width:380px;z-index:200;background:var(--navy);color:#fff;padding:12px 16px;border-radius:10px;box-shadow:var(--shadow)}
+
+/* ---------- Detaliu anunț ---------- */
+.detail-top{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.detail-price{font-size:30px;font-weight:900;color:var(--navy);margin:8px 0}
+.detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 20px;margin:14px 0;padding:14px;background:var(--bg);border-radius:10px}
+.detail-grid dt{font-size:12px;color:var(--muted);font-weight:700}.detail-grid dd{margin:0 0 6px;font-weight:700}
+.detail-desc{white-space:pre-wrap;word-break:break-word}
+.contact-box{border:1px solid var(--line);border-radius:10px;padding:14px;margin:16px 0}
+.contact-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.btn.wa{background:#1fa855;color:#fff}.btn.wa:hover{background:#178a45}
+.report-box{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.report-box select,.report-box textarea{width:100%;border:1px solid #cfd8e3;border-radius:8px;padding:9px;margin:6px 0}
+
+/* ---------- Setări / admin ---------- */
+.settings-grid{display:grid;gap:12px}
+.settings-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.settings-card summary{cursor:pointer;font-weight:900;list-style:none}
+.settings-card summary::-webkit-details-marker{display:none}
+.settings-actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.phone-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.danger-text{color:var(--bad)}
+.privacy-check{margin:10px 0}
+.admin-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.admin-tabs .btn.active{background:var(--navy);color:#fff}
+.admin-list{display:grid;gap:12px}
+.admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat{background:var(--bg);border-radius:10px;padding:14px}.stat b{font-size:13px;color:var(--muted)}.stat h3{font-size:28px;margin-top:4px}
+
+/* ---------- Legal / footer / SSR ---------- */
+.legal-page h3{margin:24px 0 6px}
+.legal-page p{line-height:1.75;color:#3d4d60}
+.site-footer{background:var(--navy);color:#c8d8ea;margin-top:48px;padding:32px 0 20px}
+.footer-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.footer-cols h4{color:#fff;margin-bottom:10px}
+.footer-cols button{display:block;border:0;background:none;color:#c8d8ea;padding:4px 0;text-align:left}
+.footer-cols button:hover{color:#fff;text-decoration:underline}
+.footer-bottom{border-top:1px solid rgba(255,255,255,.12);margin-top:22px;padding-top:16px;font-size:13px}
+.footer-bottom a{color:#9fc4f0}
+.ssr-page{padding:28px 0 56px;max-width:860px}
+.ssr-price{font-size:28px;font-weight:900;color:var(--navy)}
+.ssr-dl{display:grid;grid-template-columns:140px 1fr;gap:6px 14px}.ssr-dl dt{color:var(--muted);font-weight:700}.ssr-dl dd{margin:0}
+.ssr-meta{color:var(--muted)}
+
+/* ---------- Responsive ---------- */
+@media(max-width:980px){
+  .request-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .results-layout{grid-template-columns:220px minmax(0,1fr)}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:800px){
+  .hide-sm{display:none!important}
+  .show-sm{display:inline-flex!important}
+  .menu-btn.show-sm{display:grid!important}
+  .topbar-in{gap:10px;min-height:58px;flex-wrap:wrap;padding:8px 0}
+  .logo{font-size:23px}
+  .top-search{order:3;flex-basis:100%;max-width:none}
+  .top-search input{height:40px}
+  .hero{padding:30px 0 28px}
+  .hero-sub{font-size:15px}
+  .hero-search{flex-direction:column}
+  .hero-search input{height:44px}
+  .hero-search .btn{height:44px}
+  .hero-vehicle select{flex-basis:100%}
+  .hero-vehicle .btn{width:100%}
+  .steps{grid-template-columns:1fr}
+  .results-layout{display:block}
+  .filters{display:none;margin-bottom:14px}
+  .filters.open{display:block}
+  .results-tools{width:100%}.results-tools>*{flex:1}
+  .results-tools .btn{height:42px}
+  .request-grid,.two,.detail-grid{grid-template-columns:1fr}
+  .footer-cols{grid-template-columns:1fr}
+  .listing{padding:12px;gap:10px}
+  .listing-thumb{flex-basis:72px;height:72px;font-size:26px}
+  .page-head h2,.narrow>h2,.results-head h2{font-size:25px}
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .phone-row{align-items:flex-start;flex-direction:column}
+}
+@media(max-width:480px){
+  .listing-thumb{display:none}
+  .modal-card{padding:18px}
+}
+
+/* moduri speciale pentru pagina de rezultate (Anunțurile mele / Favorite) */
+#page-results[data-mode="mine"] .filters,#page-results[data-mode="fav"] .filters,
+#page-results[data-mode="mine"] .result-search,#page-results[data-mode="fav"] .result-search,
+#page-results[data-mode="mine"] .results-tools,#page-results[data-mode="fav"] .results-tools{display:none!important}
+#page-results[data-mode="mine"] .results-layout,#page-results[data-mode="fav"] .results-layout{grid-template-columns:1fr}
+.contact-slot{margin-top:auto}
