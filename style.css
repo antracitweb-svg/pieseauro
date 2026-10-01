@@ -207,3 +207,12 @@ body.lightbox-open{overflow:hidden}
   .listing-meta{font-size:14px}
   .listing-price{font-size:21px}
 }
+
+@media(max-width:700px){.hide-sm{display:none!important}}
+.tool-list{display:grid;gap:12px;margin-top:14px}.tool-item{display:grid;gap:6px}.tool-item .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+body.search-open{overflow:hidden}
+
+.results-actions select{min-height:48px;padding:0 14px;border:1px solid var(--line);border-radius:14px;background:#fff;font-weight:700;color:var(--ink)}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:4px}.stat h3{margin:0;font-size:28px}.stat small{color:var(--muted)}

@@ -55,8 +55,49 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 
 ## V26 — Contul meu și fluxuri noi
 - Butoanele din Contul meu pentru oferte, comenzi, mesaje, notificări și financiar au rute și interfețe funcționale.
-- Backend PostgreSQL pentru oferte, comenzi, mesaje, notificări, portofel de credite, tranzacții și facturi.
+- Backend PostgreSQL pentru oferte, comenzi, mesaje și notificări. Creditele, tranzacțiile și facturile sunt deocamdată doar pagini informative (fără backend).
 - Acceptarea unei oferte creează automat o comandă și actualizează cererea.
 - Notificări pentru oferte, comenzi și mesaje.
 - Săgețile din secțiunile Contului sunt aliniate la dreapta și se rotesc la deschidere.
 - Formularul „Trimite o ofertă” este disponibil din cererile publice.
+
+## Corecturi conturi / autentificare
+- Login: comparație bcrypt și pentru conturi inexistente (fără scurgere de informații prin timp de răspuns).
+- Înregistrare: verificare email fără diferență majuscule/minuscule; conflict de nickname returnează mesajul corect.
+- Schimbare email: cere parola curentă (protejează contul dacă o sesiune este furată), limitare încercări, ștergerea cererii dacă emailul nu pleacă, mesaje clare pentru erori Resend.
+- Confirmare email nou: gestionează conflictul de email unic fără eroare 500.
+- Validări suplimentare pentru body-uri lipsă și telefon la `PATCH /api/me`.
+
+## Corecturi catalog și căutare
+- Pornire server: `ah` era folosit înainte de definire (eroare `Cannot access 'ah' before initialization`) – mutat sus.
+- Catalog: snapshotul local `vehicles.json` nu mai blochează actualizarea (se reîncearcă sursa online dacă are peste 7 zile); o singură descărcare chiar dacă vin mai multe cereri simultan; nume corecte în fallback (Land Rover, Alfa Romeo, Rolls-Royce, Aston Martin); potrivire mai bună la „Identifică mașina”.
+- Căutare: diacritice extinse (Škoda, Citroën etc.), coduri OEM găsite și când sunt scrise cu spații/liniuțe, căutare și în an și combustibil, filtre marcă/model/județ/categorie insensibile la majuscule, spații și cratime, anunțurile fără preț la finalul sortării crescătoare, paginare protejată de valori invalide.
+- Frontend: lista de mărci se reîncarcă automat dacă prima cerere eșuează.
+
+- Performanță: listele de anunțuri (căutare, „Anunțurile mele”) trimit doar prima poză; galeria completă se încarcă în pagina de detaliu. Înainte, 30 de anunțuri puteau aduce zeci de MB.
+
+## Corecturi de securitate
+- Linkurile din emailuri și pagina SEO nu mai depind de antetul `Host` al clientului (se folosesc `APP_URL` sau `RENDER_EXTERNAL_URL`; altfel host validat). Adresa de bază este escapată în HTML.
+- Mesaje și oferte afișează nickname-ul, nu numele real; conturile blocate nu mai pot fi accesate prin `/api/messages/:uid`.
+- Login: limită suplimentară per cont (40 încercări / 15 min) împotriva ghicirii distribuite.
+- Raportări anunțuri: limită de 20 pe oră per utilizator.
+
+## Întărire suplimentară (fază de test)
+- Parole: sunt respinse parolele comune (`12345678`, `parola123` etc.), cele doar cu cifre (sub 12 caractere), caracterele repetate și parolele care conțin partea dinaintea `@` din email sau nickname-ul. Se aplică la înregistrare, resetare și schimbare parolă.
+- Login: încercările eșuate se țin și în baza de date (`login_attempts`, 15 minute), deci limitarea rezistă repornirilor serverului.
+- Poze: maximum 60 MB de poze per utilizator, în total.
+- Baza de date: `DATABASE_SSL_STRICT=true` activează verificarea certificatului SSL (implicit oprit, cum cere de obicei Render).
+- La pornire, serverul avertizează în log dacă `ADMIN_PASSWORD` este slabă (sub 12 caractere).
+- Verificarea emailului la înregistrare NU este activă (decizie pentru perioada de test).
+
+## Corecturi „Vinde o piesă” / postare anunțuri
+- Formular: „Tip anunț” (Piesă / Mașină la dezmembrat) și „Vând ca” (Persoană fizică / Firmă / Parc dezmembrări) sunt acum alegeri vizibile; înainte erau câmpuri ascunse, deci nu se putea posta niciun anunț de dezmembrări și nu se putea alege tipul de vânzător.
+- Trimitere: butonul se dezactivează cât se trimite (fără anunțuri duplicate), pozele se așteaptă până se procesează, după publicare utilizatorul este dus la „Anunțurile mele”.
+- Poze: PNG-urile transparente nu mai ies cu fundal negru; comprimare adaptivă (rezoluție + calitate) cu țintă care permite 8 poze în limita serverului; dacă selectezi prea multe, se adaugă primele până la 8; mesaje de eroare clare (poză invalidă / poze prea mari).
+- An: validat și pe server (1950 – anul viitor).
+- Stare anunț: buton „Marchează vândut” / „Repune la vânzare” în Anunțurile mele (`PATCH /api/listings/:id/status`); anunțurile vândute dispar din căutare.
+
+## Editare anunțuri
+- „Anunțurile mele” → buton **Editează** (nu apare la anunțurile blocate de admin). Se deschide același formular, completat, la `#/vinde?edit=<id>`.
+- Prețul, livrarea, negocierea, județul, starea și tipul de vânzător se salvează direct. Titlul, descrierea, pozele, categoria, marca/modelul, anul, OEM-ul sau tipul anunțului trimit anunțul din nou la moderare (apare „În așteptare”). Anunțurile respinse revin la moderare după editare.
+- Endpointuri noi: `GET /api/listings/mine/:id` (anunțul propriu, cu toate pozele) și `PATCH /api/listings/:id`. Validarea e comună cu publicarea (`parseListing`).
