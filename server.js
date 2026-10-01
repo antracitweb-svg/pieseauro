@@ -54,7 +54,7 @@ app.use(helmet({
   imgSrc:["'self'","data:"],connectSrc:["'self'"],fontSrc:["'self'","data:"],objectSrc:["'none'"],
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
-app.use(express.json({limit:'100kb'}));
+app.use(express.json({limit:'20mb'}));
 app.use(cookieParser());
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control',f==='index.html'?'no-cache':'public, max-age=300');res.sendFile(path.join(__dirname,f));});
@@ -73,6 +73,20 @@ CREATE TABLE IF NOT EXISTS listings (
  engine TEXT, fuel TEXT, vehicle_id TEXT, seller_type TEXT, quantity INTEGER DEFAULT 1, negotiable BOOLEAN DEFAULT FALSE,
  county TEXT, category TEXT, oem TEXT, delivery BOOLEAN DEFAULT FALSE, description TEXT DEFAULT '',
  status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS vehicle_makes (
+ id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, slug TEXT UNIQUE NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS vehicle_models (
+ id SERIAL PRIMARY KEY, make_id INTEGER NOT NULL REFERENCES vehicle_makes(id) ON DELETE CASCADE, name TEXT NOT NULL, slug TEXT NOT NULL,
+ UNIQUE(make_id,slug)
+);
+CREATE TABLE IF NOT EXISTS vehicle_variants (
+ id SERIAL PRIMARY KEY, model_id INTEGER NOT NULL REFERENCES vehicle_models(id) ON DELETE CASCADE, generation TEXT DEFAULT '', year_from INTEGER, year_to INTEGER, engine TEXT DEFAULT '', fuel TEXT DEFAULT '',
+ UNIQUE(model_id,generation,year_from,year_to,engine,fuel)
+);
+CREATE TABLE IF NOT EXISTS listing_photos (
+ id SERIAL PRIMARY KEY, listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE, sort_order INTEGER NOT NULL DEFAULT 0, mime_type TEXT NOT NULL, data BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS favorites (
  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, listing_id INTEGER REFERENCES listings(id) ON DELETE CASCADE,
@@ -127,6 +141,11 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT',
   'CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_unique_idx ON users(nickname) WHERE nickname IS NOT NULL',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE',
+  'CREATE TABLE IF NOT EXISTS vehicle_makes (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, slug TEXT UNIQUE NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE TABLE IF NOT EXISTS vehicle_models (id SERIAL PRIMARY KEY, make_id INTEGER NOT NULL REFERENCES vehicle_makes(id) ON DELETE CASCADE, name TEXT NOT NULL, slug TEXT NOT NULL, UNIQUE(make_id,slug))',
+  "CREATE TABLE IF NOT EXISTS vehicle_variants (id SERIAL PRIMARY KEY, model_id INTEGER NOT NULL REFERENCES vehicle_models(id) ON DELETE CASCADE, generation TEXT DEFAULT '', year_from INTEGER, year_to INTEGER, engine TEXT DEFAULT '', fuel TEXT DEFAULT '', UNIQUE(model_id,generation,year_from,year_to,engine,fuel))",
+  'CREATE TABLE IF NOT EXISTS listing_photos (id SERIAL PRIMARY KEY, listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE, sort_order INTEGER NOT NULL DEFAULT 0, mime_type TEXT NOT NULL, data BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE INDEX IF NOT EXISTS listing_photos_listing_idx ON listing_photos(listing_id,sort_order)',
   'CREATE TABLE IF NOT EXISTS user_phones (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, phone TEXT NOT NULL, is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE, verified BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id, phone))',
   'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)'
  ];
@@ -140,12 +159,60 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)'
  );
  for(const q of migrations) await pool.query(q);
+ await seedVehicleCatalog();
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
  await pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
  if(adminEmail&&adminPass){const r=await pool.query('SELECT id FROM users WHERE email=$1',[adminEmail.toLowerCase()]);if(!r.rowCount){const hash=await bcrypt.hash(adminPass,12);await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'admin')",['Administrator',adminEmail.toLowerCase(),hash]);}}
  await pool.query("INSERT INTO user_phones(user_id,phone,verified) SELECT id,phone,email_verified FROM users WHERE phone IS NOT NULL AND phone<>'' AND NOT EXISTS (SELECT 1 FROM user_phones p WHERE p.user_id=users.id AND p.phone=users.phone)");
  return true;
 }
+async function seedVehicleCatalog(){
+ const seed={
+  'Audi':['A1','A3','A4','A5','A6','A7','A8','Q2','Q3','Q5','Q7','Q8'],
+  'BMW':['Seria 1','Seria 2','Seria 3','Seria 4','Seria 5','Seria 6','Seria 7','X1','X2','X3','X4','X5','X6','X7'],
+  'Dacia':['Bigster','Duster','Jogger','Logan','Lodgy','Sandero','Spring'],
+  'Ford':['Fiesta','Focus','Mondeo','Kuga','Puma','Ranger','Transit'],
+  'Mercedes-Benz':['A-Class','B-Class','C-Class','E-Class','S-Class','CLA','GLA','GLC','GLE','Sprinter','Vito'],
+  'Opel':['Astra','Corsa','Insignia','Mokka','Crossland','Grandland','Zafira'],
+  'Renault':['Clio','Captur','Megane','Kadjar','Koleos','Scenic','Master','Trafic'],
+  'Skoda':['Fabia','Octavia','Superb','Karoq','Kodiaq','Scala','Kamiq'],
+  'Toyota':['Aygo','Yaris','Corolla','Camry','C-HR','RAV4','Land Cruiser','Hilux'],
+  'Volkswagen':['Golf','Polo','Passat','Jetta','Tiguan','Touareg','Touran','Caddy','Transporter'],
+  'Volvo':['S40','S60','S90','V40','V60','V90','XC40','XC60','XC90'],
+  'Peugeot':['208','308','508','2008','3008','5008','Partner','Boxer'],
+  'Citroen':['C3','C4','C5 Aircross','Berlingo','Jumpy','Jumper'],
+  'Fiat':['500','Panda','Punto','Tipo','Doblo','Ducato'],
+  'Hyundai':['i10','i20','i30','Kona','Tucson','Santa Fe'],
+  'Kia':['Picanto','Rio','Ceed','Sportage','Sorento'],
+  'Nissan':['Micra','Juke','Qashqai','X-Trail','Navara'],
+  'Honda':['Jazz','Civic','Accord','CR-V','HR-V'],
+  'Mazda':['2','3','6','CX-3','CX-5','CX-60'],
+  'Mitsubishi':['Colt','Lancer','ASX','Outlander','Pajero'],
+  'Suzuki':['Swift','Vitara','S-Cross','Jimny'],
+  'Seat':['Ibiza','Leon','Ateca','Arona','Tarraco'],
+  'Alfa Romeo':['Giulietta','Giulia','Stelvio'],
+  'Jeep':['Renegade','Compass','Cherokee','Grand Cherokee','Wrangler']
+ };
+ const catalog=await getCatalog();
+ const rows=catalog.length?catalog:[];
+ if(rows.length){
+  for(const v of rows){
+   const make=v.make.trim(), model=v.model.trim(); if(!make||!model)continue;
+   await pool.query(`INSERT INTO vehicle_makes(name,slug) VALUES($1,$2) ON CONFLICT(name) DO NOTHING`,[make,slugify(make)]);
+   const mr=await pool.query('SELECT id FROM vehicle_makes WHERE slug=$1',[slugify(make)]); if(!mr.rowCount)continue;
+   await pool.query(`INSERT INTO vehicle_models(make_id,name,slug) VALUES($1,$2,$3) ON CONFLICT(make_id,slug) DO NOTHING`,[mr.rows[0].id,model,slugify(model)]);
+   const mm=await pool.query('SELECT id FROM vehicle_models WHERE make_id=$1 AND slug=$2',[mr.rows[0].id,slugify(model)]); if(!mm.rowCount)continue;
+   const years=(v.years||[]).map(Number).filter(Number.isInteger).sort((a,b)=>a-b);
+   await pool.query(`INSERT INTO vehicle_variants(model_id,generation,year_from,year_to,engine,fuel) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,[mm.rows[0].id,clip(v.generation,120)||'',years[0]||null,years.at(-1)||null,clip(v.engine,120)||'',clip(v.fuel,50)||'']);
+  }
+ }
+ for(const [make,models] of Object.entries(seed)){
+  await pool.query(`INSERT INTO vehicle_makes(name,slug) VALUES($1,$2) ON CONFLICT(name) DO NOTHING`,[make,slugify(make)]);
+  const mr=await pool.query('SELECT id FROM vehicle_makes WHERE slug=$1',[slugify(make)]);
+  for(const model of models) await pool.query(`INSERT INTO vehicle_models(make_id,name,slug) VALUES($1,$2,$3) ON CONFLICT(make_id,slug) DO NOTHING`,[mr.rows[0].id,model,slugify(model)]);
+ }
+}
+
 function hashToken(token){return crypto.createHash('sha256').update(token).digest('hex');}
 function safeCookieOptions(maxAge){return {httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/',maxAge};}
 async function createSession(user,req,remember=true){
@@ -251,8 +318,9 @@ function resolveText(catalog,q){
 }
 
 app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'vehiclesdb',catalogLoaded:Array.isArray(catalogCache),catalogCount:Array.isArray(catalogCache)?catalogCache.length:0,auth:'secure-revocable-session-cookie'}));
-app.get('/api/catalog/makes',async(req,res)=>{const c=await getCatalog();const makes=[...new Set(c.map(x=>x.make))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({makes:makes.map(name=>({name})),count:makes.length});});
-app.get('/api/catalog/models',async(req,res)=>{const make=String(req.query.make||'');const c=await getCatalog();const models=[...new Set(c.filter(x=>norm(x.make)===norm(make)).map(x=>x.model))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({models:models.map(name=>({name})),count:models.length});});
+app.get('/api/catalog/makes',async(req,res)=>{if(pool){const r=await pool.query('SELECT id,name FROM vehicle_makes ORDER BY name');return res.json({makes:r.rows,count:r.rowCount});}const c=await getCatalog();const makes=[...new Set(c.map(x=>x.make))].sort((a,b)=>a.localeCompare(b,'ro'));res.json({makes:makes.map(name=>({name})),count:makes.length});});
+app.get('/api/catalog/models',async(req,res)=>{const make=String(req.query.make||'');if(pool){const r=await pool.query('SELECT vm.id,vm.name FROM vehicle_models vm JOIN vehicle_makes mk ON mk.id=vm.make_id WHERE LOWER(mk.name)=LOWER($1) ORDER BY vm.name',[make]);return res.json({models:r.rows,count:r.rowCount});}const c=await getCatalog();const models=[...new Set(c.filter(x=>norm(x.make)===norm(make)).map(x=>x.model))].sort((a,b)=>a.localeCompare(b,'ro'));res.json({models:models.map(name=>({name})),count:models.length});});
+app.get('/api/catalog/variants',async(req,res)=>{const make=String(req.query.make||''),model=String(req.query.model||'');if(pool){const r=await pool.query(`SELECT vv.id,vv.generation,vv.year_from,vv.year_to,vv.engine,vv.fuel FROM vehicle_variants vv JOIN vehicle_models vm ON vm.id=vv.model_id JOIN vehicle_makes mk ON mk.id=vm.make_id WHERE LOWER(mk.name)=LOWER($1) AND LOWER(vm.name)=LOWER($2) ORDER BY vv.year_from NULLS LAST,vv.engine`,[make,model]);return res.json({variants:r.rows});}res.json({variants:[]});});
 app.get('/api/catalog/resolve',async(req,res)=>{const q=String(req.query.q||'').trim();if(!q)return res.json({match:null});const c=await getCatalog();const match=resolveText(c,q);res.json({match});});
 
 app.get('/api/me',async(req,res)=>{
@@ -459,9 +527,11 @@ app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=awa
 const LISTING_SELECT="SELECT l.*,COALESCE(u.nickname,u.name) seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id";
 const CATEGORIES=['Motor','Transmisie','Frâne','Iluminare','Caroserie','Suspensie','Roți','Electrică','Interior','Climatizare','Evacuare','Filtre','Altele'];
 const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
+const COUNTIES=['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèê','aaisstteee')`;
 app.get('/api/listings/mine',auth,requireDb,async(req,res)=>{
  const r=await pool.query("SELECT l.* FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 200",[req.user.id]);
+ if(r.rows.length){const ids=r.rows.map(x=>x.id);const ph=await pool.query('SELECT listing_id,array_agg(id ORDER BY sort_order,id) photo_ids FROM listing_photos WHERE listing_id=ANY($1::int[]) GROUP BY listing_id',[ids]);const pm=new Map(ph.rows.map(x=>[x.listing_id,x.photo_ids||[]]));r.rows.forEach(x=>x.photo_ids=pm.get(x.id)||[]);}
  res.json({listings:r.rows});
 });
 app.get('/api/favorites',auth,requireDb,async(req,res)=>{
@@ -499,6 +569,7 @@ app.get('/api/listings',requireDb,async(req,res)=>{
  const limit=Math.min(60,Math.max(1,Number(req.query.limit)||30)), offset=Math.max(0,Number(req.query.offset)||0);
  const total=(await pool.query(`SELECT COUNT(*)::int n FROM listings l WHERE ${where.join(' AND ')}`,vals)).rows[0].n;
  const r=await pool.query(`${LISTING_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`,vals);
+ if(r.rows.length){const ids=r.rows.map(x=>x.id);const ph=await pool.query('SELECT listing_id,array_agg(id ORDER BY sort_order,id) photo_ids FROM listing_photos WHERE listing_id=ANY($1::int[]) GROUP BY listing_id',[ids]);const pm=new Map(ph.rows.map(x=>[x.listing_id,x.photo_ids||[]]));r.rows.forEach(x=>x.photo_ids=pm.get(x.id)||[]);}
  res.json({listings:r.rows,total,limit,offset});
 });
 app.get('/api/listings/:id',requireDb,async(req,res)=>{
@@ -506,9 +577,11 @@ app.get('/api/listings/:id',requireDb,async(req,res)=>{
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const x=r.rows[0]; let phones=[];
  if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[x.user_id])).rows;
+ x.photo_ids=(await pool.query('SELECT id FROM listing_photos WHERE listing_id=$1 ORDER BY sort_order,id',[x.id])).rows.map(p=>p.id);
  delete x.seller_show_phone;
  res.json({listing:x,phones});
 });
+app.get('/api/listings/:id/photos/:photoId',async(req,res)=>{const r=await pool?.query('SELECT mime_type,data FROM listing_photos WHERE id=$1 AND listing_id=$2',[req.params.photoId,req.params.id]);if(!r?.rowCount)return res.status(404).end();res.set('Cache-Control','public, max-age=31536000, immutable');res.type(r.rows[0].mime_type);res.send(r.rows[0].data);});
 app.delete('/api/listings/:id',auth,requireDb,async(req,res)=>{
  const d=await pool.query('DELETE FROM listings WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.id]);
  if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
@@ -522,13 +595,16 @@ app.post('/api/listings',auth,requireDb,async(req,res)=>{
  const x=req.body||{};
  if(!['piesa','dezmembrari'].includes(x.type)||typeof x.title!=='string'||x.title.trim().length<3||x.title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});
  if(x.type==='piesa'&&!['Nouă','Second-hand'].includes(x.condition))return res.status(400).json({error:'STARE_INVALIDA'});
- const price=Number(x.price)||0; if(price<0||price>10000000)return res.status(400).json({error:'DATE_INVALIDE'});
+ const price=Number(x.price)||0; if(!Number.isFinite(price)||price<0||price>10000000)return res.status(400).json({error:'DATE_INVALIDE'});
  if(x.category&&!CATEGORIES.includes(x.category))return res.status(400).json({error:'DATE_INVALIDE'});
+ if(x.county&&!COUNTIES.includes(x.county))return res.status(400).json({error:'JUDET_INVALID'});
  if(x.seller_type&&!SELLER_TYPES.includes(x.seller_type))return res.status(400).json({error:'DATE_INVALIDE'});
  const pending=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status='pending'",[req.user.id]);
  if(pending.rows[0].n>=20)return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});
  const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'pending') RETURNING *`,
   [req.user.id,x.type,x.title.trim(),price,clip(x.condition,30),clip(x.make,60),clip(x.model,80),clip(x.generation,80),clip(x.year,10),clip(x.engine,80),clip(x.fuel,30),clip(x.vehicle_id,120),clip(x.seller_type,30),Math.min(9999,Math.max(1,Number(x.quantity)||1)),!!x.negotiable,clip(x.county,60),clip(x.category,60),clip(x.oem,60),!!x.delivery,String(x.description||'').slice(0,5000)]);
+ const photos=Array.isArray(x.photos)?x.photos.slice(0,6):[];
+ for(let n=0;n<photos.length;n++){const p=photos[n];if(typeof p!=='object'||!/^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(String(p.data||'')))continue;const m=String(p.data).match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,(.+)$/);if(!m)continue;const buf=Buffer.from(m[2],'base64');if(buf.length>2*1024*1024)continue;await pool.query('INSERT INTO listing_photos(listing_id,sort_order,mime_type,data) VALUES($1,$2,$3,$4)',[r.rows[0].id,n,m[1],buf]);}
  res.status(201).json({listing:r.rows[0]});
 });
 app.get('/api/requests',requireDb,async(req,res)=>{
@@ -582,10 +658,12 @@ app.get('/piese/:idSlug',async(req,res,next)=>{
   const x=r.rows[0]; const base=appBaseUrl(req); const slug=slugify(x.title);
   if(req.params.idSlug!==`${x.id}-${slug}`)return res.redirect(301,`/piese/${x.id}-${slug}`);
   const canonical=`${base}/piese/${x.id}-${slug}`;
+  const photos=(await pool.query('SELECT id FROM listing_photos WHERE listing_id=$1 ORDER BY sort_order,id',[x.id])).rows.map(p=>p.id);
   const product={'@context':'https://schema.org','@type':'Product',name:x.title,description:x.description||x.title,sku:x.oem||String(x.id),brand:x.make?{'@type':'Brand',name:x.make}:undefined,itemCondition:x.condition==='Nouă'?'https://schema.org/NewCondition':'https://schema.org/UsedCondition',offers:{'@type':'Offer',price:Number(x.price||0),priceCurrency:'RON',availability:'https://schema.org/InStock',url:canonical}};
   const clean=JSON.stringify(product).replace(/</g,'\\u003c');
   const price=Number(x.price||0)>0?new Intl.NumberFormat('ro-RO').format(Number(x.price))+' lei':'La cerere';
-  res.set('Cache-Control','public, max-age=300').type('html').send(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(x.title)} | AutoPiese</title><meta name="description" content="${escapeHtml((x.description||x.title).slice(0,155))}"><link rel="canonical" href="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css"><script type="application/ld+json">${clean}</script></head><body><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Piese</span></a></div></header><main class="container ssr-page"><p class="crumbs"><a href="/">AutoPiese</a> › ${escapeHtml(x.category||'Piese auto')}</p><h1>${escapeHtml(x.title)}</h1><p class="ssr-meta">${escapeHtml([x.make,x.model,x.year].filter(Boolean).join(' · '))}</p><p class="ssr-price">${price}</p><p>${escapeHtml(x.description||'')}</p><dl class="ssr-dl"><dt>Stare</dt><dd>${escapeHtml(x.condition||'—')}</dd><dt>Cod OEM</dt><dd>${escapeHtml(x.oem||'—')}</dd><dt>Județ</dt><dd>${escapeHtml(x.county||'—')}</dd><dt>Vânzător</dt><dd>${escapeHtml(x.seller_name||'—')}</dd></dl><p><a class="btn primary" href="/#/rezultate">Vezi toate anunțurile</a></p></main></body></html>`);
+  const gallery=photos.length?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:18px 0">${photos.map((id,i)=>`<img src="/api/listings/${x.id}/photos/${id}" alt="Fotografie ${i+1}" style="width:100%;height:160px;object-fit:cover;border-radius:12px">`).join('')}</div>`:'';
+  res.set('Cache-Control','public, max-age=300').type('html').send(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(x.title)} | AutoPiese</title><meta name="description" content="${escapeHtml((x.description||x.title).slice(0,155))}"><link rel="canonical" href="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css"><script type="application/ld+json">${clean}</script></head><body><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Piese</span></a></div></header><main class="container ssr-page"><p class="crumbs"><a href="/">AutoPiese</a> › ${escapeHtml(x.category||'Piese auto')}</p><h1>${escapeHtml(x.title)}</h1><p class="ssr-meta">${escapeHtml([x.make,x.model,x.year].filter(Boolean).join(' · '))}</p><p class="ssr-price">${price}</p>${gallery}<p>${escapeHtml(x.description||'')}</p><dl class="ssr-dl"><dt>Stare</dt><dd>${escapeHtml(x.condition||'—')}</dd><dt>Cod OEM</dt><dd>${escapeHtml(x.oem||'—')}</dd><dt>Județ</dt><dd>${escapeHtml(x.county||'—')}</dd><dt>Vânzător</dt><dd>${escapeHtml(x.seller_name||'—')}</dd></dl><p><a class="btn primary" href="/#/rezultate">Vezi toate anunțurile</a></p></main></body></html>`);
  }catch(e){console.error(e);return next();}
 });
 
