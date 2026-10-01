@@ -21,7 +21,7 @@ const CATEGORIES = [['Accesorii auto','🧰'],['Accesorii roți','🛞'],['Car a
 const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],rejected:['Respins','bad'],blocked:['Blocat','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
-const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','account-tool':'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
+const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','account-tool':'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings',messages:'page-messages','verify-email-change':'page-verify-email-change'};
 const AUTH_ROUTES = new Set(['cont','cerere','vinde','settings','admin']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',maxPrice:'maxPrice',filterSeller:'seller_type',sortListings:'sort'};
 
@@ -86,7 +86,8 @@ function route(){
   else if(name==='stores') loadStores(params.get('t')==='parks');
   else if(name==='saved') renderSaved();
   else if(name==='cont') renderAccount();
-  else if(name==='settings') safe(loadSettings)();
+  else if(name==='settings') safe(()=>loadSettings(params.get('section')))();
+  else if(name==='messages') renderMessages(params.get('tab')||'received');
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
   else if(name==='admin') safe(loadAdmin)();
   else if(name==='menu') renderHeader();
@@ -645,7 +646,7 @@ async function submitSell(e){
 function priceElReset(){ const p=$('#sellPrice'); if(p){p.value='';p.dataset.manual='0';p.dataset.auto='0';} const h=$('#sellPriceHint'); if(h)h.textContent='După alegerea categoriei și a mașinii, încercăm să estimăm prețul din anunțuri similare. Îl poți modifica.'; }
 
 /* ---------- setări cont ---------- */
-async function loadSettings(){
+async function loadSettings(section='general'){
   const r = await api('/api/account/settings');
   state.phones = r.phones;
   $('#settingsName').value = r.user.name || ''; $('#settingsNickname').value = r.user.nickname || '';
@@ -653,7 +654,22 @@ async function loadSettings(){
   $('#showPhoneToggle').checked = !!r.user.show_phone;
   $('#phoneList').innerHTML = r.phones.map(p=>`<div class="phone-row"><span>${esc(p.phone)}${p.is_whatsapp?' · WhatsApp':''}</span><span><button type="button" class="text-btn" data-wa-phone="${p.id}">${p.is_whatsapp?'Scoate WhatsApp':'Marchează WhatsApp'}</button> <button type="button" class="text-btn danger-text" data-del-phone="${p.id}">Șterge</button></span></div>`).join('') || '<p class="form-note">Nu ai numere adăugate.</p>';
   $('#phoneAddForm').classList.toggle('hidden', r.phones.length>=4);
+  $$('#settingsModern .settings-detail').forEach(d=>d.open=false);
+  const wanted = $('#settingsModern .settings-detail[data-settings-section=\"'+section+'\"]');
+  if(wanted) wanted.open=true; else $('#settingsModern .settings-detail[data-settings-section=\"general\"]').open=true;
 }
+
+function renderMessages(tab='received') {
+  $$('.message-tab').forEach(b=>b.classList.toggle('active', b.dataset.messageTab===tab));
+  const list=$('#messageList');
+  if(tab==='compose'){
+    list.innerHTML='<div class=\"message-compose\"><h3>Trimite un mesaj</h3><label>Către<input placeholder=\"Nickname sau email\"></label><label>Subiect<input placeholder=\"Subiectul mesajului\"></label><label>Mesaj<textarea rows=7 placeholder=\"Scrie mesajul...\"></textarea></label><button class=\"btn primary\" type=\"button\">Trimite mesajul</button></div>';
+    return;
+  }
+  const labels={received:'Mesaje primite',sent:'Mesaje trimise',archived:'Mesaje arhivate'};
+  list.innerHTML='<div class=\"message-count-row\"><label><input type=\"checkbox\"> <b>'+labels[tab]+' (0)</b></label></div><div class=\"message-empty\"><div class=\"message-empty-icon\">✉</div><h3>Nu ai mesaje</h3><p>Mesajele '+(tab==='received'?'primite':tab==='sent'?'trimise':'arhivate')+' vor apărea aici.</p></div>';
+}
+
 async function saveProfile(e){
   e.preventDefault(); const msg = $('#profileSettingsMsg'); setMsg(msg,'');
   try{
@@ -745,7 +761,9 @@ function accountAction(a){
   else if(a==='saved') navigate('saved');
   else if(a==='delete-account') navigate('account-tool?view=delete-account');
   else if(a==='requests-lucrari') navigate('account-tool?view=requests-lucrari');
-  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices','ratings','import-csv','price-update','ad-generator','statistics','b2b','subscriptions','shipping','company','service-register'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
+  else if(a==='messages') navigate('messages');
+  else if(['offers','orders-seller','offers-received','orders','notifications','credits','transactions','invoices','ratings','import-csv','price-update','ad-generator','statistics','b2b'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
+  else if(['subscriptions','shipping','company','service-register','delete-account'].includes(a)) navigate('settings?section='+encodeURIComponent(a));
 }
 
 document.addEventListener('click', e=>{
@@ -770,6 +788,8 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-send-report]'))){ safe(sendReport)(Number(el.dataset.sendReport)); return; }
   if((el=t.closest('[data-wa-phone]'))){ const id=Number(el.dataset.waPhone); const row=(state.phones||[]).find(p=>p.id===id); if(row) safe(async()=>{ await api('/api/account/phones/'+id,{method:'PATCH',body:JSON.stringify({is_whatsapp:!row.is_whatsapp})}); await loadSettings(); })(); return; }
   if((el=t.closest('[data-del-phone]'))){ const id=el.dataset.delPhone; if(confirm('Ștergi acest număr?')) safe(async()=>{ await api('/api/account/phones/'+id,{method:'DELETE'}); await loadSettings(); })(); return; }
+  if((el=t.closest('[data-message-tab]'))){ navigate('messages?tab='+encodeURIComponent(el.dataset.messageTab)); return; }
+  if((el=t.closest('[data-message-filter]'))){ toast('Filtrarea mesajelor va fi disponibilă aici.'); return; }
   if((el=t.closest('[data-admin-tab]'))){ adminTab=el.dataset.adminTab; renderAdmin(); return; }
   if((el=t.closest('[data-admin]'))){ safe(adminAction)(el); return; }
   if((el=t.closest('[data-action]'))){ doAction(el.dataset.action); return; }
