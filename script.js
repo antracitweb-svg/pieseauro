@@ -15,13 +15,13 @@ const ERR = {
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
   PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',ADMIN_ONLY:'Doar administratorul are acces.',
-  STATUS_INVALIDE:'Status invalid.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',JUDET_INVALID:'Alege un județ valid din listă.'
+  STATUS_INVALIDE:'Status invalid.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.'
 };
 const CATEGORIES = [['Motor','⚙️'],['Transmisie','🔧'],['Frâne','🛑'],['Iluminare','💡'],['Caroserie','🚗'],['Suspensie','🔩'],['Roți','🛞'],['Electrică','🔌'],['Interior','💺'],['Climatizare','❄️'],['Evacuare','💨'],['Filtre','🧴'],['Altele','📦']];
 const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],rejected:['Respins','bad'],blocked:['Blocat','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
-const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
+const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','account-tool':'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
 const AUTH_ROUTES = new Set(['cont','cerere','vinde','settings','admin']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',maxPrice:'maxPrice',filterSeller:'seller_type',sortListings:'sort'};
 
@@ -40,8 +40,6 @@ const safe = fn => (...a) => Promise.resolve().then(()=>fn(...a)).catch(e=>toast
 let currentUser = null;
 let favorites = readJSON('autopiese_fav', []).map(Number).filter(Number.isFinite);
 const modelCache = new Map();
-let sellPhotoFiles = [];
-let sellPhotoData = [];
 const state = { mode:'search', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{} };
 
 async function api(url, opt={}){
@@ -90,6 +88,7 @@ function route(){
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
   else if(name==='admin') safe(loadAdmin)();
   else if(name==='menu') renderHeader();
+  else if(name==='account-tool') renderAccountTool(params.get('view'));
 }
 
 function renderHeader(){
@@ -104,6 +103,27 @@ function renderHeader(){
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
   renderHeader();
+}
+
+function renderAccountTool(view){
+  const data = {
+    cart:{title:'Coșul meu',text:'Coșul este pregătit. Anunțurile adăugate în coș vor apărea aici.',action:'rezultate',label:'Vezi piesele'},
+    offers:{title:'Oferte la cereri',text:'Aici vei putea trimite și gestiona ofertele pentru cererile de piese.',action:'requests',label:'Vezi cererile disponibile'},
+    'orders-seller':{title:'Comenzi din oferte',text:'Comenzile acceptate din ofertele tale vor apărea aici.',action:null,label:null},
+    'offers-received':{title:'Ofertele primite',text:'Ofertele primite la cererile tale vor apărea aici.',action:'requests?t=mine',label:'Vezi cererile mele'},
+    orders:{title:'Comenzile mele',text:'Comenzile tale vor apărea aici după ce o ofertă este acceptată.',action:null,label:null},
+    messages:{title:'Mesaje',text:'Mesageria dintre cumpărători și vânzători va apărea aici.',action:null,label:null},
+    notifications:{title:'Notificări',text:'Notificările contului vor apărea aici când există activitate nouă.',action:null,label:null},
+    credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
+    transactions:{title:'Tranzacții',text:'Istoricul tranzacțiilor va apărea aici după implementarea plăților.',action:null,label:null},
+    invoices:{title:'Facturi',text:'Facturile vor apărea aici după implementarea plăților și facturării.',action:null,label:null}
+  };
+  const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
+  $('#accountToolTitle').textContent=d.title;
+  $('#accountToolText').textContent=d.text;
+  const b=$('#accountToolAction');
+  if(d.action){b.classList.remove('hidden');b.textContent=d.label;b.dataset.action=d.action;}else{b.classList.add('hidden');b.removeAttribute('data-action');}
+  $('#accountToolText2').textContent=d.text;
 }
 
 /* ---------- selecturi / catalog ---------- */
@@ -138,26 +158,6 @@ async function loadModels(make, selectId, first='Alege modelul'){
   }
   setOptions(el, first, models);
 }
-async function loadVariants(make,model){
-  if(!make||!model) return;
-  try{
-    const r=await api('/api/catalog/variants?make='+encodeURIComponent(make)+'&model='+encodeURIComponent(model));
-    const v=(r.variants||[])[0];
-    if(v){ if($('#sellGeneration')&&!$('#sellGeneration').value) $('#sellGeneration').value=v.generation||''; if($('#sellEngine')&&!$('#sellEngine').value) $('#sellEngine').value=v.engine||''; if($('#sellFuel')&&!$('#sellFuel').value&&v.fuel) $('#sellFuel').value=v.fuel; }
-  }catch{}
-}
-async function preparePhoto(file){
-  return new Promise((resolve,reject)=>{
-    const img=new Image(); const fr=new FileReader();
-    fr.onload=()=>{img.onload=()=>{const max=1400;let w=img.naturalWidth,h=img.naturalHeight;if(w>max||h>max){const r=Math.min(max/w,max/h);w=Math.round(w*r);h=Math.round(h*r);}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve({name:file.name,data:c.toDataURL('image/jpeg',.78)});};img.onerror=reject;img.src=fr.result;};fr.onerror=reject;fr.readAsDataURL(file);
-  });
-}
-async function handleSellPhotos(e){
-  sellPhotoFiles=[...e.target.files].slice(0,6); sellPhotoData=[];
-  for(const f of sellPhotoFiles){try{sellPhotoData.push(await preparePhoto(f));}catch{}}
-  const box=$('#sellPhotoPreview'); if(box) box.innerHTML=sellPhotoData.map((x,i)=>`<div class="photo-thumb"><img src="${x.data}" alt="Fotografie ${i+1}"><span>${i===0?'Principală':''}</span></div>`).join('');
-  if(e.target.files.length>6) toast('Am păstrat primele 6 fotografii.');
-}
 
 /* ---------- carduri ---------- */
 function card(x, o={}){
@@ -165,7 +165,7 @@ function card(x, o={}){
   const meta = [x.make,x.model,x.year].filter(Boolean).join(' · ') || (x.category || 'Piesă auto');
   const st = o.mine ? (STATUS_LABEL[x.status]||['',''] ) : null;
   return `<article class="listing" data-open="${x.id}" tabindex="0">
-    <div class="listing-thumb">${x.photo_ids&&x.photo_ids.length?`<img src="/api/listings/${x.id}/photos/${x.photo_ids[0]}" alt="" loading="lazy">`:(x.type==='dezmembrari'?'🚗':'⚙️')}</div>
+    <div class="listing-thumb">${x.type==='dezmembrari'?'🚗':'⚙️'}</div>
     <div class="listing-body">
       <div class="listing-top"><h3>${esc(x.title)}</h3>${o.mine?'':`<button class="listing-fav" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'}</button>`}</div>
       <div class="listing-meta">${esc(meta)}${x.category?` · ${esc(x.category)}`:''}</div>
@@ -324,7 +324,7 @@ function contactHtml(phones, who){
 function detailHtml(x, phones, canContact){
   const fav = favorites.includes(x.id);
   const rows = [['Stare',x.condition],['Categorie',x.category],['Marcă',x.make],['Model',x.model],['An',x.year],['Generație',x.generation],['Motor',x.engine],['Cod OEM',x.oem],['Județ',x.county],['Livrare',x.delivery?'Da':'Nu'],['Vânzător',x.seller_name],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)]].filter(r=>r[1]);
-  return `${x.photo_ids&&x.photo_ids.length?`<div class="detail-gallery">${x.photo_ids.map((id,i)=>`<img src="/api/listings/${x.id}/photos/${id}" alt="Fotografie ${i+1}" loading="lazy">`).join('')}</div>`:''}<div class="detail-top"><span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
+  return `<div class="detail-top"><span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
   <h2>${esc(x.title)}</h2>
   <div class="detail-price">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
   <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
@@ -516,8 +516,8 @@ async function submitSell(e){
   const year = $('#sellYear').value.trim(), type = $('#sellType').value;
   if(year && !/^\d{4}$/.test(year)){ setMsg(msg,'Anul trebuie să aibă 4 cifre.','error'); return; }
   try{
-    await api('/api/listings',{method:'POST',body:JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,generation:$('#sellGeneration').value.trim(),engine:$('#sellEngine').value.trim(),fuel:$('#sellFuel').value,photos:sellPhotoData,oem:$('#sellOem').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked})});
-    e.target.reset(); sellPhotoFiles=[]; sellPhotoData=[]; if($('#sellPhotoPreview')) $('#sellPhotoPreview').innerHTML=''; $('#sellDelivery').checked = true; await loadModels('','sellModel'); $('#sellConditionWrap').classList.remove('hidden');
+    await api('/api/listings',{method:'POST',body:JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked})});
+    e.target.reset(); $('#sellDelivery').checked = true; await loadModels('','sellModel'); $('#sellConditionWrap').classList.remove('hidden');
     setMsg(msg,'Anunțul a fost trimis pentru verificare. Îl vezi în Anunțurile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
@@ -611,6 +611,8 @@ function doAction(a){
   else if(a==='services') navigate('servicii');
   else if(a==='match') navigate('match');
   else if(a==='admin') navigate('admin');
+  else if(a==='cart') navigate('account-tool?view=cart');
+  else if(a==='rezultate') navigate('rezultate');
 }
 function accountAction(a){
   if(a==='settings') navigate('settings');
@@ -618,6 +620,7 @@ function accountAction(a){
   else if(a==='favorites') navigate('rezultate?mode=fav');
   else if(a==='requests') navigate('requests?t=mine');
   else if(a==='saved') navigate('saved');
+  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
 }
 
 document.addEventListener('click', e=>{
@@ -630,6 +633,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-req-contact]'))){ safe(requestContact)(el.dataset.reqContact, el); return; }
   if((el=t.closest('[data-seller]'))){ openSearch({seller_id:el.dataset.seller, sname:el.dataset.sname}); return; }
   if((el=t.closest('[data-cat]'))){ openSearch({category:el.dataset.cat}); return; }
+  if((el=t.closest('[data-search-dism]'))){ openSearch({q:el.dataset.searchDism}); return; }
   if((el=t.closest('[data-saved-open]'))){ const s=getSaved()[Number(el.dataset.savedOpen)]; if(s) navigate('rezultate?'+s.qs); return; }
   if((el=t.closest('[data-saved-del]'))){ const list=getSaved(); list.splice(Number(el.dataset.savedDel),1); writeJSON('autopiese_saved_searches',list); renderSaved(); return; }
   if((el=t.closest('[data-copy-link]'))){ copyLink(Number(el.dataset.copyLink)); return; }
@@ -659,21 +663,23 @@ document.addEventListener('keydown', e=>{
 
 function wire(){
   $('#topSearchForm').addEventListener('submit', e=>{ e.preventDefault(); openSearch({q:$('#topSearchInput').value.trim()}); });
+  $('#topSearchBtn').addEventListener('click', ()=>openSearch({q:$('#topSearchInput').value.trim()}));
+  $('#homeRequestBtn').addEventListener('click', ()=>doAction('request'));
+  $('#homeDismBtn').addEventListener('click', ()=>doAction('dism'));
+  $('#cartBtn').addEventListener('click', ()=>doAction('cart'));
   $('#heroSearchForm').addEventListener('submit', e=>{ e.preventDefault(); openSearch({q:$('#searchInput').value.trim()}); });
   $('#resultsSearchForm').addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
   $('#homeMake').addEventListener('change', e=>loadModels(e.target.value,'homeModel'));
   $('#homeVehicleBtn').addEventListener('click', ()=>{ const make=$('#homeMake').value; if(!make){ toast('Alege marca mașinii.'); return; } openSearch({make, model:$('#homeModel').value}); });
   $('#matchMake').addEventListener('change', e=>loadModels(e.target.value,'matchModel'));
   $('#reqMake').addEventListener('change', e=>loadModels(e.target.value,'reqModel'));
-  $('#sellMake').addEventListener('change', async e=>{ await loadModels(e.target.value,'sellModel'); });
-  $('#sellModel').addEventListener('change', e=>loadVariants($('#sellMake').value,e.target.value));
-  $('#sellPhotos').addEventListener('change', handleSellPhotos);
+  $('#sellMake').addEventListener('change', e=>loadModels(e.target.value,'sellModel'));
   $('#matchForm').addEventListener('submit', e=>{ e.preventDefault(); const make=$('#matchMake').value, model=$('#matchModel').value, q=[$('#matchEngine').value.trim(),$('#matchPart').value.trim()].filter(Boolean).join(' '); if(!make&&!q){ toast('Alege marca sau scrie piesa căutată.'); return; } openSearch({q,make,model}); });
   $('#sellType').addEventListener('change', e=>$('#sellConditionWrap').classList.toggle('hidden', e.target.value==='dezmembrari'));
   Object.keys(FILTER_FIELDS).forEach(id=>{ if(id!=='filterMake') $('#'+id).addEventListener('change', onFilterChange); });
   $('#filterMake').addEventListener('change', async e=>{ await loadModels(e.target.value,'filterModel','Toate modelele'); onFilterChange(); });
   $('#withDelivery').addEventListener('change', onFilterChange);
-  $('#clearFilters').addEventListener('click', ()=>{ $$('#filters select').forEach(s=>s.value=''); $('#maxPrice').value=''; $('#withDelivery').checked=false; $('#sortListings').value='new'; loadModels('','filterModel','Toate modelele').then(onFilterChange); });
+  $('#clearFilters').addEventListener('click', ()=>{ $$('#filters select').forEach(s=>s.value=''); $('#maxPrice').value=''; $('#withDelivery').checked=false; $('#sortListings').value='relevance'; loadModels('','filterModel','Toate modelele').then(onFilterChange); });
   $('#filterToggle').addEventListener('click', ()=>$('#filters').classList.toggle('open'));
   $('#loadMoreBtn').addEventListener('click', safe(()=>loadResults(false)));
   $('#saveSearchBtn').addEventListener('click', saveCurrentSearch);

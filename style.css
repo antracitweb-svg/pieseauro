@@ -55,6 +55,61 @@
 #page-results .filters label:has(#filterType){display:none!important}
 #page-results .page-head p:has(#crumbCurrent){display:block}
 
+/* Desktop / laptop layout refinement — V26
+   Păstrează interfața mobilă și optimizează spațiul pentru ecrane mari. */
+@media (min-width: 801px){
+  .container{width:min(1280px,calc(100% - 64px));}
+  .narrow{width:min(1040px,calc(100% - 64px));}
+  .nav{min-height:78px;gap:28px;}
+  .brand{flex:0 0 auto;}
+  .nav-actions{gap:12px;}
+  .page-container{padding:48px 0 80px;}
 
-/* V26 photos */
-.photo-preview{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}.photo-thumb{position:relative;width:92px;height:92px;border:1px solid #dfe5ee;border-radius:12px;overflow:hidden;background:#f7f9fc}.photo-thumb img{width:100%;height:100%;object-fit:cover}.photo-thumb span{position:absolute;left:4px;bottom:4px;background:#1264d8;color:#fff;border-radius:6px;padding:2px 5px;font-size:10px}.listing-thumb{overflow:hidden}.listing-thumb img{width:100%;height:100%;display:block;object-fit:cover}.detail-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:18px}.detail-gallery img{width:100%;height:150px;object-fit:cover;border-radius:12px;border:1px solid #e2e7ef;background:#f7f9fc}@media(max-width:600px){.detail-gallery img{height:110px}}
+  /* Home */
+  .home-wrap{padding:68px 0 38px;}
+  .home-center{width:min(980px,100%);}
+  .home-center h1{max-width:900px;margin-left:auto;margin-right:auto;}
+  .home-search{max-width:900px;width:100%;}
+  .home-links{gap:34px;}
+  .home-bottom{width:100%;max-width:1280px;margin-left:auto;margin-right:auto;}
+
+  /* Results */
+  #page-results .container{width:min(1280px,calc(100% - 64px));}
+  .results-actions{align-items:center;}
+  .result-search{min-width:0;}
+  .results-layout{grid-template-columns:270px minmax(0,1fr);gap:28px;align-items:start;}
+  .listing-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;}
+  .listing{min-width:0;}
+
+  /* Menu */
+  #page-menu .narrow{width:min(980px,calc(100% - 64px));}
+  #page-menu .menu-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+  #page-menu .menu-card>button{min-height:82px;}
+  #page-menu .menu-card>button:nth-last-child(-n+2){border-bottom:0;}
+  #page-menu .menu-card>button:nth-child(odd){border-right:1px solid #edf1f5;}
+
+  /* Account */
+  #page-account .narrow{width:min(1040px,calc(100% - 64px));}
+  #page-account .account-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;}
+  #page-account .account-sections details{margin:0;}
+  #page-account .account-sections details:first-child{grid-column:1 / -1;}
+  #page-account .account-admin-compat{grid-column:1 / -1;}
+
+  /* Forms / information pages */
+  #page-request .narrow,#page-sell .narrow,#page-services .narrow,#page-match .narrow{width:min(1080px,calc(100% - 64px));}
+  .clean-form{padding:28px;}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;}
+  .request-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;}
+  .dism-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;}
+
+  /* Cards stay readable instead of becoming excessively wide */
+  .listing p{max-width:72ch;}
+}
+
+@media (min-width: 801px) and (max-width: 1200px){
+  .container,.narrow{width:calc(100% - 48px);}
+  #page-results .container{width:calc(100% - 48px);}
+  .home-center h1{font-size:clamp(46px,5.5vw,62px);}
+  .results-layout{grid-template-columns:235px minmax(0,1fr);gap:20px;}
+  #page-menu .narrow,#page-account .narrow,#page-request .narrow,#page-sell .narrow,#page-services .narrow,#page-match .narrow{width:calc(100% - 48px);}
+}

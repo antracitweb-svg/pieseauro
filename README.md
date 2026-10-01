@@ -1,4 +1,4 @@
-# AutoPiese – V27
+# AutoPiese – V26
 
 Marketplace de piese auto (Node.js + Express + PostgreSQL), găzduit pe Render.
 
@@ -43,10 +43,3 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Setare nouă „Afișează telefonul” (Setări cont) – fără ea, telefonul nu apărea niciodată în anunțuri.
 - Securitate: Content-Security-Policy activă (fără scripturi inline), nickname fără `@` (evită confuzia cu emailul la login), limitare la înregistrare și cereri, validare telefon și categorii, ștergerea sesiunilor expirate la intervale regulate.
 - Server: endpointuri noi `GET /api/listings/:id`, `DELETE /api/listings/:id`, `GET /api/requests`, `GET /api/requests/mine`, `GET /api/sellers`, `PATCH /api/account/privacy`; verificări 404 în panoul admin; cache și timeout pentru catalogul de vehicule; oprire curată la SIGTERM; `sitemap.xml` și `robots.txt` folosesc `APP_URL`.
-
-
-## V27 – catalog auto și fotografii
-- Bază de date PostgreSQL pentru mărci, modele și variante auto.
-- Mărci și modele încărcate din catalogul extern când este disponibil, plus catalog de rezervă pentru mărcile uzuale.
-- Formularul de publicare permite până la 6 fotografii/anunț. Fotografiile sunt redimensionate în browser și stocate persistent în PostgreSQL.
-- Fotografia principală apare pe cardul anunțului, iar toate fotografiile apar în detaliul anunțului.
