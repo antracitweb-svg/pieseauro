@@ -984,7 +984,7 @@ function wire(){
   $('#saveSearchBtn')?.addEventListener('click', saveCurrentSearch);
   $('#myListingsTabs')?.addEventListener('click', e=>{ const b=e.target.closest('[data-my-tab]'); if(!b) return; state.myTab=b.dataset.myTab; $('#myListingsTabs').querySelectorAll('[data-my-tab]').forEach(x=>x.classList.toggle('active',x===b)); renderList(); const url=new URL(location.href); const p=new URLSearchParams(url.hash.split('?')[1]||''); if(state.myTab==='all') p.delete('tab'); else p.set('tab',state.myTab); const qs=p.toString(); history.replaceState(null,'','#/rezultate?mode=mine'+(qs?'&'+qs:'')); });
   $('#favoritesBtn')?.addEventListener('click', ()=>navigate('rezultate?mode=fav'));
-  $('#accountBtn')?.addEventListener('click', ()=>doAction('account'));
+  $('#accountBtn')?.addEventListener('click', e=>{ e.preventDefault(); doAction('account'); });
   $('#menuBtn')?.addEventListener('click', ()=>navigate('menu'));
   $('#closeMenu')?.addEventListener('click', ()=>navigate('home'));
   $('#logoutBtn')?.addEventListener('click', logout);
