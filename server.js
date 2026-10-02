@@ -139,10 +139,20 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS seller_type TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS negotiable BOOLEAN DEFAULT FALSE',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS views INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS show_phone BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT',
   'CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_unique_idx ON users(nickname) WHERE nickname IS NOT NULL',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS ship_county TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS ship_city TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS ship_details TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_company TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_cui TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_regcom TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_address TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_bank TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_iban TEXT',
   "CREATE TABLE IF NOT EXISTS offers (id SERIAL PRIMARY KEY, request_id INTEGER NOT NULL REFERENCES part_requests(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, price NUMERIC(12,2) NOT NULL, message TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
   "CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, offer_id INTEGER REFERENCES offers(id) ON DELETE SET NULL, request_id INTEGER REFERENCES part_requests(id) ON DELETE SET NULL, buyer_id INTEGER REFERENCES users(id) ON DELETE SET NULL, seller_id INTEGER REFERENCES users(id) ON DELETE SET NULL, title TEXT, price NUMERIC(12,2) NOT NULL, status TEXT NOT NULL DEFAULT 'new', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
   "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, body TEXT NOT NULL, is_read BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
@@ -238,7 +248,10 @@ function normalizeCatalog(raw){
   for(const key of ['vehicles','models','data']) if(Array.isArray(data[key])){walk(data[key],inheritedMake);return;}
   // VehiclesDB dist/vehicles.json is a nested make -> models projection.
   for(const [make,value] of Object.entries(data)){
-   if(['version','meta','manifest'].includes(make))continue;
+   if(['version','meta','manifest','attribution','license','licence','source','sources','credits','generated','generatedat','updated','updatedat','schema','$schema','description','url','text'].includes(String(make).toLowerCase()))continue;
+   // Metadata blocks (e.g. {attribution:{text:'...',url:'...'}}) contain only strings, never model objects/arrays.
+   if(value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length&&Object.values(value).every(v=>typeof v==='string'))continue;
+   if(typeof value==='string'||typeof value==='number'||typeof value==='boolean')continue;
    if(Array.isArray(value)){
     for(const item of value){
      if(typeof item==='string')push(make,item,{});
@@ -459,9 +472,26 @@ app.post('/api/auth/reset-password',requireDb,async(req,res)=>{
  }finally{client.release();}
 });
 
+app.put('/api/account/details',requireDb,auth,async(req,res)=>{
+ try{
+  const b=req.body||{}, t=(v,max)=>{const x=String(v==null?'':v).trim().replace(/\s+/g,' ');return x.length>max?null:x;};
+  const f={ship_county:t(b.ship_county,60),ship_city:t(b.ship_city,80),ship_details:t(b.ship_details,300),bill_company:t(b.bill_company,120),bill_cui:t(b.bill_cui,20),bill_regcom:t(b.bill_regcom,30),bill_address:t(b.bill_address,300),bill_bank:t(b.bill_bank,80),bill_iban:t(b.bill_iban,40)};
+  if(Object.values(f).some(v=>v===null))return res.status(400).json({error:'DATE_INVALIDE'});
+  if(f.bill_cui&&!/^(RO)?\s?\d{2,10}$/i.test(f.bill_cui))return res.status(400).json({error:'CUI_INVALID'});
+  if(f.bill_iban){
+   const iban=f.bill_iban.replace(/\s+/g,'').toUpperCase();
+   const ok=/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)&&(()=>{const r=(iban.slice(4)+iban.slice(0,4)).replace(/[A-Z]/g,c=>c.charCodeAt(0)-55);let m=0;for(const d of r)m=(m*10+Number(d))%97;return m===1;})();
+   if(!ok)return res.status(400).json({error:'IBAN_INVALID'});
+   f.bill_iban=iban;
+  }
+  const keys=Object.keys(f), vals=keys.map(k=>f[k]||null);
+  await pool.query(`UPDATE users SET ${keys.map((k,i)=>`${k}=$${i+1}`).join(',')} WHERE id=$${keys.length+1}`,[...vals,req.user.id]);
+  res.json({ok:true});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
 app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
  try{
-  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified FROM users WHERE id=$1',[req.user.id])).rows[0];
+  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban FROM users WHERE id=$1',[req.user.id])).rows[0];
   const phones=(await pool.query('SELECT id,phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id',[req.user.id])).rows;
   res.json({user:u,phones});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
@@ -523,8 +553,19 @@ app.post('/api/account/phones',requireDb,auth,async(req,res)=>{
 });
 app.patch('/api/account/phones/:id',requireDb,auth,async(req,res)=>{
  try{
-  const id=Number(req.params.id), whatsapp=Boolean(req.body.is_whatsapp);
-  const r=await pool.query('UPDATE user_phones SET is_whatsapp=$1 WHERE id=$2 AND user_id=$3 RETURNING id,phone,is_whatsapp,verified',[whatsapp,id,req.user.id]);
+  const id=Number(req.params.id), body=req.body||{};
+  const sets=[], vals=[];
+  if(body.phone!==undefined){
+   const phone=String(body.phone||'').trim().replace(/\s+/g,' ');
+   if(!/^\+?[0-9 ().-]{6,20}$/.test(phone))return res.status(400).json({error:'PHONE_INVALID'});
+   const dup=await pool.query('SELECT id FROM user_phones WHERE user_id=$1 AND phone=$2 AND id<>$3',[req.user.id,phone,id]);
+   if(dup.rowCount)return res.status(409).json({error:'PHONE_EXISTS'});
+   vals.push(phone); sets.push(`phone=$${vals.length}`); sets.push('verified=FALSE');
+  }
+  if(body.is_whatsapp!==undefined){ vals.push(Boolean(body.is_whatsapp)); sets.push(`is_whatsapp=$${vals.length}`); }
+  if(!sets.length)return res.status(400).json({error:'DATE_INVALIDE'});
+  vals.push(id,req.user.id);
+  const r=await pool.query(`UPDATE user_phones SET ${sets.join(',')} WHERE id=$${vals.length-1} AND user_id=$${vals.length} RETURNING id,phone,is_whatsapp,verified`,vals);
   if(!r.rowCount)return res.status(404).json({error:'DATE_INVALIDE'});
   res.json({phone:r.rows[0]});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
@@ -593,14 +634,14 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,async(req,res)=>{await pool.q
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.oem,l.delivery,l.description,l.status,l.created_at,l.images[1:1] AS images";
+const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.images[1:1] AS images";
 const LISTING_SELECT=`SELECT ${LIST_COLS},COALESCE(u.nickname,u.name) seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id`;
 const CATEGORIES=['Motor','Transmisie','Frâne','Iluminare','Caroserie','Suspensie','Roți','Electrică','Interior','Climatizare','Evacuare','Filtre','Altele'];
 const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
 const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèêëáàäãåíìïóòôöõúùûüçñšžčřěýÿ','aaisstteeeeaaaaaiiiooooouuuucnszcreyy')`;
 const flat=c=>`regexp_replace(${fold(c)},'[^a-z0-9]+','','g')`;
 app.get('/api/listings/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query(`SELECT ${LIST_COLS} FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 200`,[req.user.id]);
+ const r=await pool.query(`SELECT ${LIST_COLS} FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
  res.json({listings:r.rows});
 });
 app.get('/api/favorites',auth,requireDb,async(req,res)=>{
@@ -652,6 +693,7 @@ app.get('/api/listings/:id',requireDb,async(req,res)=>{
  const r=await pool.query("SELECT l.*,COALESCE(u.nickname,u.name) seller_name,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const x=r.rows[0]; let phones=[];
+ if(req.query.noview!=='1'){pool.query('UPDATE listings SET views=views+1 WHERE id=$1',[x.id]).catch(()=>{});x.views=(Number(x.views)||0)+1;}
  if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[x.user_id])).rows;
  delete x.seller_show_phone;
  res.json({listing:x,phones});
@@ -665,9 +707,24 @@ app.patch('/api/listings/:id/status',auth,requireDb,async(req,res)=>{
  res.json({listing:r.rows[0]});
 });
 app.delete('/api/listings/:id',auth,requireDb,async(req,res)=>{
- const d=await pool.query('DELETE FROM listings WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.id]);
- if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
- res.json({ok:true});
+ // Prima ștergere = mutare în „Șterse” (status 'deleted'); a doua = ștergere definitivă.
+ const soft=await pool.query("UPDATE listings SET status='deleted' WHERE id=$1 AND user_id=$2 AND status<>'deleted' RETURNING id",[req.params.id,req.user.id]);
+ if(soft.rowCount)return res.json({ok:true,deleted:'soft'});
+ const hard=await pool.query("DELETE FROM listings WHERE id=$1 AND user_id=$2 AND status='deleted' RETURNING id",[req.params.id,req.user.id]);
+ if(!hard.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ res.json({ok:true,deleted:'hard'});
+});
+app.patch('/api/listings/:id/restore',auth,requireDb,async(req,res)=>{
+ // Restaurarea trimite anunțul din nou la moderare.
+ const r=await pool.query("UPDATE listings SET status='pending' WHERE id=$1 AND user_id=$2 AND status='deleted' RETURNING id,status",[req.params.id,req.user.id]);
+ if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ res.json({listing:r.rows[0]});
+});
+app.post('/api/listings/:id/bump',auth,requireDb,async(req,res)=>{
+ // Reactualizare: anunțul urcă în listă; maximum o dată la 24 de ore.
+ const r=await pool.query("UPDATE listings SET created_at=NOW() WHERE id=$1 AND user_id=$2 AND status='approved' AND created_at<NOW()-INTERVAL '24 hours' RETURNING id,created_at",[req.params.id,req.user.id]);
+ if(!r.rowCount)return res.status(400).json({error:'REACTUALIZARE_PREA_DEVREME'});
+ res.json({listing:r.rows[0]});
 });
 app.get('/api/sellers',requireDb,async(req,res)=>{
  const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
