@@ -16,15 +16,8 @@ const DB_URL = process.env.DATABASE_URL || '';
 const DB_LOCAL = /localhost|127\.0\.0\.1/.test(DB_URL);
 const pool = DB_URL ? new Pool({connectionString:DB_URL,ssl:DB_LOCAL?false:{rejectUnauthorized:process.env.DATABASE_SSL_STRICT==='true'},max:10,idleTimeoutMillis:30000}) : null;
 if(pool)pool.on('error',e=>console.error('pg pool error',e.message));
-const CATALOG_URL = process.env.VEHICLE_CATALOG_URL || 'https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@2026.09.1/dist/vehicles.json';
-const CATALOG_URLS = [...new Set([
-  CATALOG_URL,
-  'https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@2026.09.1/dist/vehicles.json',
-  'https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@latest/dist/vehicles.json',
-  'https://raw.githubusercontent.com/vehiclesdb/vehiclesdb/main/dist/vehicles.json'
-])];
-let catalogLastError = '';
-let catalogLastUrl = '';
+const CATALOG_URL = process.env.VEHICLE_CATALOG_URL || 'https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@latest/dist/vehicles.json';
+const CATALOG_URLS = [CATALOG_URL, 'https://github.com/vehiclesdb/vehiclesdb/raw/refs/heads/main/dist/vehicles.json'];
 const LOCAL_CATALOG_FILE = path.join(__dirname, 'vehicles.json');
 let catalogCache = null;
 let catalogLoadedAt = 0;
@@ -292,15 +285,15 @@ async function loadCatalog(){
  // 2) Download the complete VehiclesDB projection. Try both official distribution URLs.
  for(const url of CATALOG_URLS){
   try{
-   const r=await fetch(url,{headers:{'User-Agent':'AutoPiese/1.0','Accept':'application/json'},redirect:'follow',signal:AbortSignal.timeout(20000)});
-   if(!r.ok)throw new Error('catalog HTTP '+r.status);
+   const r=await fetch(url,{headers:{'User-Agent':'AutoPiese/1.0'},signal:AbortSignal.timeout(8000)});
+   if(!r.ok)throw new Error('catalog '+r.status);
    const raw=await r.json();
    const parsed=normalizeCatalog(raw);
    if(parsed.length<100)throw new Error('catalog gol/incomplet: '+parsed.length+' modele');
-   catalogCache=parsed; catalogLoadedAt=Date.now(); catalogRetryAt=0; catalogLastError=''; catalogLastUrl=url;
+   catalogCache=parsed; catalogLoadedAt=Date.now(); catalogRetryAt=0;
    try{fs.writeFileSync(LOCAL_CATALOG_FILE,JSON.stringify(raw));}catch(e){console.error('Catalog cache write:',e.message);}
    return catalogCache;
-  }catch(e){ catalogLastError=e.message; catalogLastUrl=url; console.error('Vehicle catalog source failed:',url,e.message); }
+  }catch(e){ console.error('Vehicle catalog source failed:',url,e.message); }
  }
  // Never report an empty catalogue. Keep a useful emergency fallback while the full
  // catalogue source is temporarily unavailable.
@@ -366,18 +359,7 @@ function resolveText(catalog,q){
  if(!scored.length)return null; const x=scored[0].v; return {...x,confidence:Math.min(1,scored[0].score)};
 }
 
-app.get('/api/health',async(req,res)=>{
-  let count=Array.isArray(catalogCache)?catalogCache.length:0;
-  let loaded=Array.isArray(catalogCache);
-  if(!loaded){try{const c=await getCatalog();count=c.length;loaded=true;}catch(e){catalogLastError=e.message;}}
-  const source=Array.isArray(catalogCache)&&catalogCache[0]?.id?.startsWith('fallback/')?'fallback':'VehiclesDB';
-  res.json({ok:true,database:!!pool,catalog:'VehiclesDB',catalogLoaded:loaded,catalogCount:count,catalogSource:source,catalogUrl:catalogLastUrl||CATALOG_URL,catalogError:catalogLastError||null,auth:'secure-revocable-session-cookie'});
-});
-app.get('/api/catalog/status',async(req,res)=>{
-  try{const c=await getCatalog(); const fallback=Array.isArray(c)&&c[0]?.id?.startsWith('fallback/');
-    res.json({ok:true,loaded:true,count:c.length,source:fallback?'fallback':'VehiclesDB',url:catalogLastUrl||CATALOG_URL,error:catalogLastError||null});
-  }catch(e){res.status(503).json({ok:false,loaded:false,count:0,source:'none',url:catalogLastUrl||CATALOG_URL,error:e.message});}
-});
+app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'VehiclesDB',catalogLoaded:Array.isArray(catalogCache),catalogCount:Array.isArray(catalogCache)?catalogCache.length:0,catalogSource:Array.isArray(catalogCache)&&catalogCache[0]?.id?.startsWith('fallback/')?'fallback':'VehiclesDB',auth:'secure-revocable-session-cookie'}));
 app.get('/api/catalog/makes',async(req,res)=>{const c=await getCatalog();const makes=[...new Set(c.map(x=>x.make))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({makes:makes.map(name=>({name})),count:makes.length,source:'VehiclesDB'});});
 app.get('/api/catalog/models',async(req,res)=>{const make=String(req.query.make||'');const c=await getCatalog();const models=[...new Set(c.filter(x=>norm(x.make)===norm(make)).map(x=>x.model))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({models:models.map(name=>({name})),count:models.length,source:'VehiclesDB'});});
 app.get('/api/catalog/resolve',async(req,res)=>{const q=String(req.query.q||'').trim();if(!q)return res.json({match:null});const c=await getCatalog();const match=resolveText(c,q);res.json({match});});

@@ -87,7 +87,7 @@ function initFormValidation(){
 let currentUser = null;
 let favorites = readJSON('autopiese_fav', []).map(Number).filter(Number.isFinite);
 const modelCache = new Map();
-const state = { mode:'search', myTab:'all', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{}, sellImages:[] };
+const state = { mode:'search', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{}, sellImages:[] };
 
 async function api(url, opt={}){
   let r;
@@ -146,7 +146,7 @@ function renderHeader(){
   const isAdmin = !!(currentUser && currentUser.role==='admin');
   $('#adminMenu').classList.toggle('hidden', !isAdmin);
   const ad = $('#accountAdmin'); if(ad) ad.classList.toggle('hidden', !isAdmin);
-  const favCount = $('#favCount'); if(favCount) favCount.textContent = favorites.length;
+  $('#favCount').textContent = favorites.length;
 }
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
@@ -217,16 +217,10 @@ function fillStaticSelects(){
   $('#catGrid').innerHTML = CATEGORIES.map(([n,i])=>`<button class="cat" data-cat="${esc(n)}"><span>${i}</span>${esc(n)}</button>`).join('');
 }
 async function loadCatalog(attempt=0){
-  const targets=[['filterMake','Toate mărcile'],['homeMake','Alege marca'],['matchMake','Alege marca'],['sellMake','Alege marca'],['reqMake','Alege marca']];
-  if(attempt===0){ for(const [id] of targets){ const el=$('#'+id); if(el) setOptions(el,'Se încarcă mărcile…',[]); } }
   let makes = [];
-  try{ makes = ((await api('/api/catalog/makes')).makes||[]).map(x=>x.name).filter(Boolean); }catch{}
-  if(!makes.length){
-    if(attempt<3){ setTimeout(()=>loadCatalog(attempt+1), 4000*(attempt+1)); return; }
-    for(const [id,first] of targets){ const el=$('#'+id); if(el) setOptions(el, first+' — catalog indisponibil',[]); }
-    return;
-  }
-  for(const [id,first] of targets){
+  try{ makes = ((await api('/api/catalog/makes')).makes||[]).map(x=>x.name); }catch{}
+  if(!makes.length){ if(attempt<3) setTimeout(()=>loadCatalog(attempt+1), 4000*(attempt+1)); return; }
+  for(const [id,first] of [['filterMake','Toate mărcile'],['homeMake','Alege marca'],['matchMake','Alege marca'],['sellMake','Alege marca'],['reqMake','Alege marca']]){
     const el = $('#'+id); if(el) setOptions(el, first, makes);
   }
 }
@@ -268,7 +262,7 @@ function card(x, o={}){
 }
 
 function updateFavUI(){
-  const favCount = $('#favCount'); if(favCount) favCount.textContent = favorites.length;
+  $('#favCount').textContent = favorites.length;
   $$('[data-fav]').forEach(b=>{ const on=favorites.includes(Number(b.dataset.fav)); b.textContent=(on?'♥':'♡')+(b.classList.contains('btn')?' Favorit':''); });
 }
 function toggleFavorite(id){
@@ -316,11 +310,7 @@ function openSearch(extra={}){
 function enterResults(params){
   const mode = params.get('mode');
   state.mode = (mode==='mine'||mode==='fav') ? mode : 'search';
-  state.myTab = params.get('tab') || 'all';
-  if(!['all','active','pending','sold','archive'].includes(state.myTab)) state.myTab='all';
   $('#page-results').dataset.mode = state.mode;
-  const tabs=$('#myListingsTabs'); if(tabs) tabs.classList.toggle('hidden',state.mode!=='mine');
-  if(tabs) tabs.querySelectorAll('[data-my-tab]').forEach(b=>b.classList.toggle('active',b.dataset.myTab===state.myTab));
   state.filters = {}; state.extra = {};
   for(const k of ['q','type','category','make','model','condition','county','maxPrice','seller_type','sort','delivery']) if(params.get(k)) state.filters[k]=params.get(k);
   for(const k of ['seller_id','sname']) if(params.get(k)) state.extra[k]=params.get(k);
@@ -396,14 +386,6 @@ async function loadFavoritesView(){
 }
 function renderList(){
   const mine = state.mode==='mine';
-  let visible = state.loaded;
-  if(mine && state.myTab!=='all') visible = state.loaded.filter(x=>{
-    if(state.myTab==='active') return x.status==='approved';
-    if(state.myTab==='pending') return x.status==='pending';
-    if(state.myTab==='sold') return x.status==='sold';
-    if(state.myTab==='archive') return ['rejected','blocked'].includes(x.status);
-    return true;
-  });
   let title = 'Piese auto';
   if(mine) title = 'Anunțurile mele';
   else if(state.mode==='fav') title = 'Favorite';
@@ -414,9 +396,8 @@ function renderList(){
   $('#resultsTitle').textContent = title;
   $('#crumbCurrent').textContent = title;
   $('#resultCount').textContent = state.total===1 ? '1 anunț' : `${state.total} anunțuri`;
-  $('#listingGrid').innerHTML = visible.map(x=>card(x,{mine})).join('');
-  $('#noResults').classList.toggle('hidden', visible.length>0);
-  if(mine){ const empty=$('#noResults'); if(empty) empty.textContent = visible.length ? '' : 'Nu ai anunțuri în această categorie.'; }
+  $('#listingGrid').innerHTML = state.loaded.map(x=>card(x,{mine})).join('');
+  $('#noResults').classList.toggle('hidden', state.loaded.length>0);
   renderPagination();
 }
 
@@ -956,59 +937,58 @@ function submitSearchQuery(q){
 }
 
 function wire(){
-  $('#topSearchForm')?.addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#topSearchInput').value); });
-  $('#topSearchBtn')?.addEventListener('click', ()=>openSearchOverlay());
-  $('#searchOverlayBack')?.addEventListener('click', closeSearchOverlay);
-  $('#searchOverlayForm')?.addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#searchOverlayInput').value); });
-  $('#clearRecentSearches')?.addEventListener('click', ()=>{ localStorage.removeItem('autopiese_recent_searches'); renderRecentSearches(); });
-  $('#recentSearchList')?.addEventListener('click', e=>{ const b=e.target.closest('[data-recent-search]'); if(b) submitSearchQuery(b.dataset.recentSearch); });
-  $('#homeRequestBtn')?.addEventListener('click', ()=>doAction('request'));
-  $('#homeDismBtn')?.addEventListener('click', ()=>doAction('dism'));
-  $('#cartBtn')?.addEventListener('click', ()=>doAction('cart'));
-  $('#heroSearchForm')?.addEventListener('submit', e=>{ e.preventDefault(); openSearch({q:$('#searchInput').value.trim()}); });
-  $('#resultsSearchForm')?.addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
-  $('#homeMake')?.addEventListener('change', e=>loadModels(e.target.value,'homeModel'));
-  $('#homeVehicleBtn')?.addEventListener('click', ()=>{ const make=$('#homeMake').value; if(!make){ toast('Alege marca mașinii.'); return; } openSearch({make, model:$('#homeModel').value}); });
-  $('#matchMake')?.addEventListener('change', e=>loadModels(e.target.value,'matchModel'));
-  $('#reqMake')?.addEventListener('change', e=>loadModels(e.target.value,'reqModel'));
-  $('#sellCancelEdit')?.addEventListener('click',()=>{ resetSellForm(); setSellMode(null); state.sellFilled=null; navigate('rezultate?mode=mine'); });
-  $('#sellMake')?.addEventListener('change', e=>loadModels(e.target.value,'sellModel'));
-  $('#matchForm')?.addEventListener('submit', e=>{ e.preventDefault(); const make=$('#matchMake').value, model=$('#matchModel').value, q=[$('#matchEngine').value.trim(),$('#matchPart').value.trim()].filter(Boolean).join(' '); if(!make&&!q){ toast('Alege marca sau scrie piesa căutată.'); return; } openSearch({q,make,model}); });
-  $('#sellType')?.addEventListener('change', e=>$('#sellConditionWrap').classList.toggle('hidden', e.target.value==='dezmembrari'));
-  Object.keys(FILTER_FIELDS).forEach(id=>{ if(id!=='filterMake') $('#'+id)?.addEventListener('change', onFilterChange); });
-  $('#filterMake')?.addEventListener('change', async e=>{ await loadModels(e.target.value,'filterModel','Toate modelele'); onFilterChange(); });
-  $('#withDelivery')?.addEventListener('change', onFilterChange);
-  $('#clearFilters')?.addEventListener('click', ()=>{ $$('#filters select').forEach(s=>s.value=''); $('#maxPrice').value=''; $('#withDelivery').checked=false; $('#sortListings').value='new'; loadModels('','filterModel','Toate modelele').then(onFilterChange); });
-  $('#filterToggle')?.addEventListener('click', ()=>$('#filters').classList.toggle('open'));
-  $('#pagination')?.addEventListener('click', e=>{ const b=e.target.closest('[data-page]'); if(b) safe(()=>goToResultsPage(b.dataset.page))(); });
-  $('#saveSearchBtn')?.addEventListener('click', saveCurrentSearch);
-  $('#myListingsTabs')?.addEventListener('click', e=>{ const b=e.target.closest('[data-my-tab]'); if(!b) return; state.myTab=b.dataset.myTab; $('#myListingsTabs').querySelectorAll('[data-my-tab]').forEach(x=>x.classList.toggle('active',x===b)); renderList(); const url=new URL(location.href); const p=new URLSearchParams(url.hash.split('?')[1]||''); if(state.myTab==='all') p.delete('tab'); else p.set('tab',state.myTab); const qs=p.toString(); history.replaceState(null,'','#/rezultate?mode=mine'+(qs?'&'+qs:'')); });
-  $('#favoritesBtn')?.addEventListener('click', ()=>navigate('rezultate?mode=fav'));
-  $('#accountBtn')?.addEventListener('click', e=>{ e.preventDefault(); doAction('account'); });
-  $('#menuBtn')?.addEventListener('click', ()=>navigate('menu'));
-  $('#closeMenu')?.addEventListener('click', ()=>navigate('home'));
-  $('#logoutBtn')?.addEventListener('click', logout);
-  $('#passwordChangeForm')?.addEventListener('submit', e=>{ e.preventDefault(); const m=$('#pwChangeMsg'); setMsg(m,''); api('/api/account/password',{method:'POST',body:JSON.stringify({current:$('#pwCurrent').value,password:$('#pwNew').value})}).then(()=>{ $('#pwCurrent').value=$('#pwNew').value=''; setMsg(m,'Parola a fost schimbată. Celelalte dispozitive au fost deconectate.','ok'); }).catch(err=>setMsg(m,err.message,'error')); });
-  $('#logoutAllBtn')?.addEventListener('click', safe(logoutAll));
-  $('#loginForm')?.addEventListener('submit', login);
-  $('#registerForm')?.addEventListener('submit', register);
-  $('#showRegister')?.addEventListener('click', startRegister);
-  $('#showLogin')?.addEventListener('click', ()=>{ $('#registerForm').classList.add('hidden'); $('#loginForm').classList.remove('hidden'); $('#authTitle').textContent='Intră în cont'; });
-  $('#registerNext')?.addEventListener('click', registerStep1);
-  $('#registerBack')?.addEventListener('click', ()=>{ $('#registerStep2').classList.add('hidden'); $('#registerStep1').classList.remove('hidden'); $('#regEmail').focus(); });
-  $('#forgotPasswordBtn')?.addEventListener('click', ()=>{ $('#forgotEmail').value=$('#loginIdentifier').value.includes('@')?$('#loginIdentifier').value:''; setMsg($('#forgotMessage'),''); $('#forgotModal').classList.remove('hidden'); });
-  $('#forgotForm')?.addEventListener('submit', forgotPassword);
-  $('#resetPasswordForm')?.addEventListener('submit', resetPasswordSubmit);
-  $('#requestForm')?.addEventListener('submit', submitRequest);
-  $('#registerForm')?.addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
-  $('#offerForm')?.addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const id=$('#offerRequestId').value; await api('/api/requests/'+id+'/offers',{method:'POST',body:JSON.stringify({price:$('#offerPrice').value,message:$('#offerMessage').value})}); $('#offerModal').classList.add('hidden'); toast('Oferta a fost trimisă.'); })(); });
-  $('#sellForm')?.addEventListener('submit', submitSell);
-  $('#sellImages')?.addEventListener('change', handleSellImages);
-  $('#profileSettingsForm')?.addEventListener('submit', saveProfile);
-  $('#emailChangeForm')?.addEventListener('submit', requestEmailChange);
-  $('#phoneAddForm')?.addEventListener('submit', addPhone);
-  $('#showPhoneToggle')?.addEventListener('change', togglePrivacy);
-  $('#settingsForgotPassword')?.addEventListener('click', ()=>{ if(currentUser&&currentUser.email){ $('#forgotEmail').value=currentUser.email; setMsg($('#forgotMessage'),''); $('#forgotModal').classList.remove('hidden'); } });
+  $('#topSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#topSearchInput').value); });
+  $('#topSearchBtn').addEventListener('click', ()=>openSearchOverlay());
+  $('#searchOverlayBack').addEventListener('click', closeSearchOverlay);
+  $('#searchOverlayForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#searchOverlayInput').value); });
+  $('#clearRecentSearches').addEventListener('click', ()=>{ localStorage.removeItem('autopiese_recent_searches'); renderRecentSearches(); });
+  $('#recentSearchList').addEventListener('click', e=>{ const b=e.target.closest('[data-recent-search]'); if(b) submitSearchQuery(b.dataset.recentSearch); });
+  $('#homeRequestBtn').addEventListener('click', ()=>doAction('request'));
+  $('#homeDismBtn').addEventListener('click', ()=>doAction('dism'));
+  $('#cartBtn').addEventListener('click', ()=>doAction('cart'));
+  $('#heroSearchForm').addEventListener('submit', e=>{ e.preventDefault(); openSearch({q:$('#searchInput').value.trim()}); });
+  $('#resultsSearchForm').addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
+  $('#homeMake').addEventListener('change', e=>loadModels(e.target.value,'homeModel'));
+  $('#homeVehicleBtn').addEventListener('click', ()=>{ const make=$('#homeMake').value; if(!make){ toast('Alege marca mașinii.'); return; } openSearch({make, model:$('#homeModel').value}); });
+  $('#matchMake').addEventListener('change', e=>loadModels(e.target.value,'matchModel'));
+  $('#reqMake').addEventListener('change', e=>loadModels(e.target.value,'reqModel'));
+  $('#sellCancelEdit').addEventListener('click',()=>{ resetSellForm(); setSellMode(null); state.sellFilled=null; navigate('rezultate?mode=mine'); });
+  $('#sellMake').addEventListener('change', e=>loadModels(e.target.value,'sellModel'));
+  $('#matchForm').addEventListener('submit', e=>{ e.preventDefault(); const make=$('#matchMake').value, model=$('#matchModel').value, q=[$('#matchEngine').value.trim(),$('#matchPart').value.trim()].filter(Boolean).join(' '); if(!make&&!q){ toast('Alege marca sau scrie piesa căutată.'); return; } openSearch({q,make,model}); });
+  $('#sellType').addEventListener('change', e=>$('#sellConditionWrap').classList.toggle('hidden', e.target.value==='dezmembrari'));
+  Object.keys(FILTER_FIELDS).forEach(id=>{ if(id!=='filterMake') $('#'+id).addEventListener('change', onFilterChange); });
+  $('#filterMake').addEventListener('change', async e=>{ await loadModels(e.target.value,'filterModel','Toate modelele'); onFilterChange(); });
+  $('#withDelivery').addEventListener('change', onFilterChange);
+  $('#clearFilters').addEventListener('click', ()=>{ $$('#filters select').forEach(s=>s.value=''); $('#maxPrice').value=''; $('#withDelivery').checked=false; $('#sortListings').value='new'; loadModels('','filterModel','Toate modelele').then(onFilterChange); });
+  $('#filterToggle').addEventListener('click', ()=>$('#filters').classList.toggle('open'));
+  $('#pagination').addEventListener('click', e=>{ const b=e.target.closest('[data-page]'); if(b) safe(()=>goToResultsPage(b.dataset.page))(); });
+  $('#saveSearchBtn').addEventListener('click', saveCurrentSearch);
+  $('#favoritesBtn').addEventListener('click', ()=>navigate('rezultate?mode=fav'));
+  $('#accountBtn').addEventListener('click', ()=>doAction('account'));
+  $('#menuBtn').addEventListener('click', ()=>navigate('menu'));
+  $('#closeMenu').addEventListener('click', ()=>navigate('home'));
+  $('#logoutBtn').addEventListener('click', logout);
+  $('#passwordChangeForm').addEventListener('submit', e=>{ e.preventDefault(); const m=$('#pwChangeMsg'); setMsg(m,''); api('/api/account/password',{method:'POST',body:JSON.stringify({current:$('#pwCurrent').value,password:$('#pwNew').value})}).then(()=>{ $('#pwCurrent').value=$('#pwNew').value=''; setMsg(m,'Parola a fost schimbată. Celelalte dispozitive au fost deconectate.','ok'); }).catch(err=>setMsg(m,err.message,'error')); });
+  $('#logoutAllBtn').addEventListener('click', safe(logoutAll));
+  $('#loginForm').addEventListener('submit', login);
+  $('#registerForm').addEventListener('submit', register);
+  $('#showRegister').addEventListener('click', startRegister);
+  $('#showLogin').addEventListener('click', ()=>{ $('#registerForm').classList.add('hidden'); $('#loginForm').classList.remove('hidden'); $('#authTitle').textContent='Intră în cont'; });
+  $('#registerNext').addEventListener('click', registerStep1);
+  $('#registerBack').addEventListener('click', ()=>{ $('#registerStep2').classList.add('hidden'); $('#registerStep1').classList.remove('hidden'); $('#regEmail').focus(); });
+  $('#forgotPasswordBtn').addEventListener('click', ()=>{ $('#forgotEmail').value=$('#loginIdentifier').value.includes('@')?$('#loginIdentifier').value:''; setMsg($('#forgotMessage'),''); $('#forgotModal').classList.remove('hidden'); });
+  $('#forgotForm').addEventListener('submit', forgotPassword);
+  $('#resetPasswordForm').addEventListener('submit', resetPasswordSubmit);
+  $('#requestForm').addEventListener('submit', submitRequest);
+  $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
+  $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const id=$('#offerRequestId').value; await api('/api/requests/'+id+'/offers',{method:'POST',body:JSON.stringify({price:$('#offerPrice').value,message:$('#offerMessage').value})}); $('#offerModal').classList.add('hidden'); toast('Oferta a fost trimisă.'); })(); });
+  $('#sellForm').addEventListener('submit', submitSell);
+  $('#sellImages').addEventListener('change', handleSellImages);
+  $('#profileSettingsForm').addEventListener('submit', saveProfile);
+  $('#emailChangeForm').addEventListener('submit', requestEmailChange);
+  $('#phoneAddForm').addEventListener('submit', addPhone);
+  $('#showPhoneToggle').addEventListener('change', togglePrivacy);
+  $('#settingsForgotPassword').addEventListener('click', ()=>{ if(currentUser&&currentUser.email){ $('#forgotEmail').value=currentUser.email; setMsg($('#forgotMessage'),''); $('#forgotModal').classList.remove('hidden'); } });
   window.addEventListener('hashchange', route);
 }
 
