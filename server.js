@@ -16,9 +16,7 @@ const DB_URL = process.env.DATABASE_URL || '';
 const DB_LOCAL = /localhost|127\.0\.0\.1/.test(DB_URL);
 const pool = DB_URL ? new Pool({connectionString:DB_URL,ssl:DB_LOCAL?false:{rejectUnauthorized:process.env.DATABASE_SSL_STRICT==='true'},max:10,idleTimeoutMillis:30000}) : null;
 if(pool)pool.on('error',e=>console.error('pg pool error',e.message));
-const CATALOG_URL = process.env.VEHICLE_CATALOG_URL || 'https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@latest/dist/vehicles.json';
-const CATALOG_URLS = [CATALOG_URL, 'https://github.com/vehiclesdb/vehiclesdb/raw/refs/heads/main/dist/vehicles.json'];
-const LOCAL_CATALOG_FILE = path.join(__dirname, 'vehicles.json');
+const { CURATED_VEHICLES } = require('./vehicles-catalog');
 let catalogCache = null;
 let catalogLoadedAt = 0;
 let catalogRetryAt = 0;
@@ -223,154 +221,18 @@ function norm(s=''){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g
 function slugify(s=''){return norm(s).replace(/\s+/g,'-').slice(0,120);}
 function escapeHtml(s=''){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 
-function normalizeCatalog(raw){
- const out=[];
- const push=(make,model,meta={})=>{
-  if(!make||!model)return;
-  const kind=String(meta.kind||'car').toLowerCase();
-  if(!['car','van','motorcycle','moped','truck','bus'].includes(kind))return;
-  const years=Array.isArray(meta.years)?meta.years:(Array.isArray(meta.production_years)?meta.production_years:[]);
-  out.push({
-   id:meta.id||meta.slug||`catalog/${slugify(make)}/${slugify(model)}`,
-   name:model, make:String(make), model:String(model),
-   generation:meta.generation?.name||meta.generation_name||meta.generation||'',
-   years, kind, engine:meta.engine||meta.engine_name||'', fuel:meta.fuel||meta.fuel_type||'', raw:meta
-  });
- };
- const walk=(data, inheritedMake='')=>{
-  if(Array.isArray(data)){
-   for(const item of data){
-    if(!item||typeof item!=='object')continue;
-    const make=item.make?.name||item.make_name||item.make||item.brand?.name||item.brand||inheritedMake;
-    const model=item.model?.name||item.model_name||item.model||item.name||'';
-    if(make&&model)push(make,model,item);
-    else if(inheritedMake && item.name)push(inheritedMake,item.name,item);
-    else walk(item,inheritedMake);
-   }
-   return;
-  }
-  if(!data||typeof data!=='object')return;
-  // Flat datasets: {vehicles:[...]} / {models:[...]}
-  for(const key of ['vehicles','models','data']) if(Array.isArray(data[key])){walk(data[key],inheritedMake);return;}
-  // VehiclesDB dist/vehicles.json is a nested make -> models projection.
-  for(const [make,value] of Object.entries(data)){
-   if(['version','meta','manifest','attribution','license','licence','source','sources','credits','generated','generatedat','updated','updatedat','schema','$schema','description','url','text'].includes(String(make).toLowerCase()))continue;
-   // Metadata blocks (e.g. {attribution:{text:'...',url:'...'}}) contain only strings, never model objects/arrays.
-   if(value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length&&Object.values(value).every(v=>typeof v==='string'))continue;
-   if(typeof value==='string'||typeof value==='number'||typeof value==='boolean')continue;
-   if(Array.isArray(value)){
-    for(const item of value){
-     if(typeof item==='string')push(make,item,{});
-     else if(Array.isArray(item))push(make,String(item[0]||''),item[1]&&typeof item[1]==='object'?item[1]:{});
-     else if(item&&typeof item==='object')push(make,item.name||item.model||'',item);
-    }
-   }else if(value&&typeof value==='object'){
-    // Accept {make:{model:{...}}} and {make:{models:[...]}} forms.
-    if(Array.isArray(value.models))walk(value.models,make);
-    else for(const [model,meta] of Object.entries(value)){
-     if(model==='models'||model==='name')continue;
-     if(typeof meta==='object')push(make,meta.name||meta.model||model,meta);
-     else push(make,model,{});
-    }
-   }
-  }
- };
- walk(raw);
- const seen=new Set();
- return out.filter(v=>{const k=`${norm(v.make)}|${norm(v.model)}`;if(seen.has(k))return false;seen.add(k);return true;});
-}
 let catalogLoading=null;
+// Catalogul de mărci/modele este local (vehicles-catalog.js): nu depinde de internet sau de servicii externe.
 function getCatalog(){
- if(catalogCache && Date.now()-catalogLoadedAt<6*60*60*1000)return Promise.resolve(catalogCache);
- if(catalogCache && Date.now()<catalogRetryAt)return Promise.resolve(catalogCache);
- if(!catalogLoading)catalogLoading=loadCatalog().finally(()=>{catalogLoading=null;});
- return catalogLoading;
-}
-async function loadCatalog(){
- let localCatalog=null, localFresh=false;
- // 1) Use a same-folder snapshot when present. This makes the catalog independent
- // of CDN availability after the first successful sync.
- try{
-  if(fs.existsSync(LOCAL_CATALOG_FILE)){
-   const raw=JSON.parse(fs.readFileSync(LOCAL_CATALOG_FILE,'utf8'));
-   const local=normalizeCatalog(raw);
-   if(local.length>=100){
-    localCatalog=local;
-    localFresh=Date.now()-fs.statSync(LOCAL_CATALOG_FILE).mtimeMs<7*24*3600*1000;
-    if(localFresh){ catalogCache=local; catalogLoadedAt=Date.now(); return catalogCache; }
-   }
-  }
- }catch(e){ console.error('Local vehicle catalog error:',e.message); }
- // 2) Download the complete VehiclesDB projection. Try both official distribution URLs.
- for(const url of CATALOG_URLS){
-  try{
-   const r=await fetch(url,{headers:{'User-Agent':'AutoPiese/1.0'},signal:AbortSignal.timeout(8000)});
-   if(!r.ok)throw new Error('catalog '+r.status);
-   const raw=await r.json();
-   const parsed=normalizeCatalog(raw);
-   if(parsed.length<100)throw new Error('catalog gol/incomplet: '+parsed.length+' modele');
-   catalogCache=parsed; catalogLoadedAt=Date.now(); catalogRetryAt=0;
-   try{fs.writeFileSync(LOCAL_CATALOG_FILE,JSON.stringify(raw));}catch(e){console.error('Catalog cache write:',e.message);}
-   return catalogCache;
-  }catch(e){ console.error('Vehicle catalog source failed:',url,e.message); }
+ if(!catalogCache){
+  catalogCache=CURATED_VEHICLES.map(v=>({
+   id:`curated/${slugify(v.make)}/${slugify(v.model)}`,
+   name:v.model, make:v.make, model:v.model, generation:'', years:[],
+   year_from:v.year_from, year_to:v.year_to, kind:v.kind||'car', engine:'', fuel:'', raw:{}
+  }));
+  catalogLoadedAt=Date.now();
  }
- // Never report an empty catalogue. Keep a useful emergency fallback while the full
- // catalogue source is temporarily unavailable.
- catalogRetryAt=Date.now()+5*60*1000;
- // Snapshot local mai vechi de 7 zile: mai bun decât nimic dacă sursa online nu răspunde.
- if(localCatalog){ catalogCache=localCatalog; return catalogCache; }
- if(catalogCache && catalogCache.length)return catalogCache;
- const fallback={
-  BMW:['Seria 1','Seria 2','Seria 3','Seria 4','Seria 5','Seria 6','Seria 7','X1','X2','X3','X4','X5','X6','X7','i3','i4','i5','i7','iX','iX1'],
-  Volkswagen:['Golf','Passat','Polo','Tiguan','Touareg','T-Roc','Touran','Caddy','Transporter','Arteon','ID.3','ID.4','ID.5','ID.7'],
-  Audi:['A1','A3','A4','A5','A6','A7','A8','Q2','Q3','Q4','Q5','Q7','Q8','TT','R8','e-tron','Q4 e-tron'],
-  Dacia:['1310','Logan','Sandero','Duster','Dokker','Lodgy','Spring','Jogger','Bigster'],
-  'Mercedes-Benz':['A-Class','B-Class','C-Class','E-Class','S-Class','CLA','CLS','GLA','GLB','GLC','GLE','GLS','G-Class','Sprinter','Vito','EQA','EQB','EQC','EQE','EQS'],
-  Ford:['Fiesta','Focus','Mondeo','Puma','Kuga','Edge','Explorer','Mustang','Ranger','Transit','Tourneo'],
-  Opel:['Astra','Corsa','Insignia','Vectra','Zafira','Mokka','Crossland','Grandland','Frontera','Combo','Vivaro'],
-  Skoda:['Fabia','Scala','Octavia','Superb','Rapid','Karoq','Kodiaq','Kamiq','Enyaq','Yeti'],
-  Toyota:['Yaris','Corolla','Camry','Avensis','Prius','C-HR','RAV4','Highlander','Land Cruiser','Hilux','Proace'],
-  Renault:['Clio','Megane','Laguna','Talisman','Captur','Kadjar','Austral','Koleos','Scenic','Espace','Kangoo','Master','Trafic'],
-  Peugeot:['106','206','207','208','306','307','308','406','407','508','2008','3008','5008','Partner','Expert','Boxer'],
-  Citroen:['C1','C2','C3','C4','C5','C3 Aircross','C4 Cactus','C5 Aircross','Berlingo','Jumper','Jumpy'],
-  Volvo:['S40','S60','S80','S90','V40','V60','V70','V90','XC40','XC60','XC70','XC90'],
-  Honda:['Civic','Accord','Jazz','CR-V','HR-V','ZR-V','FR-V','NSX'],
-  Mazda:['2','3','5','6','CX-3','CX-5','CX-30','CX-60','CX-80','MX-5'],
-  Nissan:['Micra','Note','Almera','Primera','Juke','Qashqai','X-Trail','Murano','Navara','Patrol','Leaf'],
-  Kia:['Picanto','Rio','Ceed','Proceed','Optima','Stinger','Stonic','Niro','Sportage','Sorento','EV6','EV9'],
-  Hyundai:['i10','i20','i30','Accent','Elantra','Sonata','Tucson','Santa Fe','Kona','Ioniq','Ioniq 5','Ioniq 6'],
-  Fiat:['Panda','Punto','Bravo','Tipo','500','500L','500X','Doblo','Ducato','Fiorino'],
-  Seat:['Ibiza','Leon','Toledo','Altea','Ateca','Arona','Tarraco'],
-  Suzuki:['Swift','Ignis','Baleno','Vitara','S-Cross','Jimny','SX4'],
-  Tesla:['Model 3','Model S','Model X','Model Y'],
-  Mitsubishi:['Colt','Lancer','ASX','Outlander','Pajero','L200','Eclipse Cross'],
-  Subaru:['Impreza','Legacy','Forester','Outback','XV','BRZ'],
-  'Land Rover':['Defender','Discovery','Discovery Sport','Range Rover','Range Rover Sport','Range Rover Evoque','Freelander'],
-  Jeep:['Renegade','Compass','Cherokee','Grand Cherokee','Wrangler','Gladiator'],
-  Porsche:['911','Boxster','Cayman','Panamera','Macan','Cayenne','Taycan'],
-  Jaguar:['XE','XF','XJ','F-Pace','E-Pace','I-Pace','F-Type'],
-  'Alfa Romeo':['145','147','156','159','Giulietta','Giulia','Stelvio','Tonale'],
-  Lancia:['Ypsilon','Delta','Lybra','Musa','Thema'],
-  Chevrolet:['Aveo','Cruze','Captiva','Spark','Orlando','Malibu'],
-  Daewoo:['Matiz','Kalos','Lanos','Nubira','Leganza'],
-  Lexus:['IS','ES','GS','LS','CT','UX','NX','RX','GX','LX'],
-  Infiniti:['Q30','Q50','Q60','QX30','QX50','QX60','QX70','QX80'],
-  Isuzu:['D-Max','Trooper','Rodeo'],
-  SsangYong:['Korando','Rexton','Tivoli','Musso','Rodius'],
-  Smart:['Fortwo','Forfour'],
-  Mini:['Hatch','Clubman','Countryman','Paceman','Convertible'],
-  Maserati:['Ghibli','Quattroporte','Levante','Grecale','GranTurismo','GranCabrio'],
-  Ferrari:['Roma','Portofino','488','F8','812','Purosangue','SF90'],
-  Lamborghini:['Huracan','Aventador','Urus','Revuelto'],
-  Bentley:['Continental','Flying Spur','Bentayga'],
-  'Rolls-Royce':['Ghost','Phantom','Cullinan','Wraith','Dawn'],
-  McLaren:['570S','720S','750S','Artura','GT','765LT'],
-  'Aston Martin':['Vantage','DB9','DB11','DB12','DBS','DBX'],
-  BYD:['Atto 3','Dolphin','Seal','Han','Tang','Song'],
-  Cupra:['Ateca','Formentor','Leon','Born','Tavascan']
- };
- catalogCache=Object.entries(fallback).flatMap(([make,models])=>models.map(model=>({id:`fallback/${slugify(make)}/${slugify(model)}`,name:model,make,model,generation:'',years:[],kind:'car',engine:'',fuel:'',raw:{}})));
- return catalogCache;
+ return Promise.resolve(catalogCache);
 }
 function resolveText(catalog,q){
  const ts=norm(q).split(/\s+/).filter(x=>x.length>1); if(!ts.length)return null;
@@ -413,56 +275,56 @@ async function getVehicleRows(){
  }
  return getCatalog();
 }
-async function syncVehicleDb(){
+async function syncVehicleDb({reset=false}={}){
  if(!pool)return {ok:false,error:'DATABASE_NOT_CONFIGURED'};
  if(vehicleSyncing)return vehicleSyncing;
  vehicleSyncing=(async()=>{
   const cat=await getCatalog();
-  const fallback=!!(cat[0]&&String(cat[0].id).startsWith('fallback/'));
-  const source=fallback?'fallback':'vehiclesdb';
+  // reset: șterge tot ce nu e adăugat manual (liste vechi/greșite) și reface lista standard.
+  if(reset)await pool.query("DELETE FROM vehicles WHERE source<>'manual'");
   const map=new Map();
   for(const v of cat){
    const mk=vkey(v.make),mo=vkey(v.model); if(!mk||!mo)continue;
    const k=mk+'|'+mo; if(map.has(k))continue;
-   const y=yearRange(v);
-   map.set(k,[String(v.make).slice(0,60),String(v.model).slice(0,80),mk,mo,vstr(v.generation,80),y.from,y.to,VEHICLE_KINDS.includes(v.kind)?v.kind:'car',vstr(v.engine,80),vstr(v.fuel,30),source]);
+   map.set(k,[String(v.make).slice(0,60),String(v.model).slice(0,80),mk,mo,null,v.year_from||null,v.year_to||null,VEHICLE_KINDS.includes(v.kind)?v.kind:'car',null,null,'curated']);
   }
   const rows=[...map.values()];
-  const conflict=fallback
-   ?'ON CONFLICT (make_norm,model_norm) DO NOTHING'
-   :"ON CONFLICT (make_norm,model_norm) DO UPDATE SET make=EXCLUDED.make,model=EXCLUDED.model,generation=EXCLUDED.generation,year_from=EXCLUDED.year_from,year_to=EXCLUDED.year_to,kind=EXCLUDED.kind,engine=EXCLUDED.engine,fuel=EXCLUDED.fuel,source=EXCLUDED.source,updated_at=NOW() WHERE vehicles.source<>'manual'";
+  const conflict="ON CONFLICT (make_norm,model_norm) DO UPDATE SET make=EXCLUDED.make,model=EXCLUDED.model,year_from=EXCLUDED.year_from,year_to=EXCLUDED.year_to,kind=EXCLUDED.kind,source=EXCLUDED.source,updated_at=NOW() WHERE vehicles.source<>'manual'";
   for(let i=0;i<rows.length;i+=500){
    const ch=rows.slice(i,i+500), cols=Array.from({length:11},(_,c)=>ch.map(r=>r[c]));
    await pool.query(`INSERT INTO vehicles(make,model,make_norm,model_norm,generation,year_from,year_to,kind,engine,fuel,source) SELECT * FROM unnest($1::text[],$2::text[],$3::text[],$4::text[],$5::text[],$6::int[],$7::int[],$8::text[],$9::text[],$10::text[],$11::text[]) WHERE true ${conflict}`,cols);
   }
   invalidateVehicles();
   const total=(await pool.query('SELECT COUNT(*)::int n FROM vehicles')).rows[0].n;
-  return {ok:true,source,processed:rows.length,total,fullCatalog:!fallback};
+  return {ok:true,source:'curated',processed:rows.length,total,fullCatalog:true};
  })().finally(()=>{vehicleSyncing=null;});
  return vehicleSyncing;
 }
 async function ensureVehicleDb(){
  if(!pool)return;
  try{
-  const r=(await pool.query("SELECT COUNT(*) FILTER (WHERE source='vehiclesdb')::int AS nfull, COUNT(*)::int AS ntotal, MAX(updated_at) FILTER (WHERE source='vehiclesdb') AS lastsync FROM vehicles")).rows[0];
-  const stale=!r.lastsync||Date.now()-new Date(r.lastsync).getTime()>7*86400000;
-  if(r.ntotal===0||r.nfull<100||stale){const out=await syncVehicleDb();console.log('Vehicle DB sync:',JSON.stringify(out));}
+  const cat=await getCatalog();
+  const r=(await pool.query("SELECT COUNT(*) FILTER (WHERE source='curated')::int AS nc, COUNT(*) FILTER (WHERE source NOT IN ('curated','manual'))::int AS nold FROM vehicles")).rows[0];
+  // Listele vechi (VehiclesDB / rezervă) sunt înlocuite o singură dată cu lista standard.
+  if(r.nold>0||r.nc<cat.length*0.9){const out=await syncVehicleDb({reset:true});console.log('Vehicle DB sync:',JSON.stringify(out));}
  }catch(e){console.error('Vehicle DB sync failed:',e.message);}
 }
 
-app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'VehiclesDB',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':(Array.isArray(catalogCache)&&catalogCache[0]?.id?.startsWith('fallback/')?'fallback':'VehiclesDB'),auth:'secure-revocable-session-cookie'}));
+app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'local',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':'local',auth:'secure-revocable-session-cookie'}));
 app.get('/api/catalog/makes',async(req,res)=>{
  const c=await getVehicleRows(); const seen=new Map();
  for(const x of c){const k=vkey(x.make);if(k&&!seen.has(k))seen.set(k,x.make);}
- const makes=[...seen.values()].sort((a,b)=>a.localeCompare(b,'ro'));
- res.set('Cache-Control','public, max-age=300');res.json({makes:makes.map(name=>({name})),count:makes.length,source:'VehiclesDB'});
+ const last=x=>/^alt[aă] marc[aă]$/i.test(x)?1:0;
+ const makes=[...seen.values()].sort((a,b)=>last(a)-last(b)||a.localeCompare(b,'ro',{numeric:true}));
+ res.set('Cache-Control','public, max-age=300');res.json({makes:makes.map(name=>({name})),count:makes.length,source:'local'});
 });
 app.get('/api/catalog/models',async(req,res)=>{
  const mk=vkey(req.query.make); const c=await getVehicleRows(); const seen=new Map();
  for(const x of c){if(vkey(x.make)!==mk)continue;const k=vkey(x.model);if(k&&!seen.has(k))seen.set(k,x);}
- const models=[...seen.values()].sort((a,b)=>String(a.model).localeCompare(String(b.model),'ro'));
+ const lastM=x=>/^alt model$/i.test(x)?1:0;
+ const models=[...seen.values()].sort((a,b)=>lastM(a.model)-lastM(b.model)||String(a.model).localeCompare(String(b.model),'ro',{numeric:true}));
  res.set('Cache-Control','public, max-age=300');
- res.json({models:models.map(x=>({name:x.model,year_from:x.year_from||null,year_to:x.year_to||null,generation:x.generation||null,engine:x.engine||null,fuel:x.fuel||null,kind:x.kind||'car'})),count:models.length,source:'VehiclesDB'});
+ res.json({models:models.map(x=>({name:x.model,year_from:x.year_from||null,year_to:x.year_to||null,generation:x.generation||null,engine:x.engine||null,fuel:x.fuel||null,kind:x.kind||'car'})),count:models.length,source:'local'});
 });
 // Anii de fabricație posibili pentru un model (pentru sugestii în câmpul „An”).
 app.get('/api/catalog/years',async(req,res)=>{
@@ -520,10 +382,9 @@ app.delete('/api/admin/vehicles/:id',auth,admin,requireDb,async(req,res)=>{
  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_vehicle','vehicle',req.params.id,`${d.rows[0].make} ${d.rows[0].model}`]);
  res.json({ok:true});
 });
-// Resincronizare manuală cu VehiclesDB. Înregistrările adăugate manual nu sunt suprascrise.
+// Resetare la lista standard de mărci/modele. Înregistrările adăugate manual nu sunt șterse.
 app.post('/api/admin/vehicles/sync',auth,admin,requireDb,async(req,res)=>{
- catalogLoadedAt=0;catalogRetryAt=0;
- const out=await syncVehicleDb();
+ const out=await syncVehicleDb({reset:true});
  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'sync_vehicles','vehicle',null,String(out.source||'')+' '+String(out.total||0)]);
  res.json(out);
 });

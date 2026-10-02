@@ -220,7 +220,7 @@ function fillStaticSelects(){
 async function loadCatalog(attempt=0){
   let makes = [];
   try{ makes = ((await api('/api/catalog/makes')).makes||[]).map(x=>x.name); }catch{}
-  if(!makes.length){ if(attempt<3) setTimeout(()=>loadCatalog(attempt+1), 4000*(attempt+1)); return; }
+  if(!makes.length){ if(attempt<3) setTimeout(()=>loadCatalog(attempt+1), 4000*(attempt+1)); else toast('Nu am putut încărca lista de mărci. Reîncarcă pagina.'); return; }
   for(const [id,first] of [['filterMake','Toate mărcile'],['homeMake','Alege marca'],['matchMake','Alege marca'],['sellMake','Alege marca'],['reqMake','Alege marca']]){
     const el = $('#'+id); if(el) setOptions(el, first, makes);
   }
@@ -901,7 +901,7 @@ function renderAdmin(){
 }
 let vehQuery = '';
 const KIND_LABEL = {car:'Autoturism',van:'Utilitară',motorcycle:'Motocicletă',moped:'Moped',truck:'Camion',bus:'Autobuz'};
-const SRC_LABEL = {manual:'manual',vehiclesdb:'VehiclesDB',fallback:'listă de rezervă'};
+const SRC_LABEL = {manual:'manual',curated:'listă standard',vehiclesdb:'listă veche',fallback:'listă veche'};
 async function loadAdminVehicles(){
   const box = $('#vehAdmin'); if(!box) return;
   const d = await api('/api/admin/vehicles?limit=100&q='+encodeURIComponent(vehQuery));
@@ -911,7 +911,7 @@ async function loadAdminVehicles(){
     return `<article class="info-card"><b>${esc(x.make)} ${esc(x.model)}</b> <span class="badge">${esc(KIND_LABEL[x.kind]||x.kind)}</span><p>${esc(yrs)}${x.generation?' · '+esc(x.generation):''}${x.engine?' · '+esc(x.engine):''}${x.fuel?' · '+esc(x.fuel):''}</p><small>Sursă: ${esc(SRC_LABEL[x.source]||x.source)}</small><div class="admin-actions"><button class="btn danger small" data-veh="del" data-id="${x.id}">Șterge</button></div></article>`;
   }).join('') || '<p>Nu am găsit vehicule.</p>';
   box.innerHTML = `<div class="stat-grid"><div class="stat"><b>Vehicule</b><h3>${st.total||0}</h3></div><div class="stat"><b>Mărci</b><h3>${st.makes||0}</h3></div><div class="stat"><b>Adăugate manual</b><h3>${st.manual||0}</h3></div></div>
-  <div class="admin-actions" style="margin:14px 0"><input id="vehSearch" placeholder="Caută marcă sau model…" value="${esc(vehQuery)}" style="flex:1;min-width:180px;padding:10px;border:1px solid #d6e1ec;border-radius:10px"><button class="btn ghost small" data-veh="search">Caută</button><button class="btn ghost small" data-veh="sync">Sincronizează cu VehiclesDB</button></div>
+  <div class="admin-actions" style="margin:14px 0"><input id="vehSearch" placeholder="Caută marcă sau model…" value="${esc(vehQuery)}" style="flex:1;min-width:180px;padding:10px;border:1px solid #d6e1ec;border-radius:10px"><button class="btn ghost small" data-veh="search">Caută</button><button class="btn ghost small" data-veh="sync">Resetează la lista standard</button></div>
   <div class="info-card" style="margin-bottom:14px"><b>Adaugă sau actualizează un vehicul</b><p class="form-note">Dacă marca și modelul există deja, înregistrarea este actualizată și marcată „manual” (nu va fi suprascrisă la sincronizare).</p>
   <div class="two"><input id="vehMake" placeholder="Marcă (ex. Dacia)"><input id="vehModel" placeholder="Model (ex. Duster)"></div>
   <div class="two" style="margin-top:8px"><input id="vehFrom" inputmode="numeric" maxlength="4" placeholder="An început (ex. 2010)"><input id="vehTo" inputmode="numeric" maxlength="4" placeholder="An sfârșit (gol = în producție)"></div>
@@ -925,9 +925,10 @@ async function vehAction(el){
   if(act==='search'){ vehQuery = $('#vehSearch').value.trim(); await loadAdminVehicles(); return; }
   if(act==='del'){ if(!confirm('Ștergi acest vehicul din baza de date?')) return; await api('/api/admin/vehicles/'+el.dataset.id,{method:'DELETE'}); modelCache.clear(); yearsCache.clear(); await loadAdminVehicles(); return; }
   if(act==='sync'){
-    toast('Sincronizare în curs… poate dura câteva secunde.');
+    if(!confirm('Resetezi lista de mărci și modele la lista standard? Vehiculele adăugate manual rămân.')) return;
+    toast('Se reface lista de mărci și modele…');
     const r = await api('/api/admin/vehicles/sync',{method:'POST'});
-    toast(r.fullCatalog ? `Sincronizat: ${r.total} vehicule în baza de date.` : 'VehiclesDB nu a putut fi accesat acum; s-a păstrat lista existentă/de rezervă.');
+    toast(`Lista standard a fost restaurată: ${r.total} vehicule în baza de date.`);
     modelCache.clear(); yearsCache.clear(); await loadAdminVehicles(); loadCatalog(); return;
   }
   if(act==='add'){
