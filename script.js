@@ -14,7 +14,7 @@ const ERR = {
   LOGIN_RATE_LIMIT:'Prea multe încercări. Încearcă din nou mai târziu.',RESET_EXPIRED:'Linkul a expirat sau a fost deja folosit.',
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
-  PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',ADMIN_ONLY:'Doar administratorul are acces.',
+  PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
   CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.'
 };
 const CATEGORIES = [['Motor','⚙️'],['Transmisie','🔧'],['Frâne','🛑'],['Iluminare','💡'],['Caroserie','🚗'],['Suspensie','🔩'],['Roți','🛞'],['Electrică','🔌'],['Interior','💺'],['Climatizare','❄️'],['Evacuare','💨'],['Filtre','🧴'],['Altele','📦']];
@@ -234,6 +234,19 @@ async function loadModels(make, selectId, first='Alege modelul'){
     catch{ models = []; }
   }
   setOptions(el, first, models);
+}
+
+const yearsCache = new Map();
+async function loadYears(make, model){
+  const dl = $('#yearList'); if(!dl) return;
+  if(!make || !model){ dl.innerHTML = ''; return; }
+  const key = make+'|'+model;
+  let years = yearsCache.get(key);
+  if(!years){
+    try{ years = (await api('/api/catalog/years?make='+encodeURIComponent(make)+'&model='+encodeURIComponent(model))).years||[]; yearsCache.set(key,years); }
+    catch{ years = []; }
+  }
+  dl.innerHTML = years.map(y=>`<option value="${y}"></option>`).join('');
 }
 
 /* ---------- carduri ---------- */
@@ -743,7 +756,7 @@ async function enterSell(editParam){
   $('#sellConditionWrap').classList.toggle('hidden', x.type==='dezmembrari');
   $('#sellTitle').value = x.title||''; $('#sellDescription').value = x.description||'';
   $('#sellCategory').value = x.category||''; $('#sellMake').value = x.make||'';
-  await loadModels(x.make||'','sellModel'); $('#sellModel').value = x.model||'';
+  await loadModels(x.make||'','sellModel'); $('#sellModel').value = x.model||''; loadYears(x.make||'',x.model||'');
   if(x.model && $('#sellModel').value!==x.model){ const o=document.createElement('option'); o.value=o.textContent=x.model; $('#sellModel').appendChild(o); $('#sellModel').value=x.model; }
   if(x.make && $('#sellMake').value!==x.make){ const o=document.createElement('option'); o.value=o.textContent=x.make; $('#sellMake').appendChild(o); $('#sellMake').value=x.make; }
   $('#sellYear').value = x.year||''; $('#sellOem').value = x.oem||'';
@@ -871,7 +884,7 @@ async function loadAdmin(){
 function adminBtns(kind, id, items){ return items.map(([label,status])=>`<button class="btn ghost small" data-admin="${kind}" data-id="${id}" data-status="${status}">${label}</button>`).join(''); }
 function renderAdmin(){
   const d = adminData, s = d.s;
-  const tabs = [['dashboard','Dashboard'],['listings',`Anunțuri${s.pending?` (${s.pending})`:''}`],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['reports',`Raportări${s.reports?` (${s.reports})`:''}`],['activity','Activitate']];
+  const tabs = [['dashboard','Dashboard'],['listings',`Anunțuri${s.pending?` (${s.pending})`:''}`],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['reports',`Raportări${s.reports?` (${s.reports})`:''}`],['activity','Activitate'],['vehicles','Mașini']];
   let body = '';
   if(adminTab==='dashboard') body = `<div class="stat-grid"><div class="stat"><b>Utilizatori</b><h3>${s.users}</h3><small>${s.activeUsers} activi</small></div><div class="stat"><b>Anunțuri</b><h3>${s.listings}</h3><small>${s.approved} aprobate · ${s.pending} în așteptare · ${s.rejected} respinse</small></div><div class="stat"><b>Raportări deschise</b><h3>${s.reports}</h3></div><div class="stat"><b>Cereri deschise</b><h3>${s.requests}</h3></div></div>`;
   if(adminTab==='dashboard') body += `<div class="stat-grid" style="margin-top:12px"><div class="stat"><b>Oferte</b><h3>${s.offers||0}</h3></div><div class="stat"><b>Comenzi</b><h3>${s.orders||0}</h3></div><div class="stat"><b>Mesaje trimise</b><h3>${s.messages||0}</h3><small>doar numărul, conținutul e privat</small></div></div>`;
@@ -882,7 +895,47 @@ function renderAdmin(){
   if(adminTab==='requests') body = `<div class="admin-list">${d.requests.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title)}</b><p>${esc(x.user_name||'—')} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`).join('')||'<p>Nu există cereri.</p>'}</div>`;
   if(adminTab==='reports') body = `<div class="admin-list">${d.reports.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${esc(x.reporter_name||'—')} · ${esc(x.status)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions">${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`).join('')||'<p>Nu există raportări.</p>'}</div>`;
   if(adminTab==='activity') body = `<div class="admin-list">${d.activity.map(x=>`<article class="info-card"><b>${esc(x.action)}</b><p>${esc(x.admin_name||'Admin')} · ${new Date(x.created_at).toLocaleString('ro-RO')}</p><small>${esc(x.target_type||'')} #${x.target_id||''} · ${esc(x.details||'')}</small></article>`).join('')||'<p>Nu există activitate.</p>'}</div>`;
+  if(adminTab==='vehicles') body = '<div id="vehAdmin"><p>Se încarcă baza de vehicule…</p></div>';
   $('#adminContent').innerHTML = `<div class="admin-tabs">${tabs.map(([k,l])=>`<button class="btn ghost ${k===adminTab?'active':''}" data-admin-tab="${k}">${l}</button>`).join('')}</div>${body}`;
+  if(adminTab==='vehicles') safe(loadAdminVehicles)();
+}
+let vehQuery = '';
+const KIND_LABEL = {car:'Autoturism',van:'Utilitară',motorcycle:'Motocicletă',moped:'Moped',truck:'Camion',bus:'Autobuz'};
+const SRC_LABEL = {manual:'manual',vehiclesdb:'VehiclesDB',fallback:'listă de rezervă'};
+async function loadAdminVehicles(){
+  const box = $('#vehAdmin'); if(!box) return;
+  const d = await api('/api/admin/vehicles?limit=100&q='+encodeURIComponent(vehQuery));
+  const st = d.stats||{};
+  const rows = d.vehicles.map(x=>{
+    const yrs = x.year_from ? `${x.year_from}–${x.year_to||'prezent'}` : '—';
+    return `<article class="info-card"><b>${esc(x.make)} ${esc(x.model)}</b> <span class="badge">${esc(KIND_LABEL[x.kind]||x.kind)}</span><p>${esc(yrs)}${x.generation?' · '+esc(x.generation):''}${x.engine?' · '+esc(x.engine):''}${x.fuel?' · '+esc(x.fuel):''}</p><small>Sursă: ${esc(SRC_LABEL[x.source]||x.source)}</small><div class="admin-actions"><button class="btn danger small" data-veh="del" data-id="${x.id}">Șterge</button></div></article>`;
+  }).join('') || '<p>Nu am găsit vehicule.</p>';
+  box.innerHTML = `<div class="stat-grid"><div class="stat"><b>Vehicule</b><h3>${st.total||0}</h3></div><div class="stat"><b>Mărci</b><h3>${st.makes||0}</h3></div><div class="stat"><b>Adăugate manual</b><h3>${st.manual||0}</h3></div></div>
+  <div class="admin-actions" style="margin:14px 0"><input id="vehSearch" placeholder="Caută marcă sau model…" value="${esc(vehQuery)}" style="flex:1;min-width:180px;padding:10px;border:1px solid #d6e1ec;border-radius:10px"><button class="btn ghost small" data-veh="search">Caută</button><button class="btn ghost small" data-veh="sync">Sincronizează cu VehiclesDB</button></div>
+  <div class="info-card" style="margin-bottom:14px"><b>Adaugă sau actualizează un vehicul</b><p class="form-note">Dacă marca și modelul există deja, înregistrarea este actualizată și marcată „manual” (nu va fi suprascrisă la sincronizare).</p>
+  <div class="two"><input id="vehMake" placeholder="Marcă (ex. Dacia)"><input id="vehModel" placeholder="Model (ex. Duster)"></div>
+  <div class="two" style="margin-top:8px"><input id="vehFrom" inputmode="numeric" maxlength="4" placeholder="An început (ex. 2010)"><input id="vehTo" inputmode="numeric" maxlength="4" placeholder="An sfârșit (gol = în producție)"></div>
+  <div class="two" style="margin-top:8px"><input id="vehGen" placeholder="Generație (opțional)"><input id="vehEngine" placeholder="Motor (opțional)"></div>
+  <div class="two" style="margin-top:8px"><select id="vehFuel"><option value="">Combustibil (opțional)</option><option>Benzină</option><option>Motorină</option><option>GPL</option><option>Hibrid</option><option>Electric</option></select><select id="vehKind">${Object.entries(KIND_LABEL).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div>
+  <button class="btn primary full" style="margin-top:10px" data-veh="add">Salvează vehiculul</button></div>
+  <div class="admin-list">${rows}</div>`;
+}
+async function vehAction(el){
+  const act = el.dataset.veh;
+  if(act==='search'){ vehQuery = $('#vehSearch').value.trim(); await loadAdminVehicles(); return; }
+  if(act==='del'){ if(!confirm('Ștergi acest vehicul din baza de date?')) return; await api('/api/admin/vehicles/'+el.dataset.id,{method:'DELETE'}); modelCache.clear(); yearsCache.clear(); await loadAdminVehicles(); return; }
+  if(act==='sync'){
+    toast('Sincronizare în curs… poate dura câteva secunde.');
+    const r = await api('/api/admin/vehicles/sync',{method:'POST'});
+    toast(r.fullCatalog ? `Sincronizat: ${r.total} vehicule în baza de date.` : 'VehiclesDB nu a putut fi accesat acum; s-a păstrat lista existentă/de rezervă.');
+    modelCache.clear(); yearsCache.clear(); await loadAdminVehicles(); loadCatalog(); return;
+  }
+  if(act==='add'){
+    const body = {make:$('#vehMake').value.trim(),model:$('#vehModel').value.trim(),year_from:$('#vehFrom').value.trim(),year_to:$('#vehTo').value.trim(),generation:$('#vehGen').value.trim(),engine:$('#vehEngine').value.trim(),fuel:$('#vehFuel').value,kind:$('#vehKind').value};
+    if(!body.make || !body.model){ toast('Completează marca și modelul.'); return; }
+    await api('/api/admin/vehicles',{method:'POST',body:JSON.stringify(body)});
+    toast('Vehicul salvat.'); modelCache.clear(); yearsCache.clear(); await loadAdminVehicles(); loadCatalog();
+  }
 }
 async function adminAction(el){
   const {admin:kind,id,status} = el.dataset;
@@ -952,6 +1005,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-wa-phone]'))){ const id=Number(el.dataset.waPhone); const row=(state.phones||[]).find(p=>p.id===id); if(row) safe(async()=>{ await api('/api/account/phones/'+id,{method:'PATCH',body:JSON.stringify({is_whatsapp:!row.is_whatsapp})}); await loadSettings(); })(); return; }
   if((el=t.closest('[data-del-phone]'))){ const id=el.dataset.delPhone; if(confirm('Ștergi acest număr?')) safe(async()=>{ await api('/api/account/phones/'+id,{method:'DELETE'}); await loadSettings(); })(); return; }
   if((el=t.closest('[data-admin-tab]'))){ adminTab=el.dataset.adminTab; renderAdmin(); return; }
+  if((el=t.closest('[data-veh]'))){ safe(vehAction)(el); return; }
   if((el=t.closest('[data-admin]'))){ safe(adminAction)(el); return; }
   if((el=t.closest('[data-action]'))){ doAction(el.dataset.action); return; }
   if((el=t.closest('[data-account]'))){ accountAction(el.dataset.account); return; }
@@ -1023,6 +1077,9 @@ function wire(){
   $('#reqMake').addEventListener('change', e=>loadModels(e.target.value,'reqModel'));
   $('#sellCancelEdit').addEventListener('click',()=>{ resetSellForm(); setSellMode(null); state.sellFilled=null; navigate('anunturile-mele'); });
   $('#sellMake').addEventListener('change', e=>loadModels(e.target.value,'sellModel'));
+  $('#sellModel').addEventListener('change', ()=>loadYears($('#sellMake').value,$('#sellModel').value));
+  $('#matchModel').addEventListener('change', ()=>loadYears($('#matchMake').value,$('#matchModel').value));
+  $('#reqModel').addEventListener('change', ()=>loadYears($('#reqMake').value,$('#reqModel').value));
   $('#matchForm').addEventListener('submit', e=>{ e.preventDefault(); const make=$('#matchMake').value, model=$('#matchModel').value, q=[$('#matchEngine').value.trim(),$('#matchPart').value.trim()].filter(Boolean).join(' '); if(!make&&!q){ toast('Alege marca sau scrie piesa căutată.'); return; } openSearch({q,make,model}); });
   $('#sellType').addEventListener('change', e=>$('#sellConditionWrap').classList.toggle('hidden', e.target.value==='dezmembrari'));
   Object.keys(FILTER_FIELDS).forEach(id=>{ if(id!=='filterMake') $('#'+id).addEventListener('change', onFilterChange); });

@@ -75,6 +75,11 @@ app.use(cookieParser());
 for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control',f==='index.html'?'no-cache':'public, max-age=300');res.sendFile(path.join(__dirname,f));});
 app.use('/assets',express.static(ASSETS_DIR,{index:false,dotfiles:'ignore',maxAge:'7d'}));
 
+const VEHICLE_SCHEMA=[
+ "CREATE TABLE IF NOT EXISTS vehicles (id SERIAL PRIMARY KEY, make TEXT NOT NULL, model TEXT NOT NULL, make_norm TEXT NOT NULL, model_norm TEXT NOT NULL, generation TEXT, year_from INTEGER, year_to INTEGER, kind TEXT NOT NULL DEFAULT 'car', engine TEXT, fuel TEXT, source TEXT NOT NULL DEFAULT 'manual', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+ 'CREATE UNIQUE INDEX IF NOT EXISTS vehicles_make_model_uq ON vehicles(make_norm,model_norm)',
+ 'CREATE INDEX IF NOT EXISTS vehicles_make_idx ON vehicles(make_norm)'
+];
 const schema = `
 CREATE TABLE IF NOT EXISTS users (
  id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, phone TEXT, show_phone BOOLEAN NOT NULL DEFAULT FALSE,
@@ -169,7 +174,8 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS listings_make_model_idx ON listings(make,model)',
   'CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)',
   'CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at)',
-  'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)'
+  'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)',
+  ...VEHICLE_SCHEMA
  );
  for(const q of migrations) await pool.query(q);
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
@@ -372,10 +378,155 @@ function resolveText(catalog,q){
  if(!scored.length)return null; const x=scored[0].v; return {...x,confidence:Math.min(1,scored[0].score)};
 }
 
-app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'VehiclesDB',catalogLoaded:Array.isArray(catalogCache),catalogCount:Array.isArray(catalogCache)?catalogCache.length:0,catalogSource:Array.isArray(catalogCache)&&catalogCache[0]?.id?.startsWith('fallback/')?'fallback':'VehiclesDB',auth:'secure-revocable-session-cookie'}));
-app.get('/api/catalog/makes',async(req,res)=>{const c=await getCatalog();const makes=[...new Set(c.map(x=>x.make))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({makes:makes.map(name=>({name})),count:makes.length,source:'VehiclesDB'});});
-app.get('/api/catalog/models',async(req,res)=>{const make=String(req.query.make||'');const c=await getCatalog();const models=[...new Set(c.filter(x=>norm(x.make)===norm(make)).map(x=>x.model))].sort((a,b)=>a.localeCompare(b,'ro'));res.set('Cache-Control','public, max-age=3600');res.json({models:models.map(name=>({name})),count:models.length,source:'VehiclesDB'});});
-app.get('/api/catalog/resolve',async(req,res)=>{const q=String(req.query.q||'').trim();if(!q)return res.json({match:null});const c=await getCatalog();const match=resolveText(c,q);res.json({match});});
+/* ---------- baza de date vehicule (Postgres) ---------- */
+// Cheie comparabilă: fără diacritice, majuscule, spații sau cratime ("Land Rover" = "LandRover").
+const vkey=s=>norm(s).replace(/\s+/g,'');
+const VEHICLE_KINDS=['car','van','motorcycle','moped','truck','bus'];
+const vstr=(x,n)=>typeof x==='string'&&x.trim()?x.trim().slice(0,n):null;
+function yearRange(v){
+ const nums=[];
+ const scan=x=>{
+  if(x==null)return;
+  if(typeof x==='number'){nums.push(x);return;}
+  if(typeof x==='string'){for(const m of x.matchAll(/(?:19|20)\d{2}/g))nums.push(Number(m[0]));return;}
+  if(Array.isArray(x)){x.forEach(scan);return;}
+  if(typeof x==='object')Object.values(x).forEach(scan);
+ };
+ scan(v.years);
+ const r=v.raw&&typeof v.raw==='object'?v.raw:{};
+ for(const k of ['year_from','year_start','start_year','yearFrom','production_start','year_end','end_year','year_to','yearTo','production_end'])scan(r[k]);
+ const max=new Date().getFullYear()+2;
+ const ok=nums.filter(n=>Number.isInteger(n)&&n>=1900&&n<=max);
+ return ok.length?{from:Math.min(...ok),to:Math.max(...ok)}:{from:null,to:null};
+}
+let vehicleRows=null, vehicleRowsAt=0, vehicleSyncing=null;
+function invalidateVehicles(){vehicleRows=null;vehicleRowsAt=0;}
+// Sursa de adevăr pentru selecturile marcă/model: tabelul `vehicles`. Dacă baza nu e disponibilă sau e goală,
+// se folosește catalogul în memorie (VehiclesDB / lista de rezervă), ca site-ul să nu rămână fără mărci.
+async function getVehicleRows(){
+ if(pool){
+  if(vehicleRows&&Date.now()-vehicleRowsAt<5*60*1000)return vehicleRows;
+  try{
+   const r=await pool.query('SELECT id,make,model,generation,year_from,year_to,kind,engine,fuel,source FROM vehicles ORDER BY make,model');
+   if(r.rowCount){vehicleRows=r.rows.map(x=>({...x,name:x.model}));vehicleRowsAt=Date.now();return vehicleRows;}
+  }catch(e){console.error('vehicles read:',e.message);}
+ }
+ return getCatalog();
+}
+async function syncVehicleDb(){
+ if(!pool)return {ok:false,error:'DATABASE_NOT_CONFIGURED'};
+ if(vehicleSyncing)return vehicleSyncing;
+ vehicleSyncing=(async()=>{
+  const cat=await getCatalog();
+  const fallback=!!(cat[0]&&String(cat[0].id).startsWith('fallback/'));
+  const source=fallback?'fallback':'vehiclesdb';
+  const map=new Map();
+  for(const v of cat){
+   const mk=vkey(v.make),mo=vkey(v.model); if(!mk||!mo)continue;
+   const k=mk+'|'+mo; if(map.has(k))continue;
+   const y=yearRange(v);
+   map.set(k,[String(v.make).slice(0,60),String(v.model).slice(0,80),mk,mo,vstr(v.generation,80),y.from,y.to,VEHICLE_KINDS.includes(v.kind)?v.kind:'car',vstr(v.engine,80),vstr(v.fuel,30),source]);
+  }
+  const rows=[...map.values()];
+  const conflict=fallback
+   ?'ON CONFLICT (make_norm,model_norm) DO NOTHING'
+   :"ON CONFLICT (make_norm,model_norm) DO UPDATE SET make=EXCLUDED.make,model=EXCLUDED.model,generation=EXCLUDED.generation,year_from=EXCLUDED.year_from,year_to=EXCLUDED.year_to,kind=EXCLUDED.kind,engine=EXCLUDED.engine,fuel=EXCLUDED.fuel,source=EXCLUDED.source,updated_at=NOW() WHERE vehicles.source<>'manual'";
+  for(let i=0;i<rows.length;i+=500){
+   const ch=rows.slice(i,i+500), cols=Array.from({length:11},(_,c)=>ch.map(r=>r[c]));
+   await pool.query(`INSERT INTO vehicles(make,model,make_norm,model_norm,generation,year_from,year_to,kind,engine,fuel,source) SELECT * FROM unnest($1::text[],$2::text[],$3::text[],$4::text[],$5::text[],$6::int[],$7::int[],$8::text[],$9::text[],$10::text[],$11::text[]) WHERE true ${conflict}`,cols);
+  }
+  invalidateVehicles();
+  const total=(await pool.query('SELECT COUNT(*)::int n FROM vehicles')).rows[0].n;
+  return {ok:true,source,processed:rows.length,total,fullCatalog:!fallback};
+ })().finally(()=>{vehicleSyncing=null;});
+ return vehicleSyncing;
+}
+async function ensureVehicleDb(){
+ if(!pool)return;
+ try{
+  const r=(await pool.query("SELECT COUNT(*) FILTER (WHERE source='vehiclesdb')::int AS nfull, COUNT(*)::int AS ntotal, MAX(updated_at) FILTER (WHERE source='vehiclesdb') AS lastsync FROM vehicles")).rows[0];
+  const stale=!r.lastsync||Date.now()-new Date(r.lastsync).getTime()>7*86400000;
+  if(r.ntotal===0||r.nfull<100||stale){const out=await syncVehicleDb();console.log('Vehicle DB sync:',JSON.stringify(out));}
+ }catch(e){console.error('Vehicle DB sync failed:',e.message);}
+}
+
+app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'VehiclesDB',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':(Array.isArray(catalogCache)&&catalogCache[0]?.id?.startsWith('fallback/')?'fallback':'VehiclesDB'),auth:'secure-revocable-session-cookie'}));
+app.get('/api/catalog/makes',async(req,res)=>{
+ const c=await getVehicleRows(); const seen=new Map();
+ for(const x of c){const k=vkey(x.make);if(k&&!seen.has(k))seen.set(k,x.make);}
+ const makes=[...seen.values()].sort((a,b)=>a.localeCompare(b,'ro'));
+ res.set('Cache-Control','public, max-age=300');res.json({makes:makes.map(name=>({name})),count:makes.length,source:'VehiclesDB'});
+});
+app.get('/api/catalog/models',async(req,res)=>{
+ const mk=vkey(req.query.make); const c=await getVehicleRows(); const seen=new Map();
+ for(const x of c){if(vkey(x.make)!==mk)continue;const k=vkey(x.model);if(k&&!seen.has(k))seen.set(k,x);}
+ const models=[...seen.values()].sort((a,b)=>String(a.model).localeCompare(String(b.model),'ro'));
+ res.set('Cache-Control','public, max-age=300');
+ res.json({models:models.map(x=>({name:x.model,year_from:x.year_from||null,year_to:x.year_to||null,generation:x.generation||null,engine:x.engine||null,fuel:x.fuel||null,kind:x.kind||'car'})),count:models.length,source:'VehiclesDB'});
+});
+// Anii de fabricație posibili pentru un model (pentru sugestii în câmpul „An”).
+app.get('/api/catalog/years',async(req,res)=>{
+ const mk=vkey(req.query.make),mo=vkey(req.query.model); if(!mk||!mo)return res.json({years:[]});
+ const c=await getVehicleRows(); const x=c.find(v=>vkey(v.make)===mk&&vkey(v.model)===mo);
+ const cy=new Date().getFullYear(); const from=x&&x.year_from?Number(x.year_from):null; let to=x&&x.year_to?Number(x.year_to):null;
+ if(!from)return res.json({years:[]});
+ if(!to||to<from)to=cy; to=Math.min(to,cy+1);
+ const years=[]; for(let y=to;y>=from;y--)years.push(y);
+ res.set('Cache-Control','public, max-age=300');res.json({years,year_from:from,year_to:to});
+});
+app.get('/api/catalog/resolve',async(req,res)=>{const q=String(req.query.q||'').trim();if(!q)return res.json({match:null});const c=await getVehicleRows();const match=resolveText(c,q);res.json({match});});
+
+/* ---------- administrare vehicule ---------- */
+function parseVehicle(b){
+ b=b||{};
+ const make=vstr(b.make,60),model=vstr(b.model,80); if(!make||!model)return null;
+ const yr=v=>v===''||v==null?null:Number(v);
+ const yf=yr(b.year_from),yt=yr(b.year_to),max=new Date().getFullYear()+2;
+ for(const y of [yf,yt])if(y!==null&&(!Number.isInteger(y)||y<1900||y>max))return null;
+ if(yf&&yt&&yt<yf)return null;
+ return {make,model,make_norm:vkey(make),model_norm:vkey(model),generation:vstr(b.generation,80),year_from:yf,year_to:yt,kind:VEHICLE_KINDS.includes(b.kind)?b.kind:'car',engine:vstr(b.engine,80),fuel:vstr(b.fuel,30)};
+}
+app.get('/api/admin/vehicles',auth,admin,requireDb,async(req,res)=>{
+ const q=vkey(String(req.query.q||'').slice(0,60)); const limit=Math.min(200,Math.max(1,Number(req.query.limit)||100));
+ const where=q?'WHERE (make_norm||model_norm) LIKE $1':'';
+ const vals=q?['%'+q+'%']:[];
+ const rows=(await pool.query(`SELECT id,make,model,generation,year_from,year_to,kind,engine,fuel,source FROM vehicles ${where} ORDER BY make,model LIMIT ${limit}`,vals)).rows;
+ const st=(await pool.query("SELECT COUNT(*)::int total, COUNT(DISTINCT make_norm)::int makes, COUNT(*) FILTER (WHERE source='manual')::int manual FROM vehicles")).rows[0];
+ res.json({vehicles:rows,stats:st});
+});
+app.post('/api/admin/vehicles',auth,admin,requireDb,async(req,res)=>{
+ const v=parseVehicle(req.body); if(!v)return res.status(400).json({error:'DATE_INVALIDE'});
+ const r=await pool.query("INSERT INTO vehicles(make,model,make_norm,model_norm,generation,year_from,year_to,kind,engine,fuel,source) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'manual') ON CONFLICT (make_norm,model_norm) DO UPDATE SET make=EXCLUDED.make,model=EXCLUDED.model,generation=EXCLUDED.generation,year_from=EXCLUDED.year_from,year_to=EXCLUDED.year_to,kind=EXCLUDED.kind,engine=EXCLUDED.engine,fuel=EXCLUDED.fuel,source='manual',updated_at=NOW() RETURNING id,make,model",
+  [v.make,v.model,v.make_norm,v.model_norm,v.generation,v.year_from,v.year_to,v.kind,v.engine,v.fuel]);
+ invalidateVehicles();
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'save_vehicle','vehicle',r.rows[0].id,`${v.make} ${v.model}`]);
+ res.status(201).json({vehicle:r.rows[0]});
+});
+app.patch('/api/admin/vehicles/:id',auth,admin,requireDb,async(req,res)=>{
+ const v=parseVehicle(req.body); if(!v)return res.status(400).json({error:'DATE_INVALIDE'});
+ try{
+  const r=await pool.query("UPDATE vehicles SET make=$1,model=$2,make_norm=$3,model_norm=$4,generation=$5,year_from=$6,year_to=$7,kind=$8,engine=$9,fuel=$10,source='manual',updated_at=NOW() WHERE id=$11 RETURNING id,make,model",
+   [v.make,v.model,v.make_norm,v.model_norm,v.generation,v.year_from,v.year_to,v.kind,v.engine,v.fuel,req.params.id]);
+  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+  invalidateVehicles();
+  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_vehicle','vehicle',req.params.id,`${v.make} ${v.model}`]);
+  res.json({vehicle:r.rows[0]});
+ }catch(e){if(e&&e.code==='23505')return res.status(409).json({error:'VEHICUL_EXISTA'});throw e;}
+});
+app.delete('/api/admin/vehicles/:id',auth,admin,requireDb,async(req,res)=>{
+ const d=await pool.query('DELETE FROM vehicles WHERE id=$1 RETURNING id,make,model',[req.params.id]);
+ if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ invalidateVehicles();
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_vehicle','vehicle',req.params.id,`${d.rows[0].make} ${d.rows[0].model}`]);
+ res.json({ok:true});
+});
+// Resincronizare manuală cu VehiclesDB. Înregistrările adăugate manual nu sunt suprascrise.
+app.post('/api/admin/vehicles/sync',auth,admin,requireDb,async(req,res)=>{
+ catalogLoadedAt=0;catalogRetryAt=0;
+ const out=await syncVehicleDb();
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'sync_vehicles','vehicle',null,String(out.source||'')+' '+String(out.total||0)]);
+ res.json(out);
+});
 
 app.get('/api/me',async(req,res)=>{
  if(!pool)return res.json({user:null,mode:'prototype'});
@@ -934,6 +1085,7 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
  try{
   if(pool)await dbReady();
   const server=app.listen(PORT,()=>console.log(`AutoPiese V26 running on ${PORT}`));
+  if(pool){ensureVehicleDb();setInterval(ensureVehicleDb,12*3600*1000).unref();}
   if(pool)setInterval(()=>pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'").catch(()=>{}),30*60*1000).unref();
   if(pool)setInterval(()=>pool.query('DELETE FROM sessions WHERE expires_at < NOW()').catch(e=>console.error('session cleanup',e.message)),60*60*1000).unref();
   const stop=()=>{server.close(()=>{(pool?pool.end():Promise.resolve()).finally(()=>process.exit(0));});setTimeout(()=>process.exit(0),8000).unref();};
