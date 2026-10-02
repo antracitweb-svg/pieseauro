@@ -1,4 +1,4 @@
-# AutoPiese – V26
+# AutoPiese – V27
 
 Marketplace de piese auto (Node.js + Express + PostgreSQL), găzduit pe Render.
 
@@ -101,3 +101,12 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - „Anunțurile mele” → buton **Editează** (nu apare la anunțurile blocate de admin). Se deschide același formular, completat, la `#/vinde?edit=<id>`.
 - Prețul, livrarea, negocierea, județul, starea și tipul de vânzător se salvează direct. Titlul, descrierea, pozele, categoria, marca/modelul, anul, OEM-ul sau tipul anunțului trimit anunțul din nou la moderare (apare „În așteptare”). Anunțurile respinse revin la moderare după editare.
 - Endpointuri noi: `GET /api/listings/mine/:id` (anunțul propriu, cu toate pozele) și `PATCH /api/listings/:id`. Validarea e comună cu publicarea (`parseListing`).
+
+
+## Ce s-a schimbat în V27
+- Interfața este reorganizată în jurul celor trei acțiuni principale: caută piesa, caută după mașină și vinde.
+- Meniul secundar este ascuns sub „Mai multe”, pentru o pagină mai aerisită.
+- „Anunțurile mele” are file orizontale: Toate, Active, În așteptare, Vândute și Arhivă.
+- Filtrele și acțiunile secundare sunt ascunse în modul „Anunțurile mele”; funcțiile backend existente rămân păstrate.
+- Filtrul de județ pornește din lista completă de 41 de județe definită în `script.js`.
+- Nu a fost modificat `server.js` și nu a fost schimbată schema bazei de date.

@@ -216,3 +216,29 @@ body.search-open{overflow:hidden}
 .results-actions select{min-height:48px;padding:0 14px;border:1px solid var(--line);border-radius:14px;background:#fff;font-weight:700;color:var(--ink)}
 
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:4px}.stat h3{margin:0;font-size:28px}.stat small{color:var(--muted)}
+
+/* V27 — navigație și Anunțurile mele */
+.menu-title{margin:6px 0 18px;font-size:32px;letter-spacing:-.7px}
+.menu-primary{margin-bottom:14px}
+.menu-more{margin-top:14px;border:0}
+.menu-more>summary{list-style:none;cursor:pointer;padding:13px 4px;color:#1766b5;font-weight:800}
+.menu-more>summary::-webkit-details-marker{display:none}
+.menu-more>summary span{float:right}
+.my-listing-tabs{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:5px 0;border-bottom:1px solid #e6edf4}
+.my-tabs-scroll{display:flex;gap:4px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.my-tabs-scroll::-webkit-scrollbar{display:none}
+.my-tabs-scroll button{white-space:nowrap;border:0;background:transparent;color:#61758a;padding:10px 12px;border-bottom:2px solid transparent;font-weight:800;cursor:pointer}
+.my-tabs-scroll button.active{color:#0d6efd;border-bottom-color:#0d6efd}
+.my-new-listing{margin-left:auto;white-space:nowrap;flex:0 0 auto}
+#page-results[data-mode="mine"] .results-actions .filter-toggle,#page-results[data-mode="mine"] .results-actions .save-search,#page-results[data-mode="mine"] .results-actions #sortListings{display:none}
+#page-results[data-mode="mine"] .results-actions .result-search{max-width:520px}
+#page-results[data-mode="mine"] .filters{display:none}
+#page-results[data-mode="mine"] .results-layout{display:block}
+#page-results[data-mode="mine"] #resultCount{color:#718399}
+#page-results[data-mode="mine"] .listing-grid{max-width:980px;margin:0 auto}
+@media(max-width:700px){
+  .menu-title{font-size:28px}
+  .my-listing-tabs{align-items:stretch;flex-direction:column;gap:8px}
+  .my-tabs-scroll{width:100%}
+  .my-new-listing{width:100%;margin-left:0}
+}
