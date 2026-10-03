@@ -44,7 +44,7 @@ const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],sold:['Vândut','pending'],rejected:['Respins','bad'],blocked:['Blocat','bad'],deleted:['Șters','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
 const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
-const AUTH_ROUTES = new Set(['cont','cerere','cerere-noua','vinde','settings','admin','anunturile-mele']);
+const AUTH_ROUTES = new Set(['account-tool','cont','cerere','cerere-noua','vinde','settings','admin','anunturile-mele']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',maxPrice:'maxPrice',filterSeller:'seller_type',sortListings:'sort'};
 
 /* ---------- utilitare ---------- */
@@ -137,8 +137,9 @@ function navigate(x){ const target='#/'+x; if(location.hash===target) route(); e
 function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='requests' && params.get('t')==='mine') || (name==='rezultate' && ['mine'].includes(params.get('mode'))); }
 function showPage(id){ $$('.page').forEach(p=>p.classList.toggle('active',p.id===id)); window.scrollTo(0,0); }
 
+function closeOverlays(){ ['#detailModal','#offerModal'].forEach(q=>{ const m=$(q); if(m) m.classList.add('hidden'); }); }
 function route(){
-  const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); closeLightbox();
+  stopChatPoll(); closeOverlays();
   const { name, params } = parseHash();
   const id = ROUTES[name];
   if(!id){ navigate('home'); return; }
@@ -163,7 +164,7 @@ function route(){
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
   else if(name==='admin') safe(loadAdmin)();
   else if(name==='menu') renderHeader();
-  else if(name==='account-tool') renderAccountTool(params.get('view'), params.get('with'));
+  else if(name==='account-tool') renderAccountTool(params.get('view'), params.get('with'), params);
 }
 
 function renderHeader(){
@@ -174,71 +175,189 @@ function renderHeader(){
   $('#adminMenu').classList.toggle('hidden', !isAdmin);
   const ad = $('#accountAdmin'); if(ad) ad.classList.toggle('hidden', !isAdmin);
   $('#favCount').textContent = favorites.length;
+  refreshCounts();
 }
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
   renderHeader();
 }
 
-function renderAccountTool(view, withId){
-  const data = {
-    cart:{title:'Coșul meu',text:'Anunțurile pe care vrei să le ții la îndemână.',action:'rezultate',label:'Vezi piesele'},
-    offers:{title:'Oferte la cereri',text:'Aici vei putea trimite și gestiona ofertele pentru cererile de piese.',action:'requests',label:'Vezi cererile disponibile'},
-    'orders-seller':{title:'Comenzi din oferte',text:'Comenzile acceptate din ofertele tale vor apărea aici.',action:null,label:null},
-    'offers-received':{title:'Ofertele primite',text:'Ofertele primite la cererile tale vor apărea aici.',action:'requests?t=mine',label:'Vezi cererile mele'},
-    orders:{title:'Comenzile mele',text:'Comenzile tale vor apărea aici după ce o ofertă este acceptată.',action:null,label:null},
-    messages:{title:'Mesaje',text:'Conversațiile tale cu cumpărători și vânzători.',action:null,label:null},
-    notifications:{title:'Notificări',text:'Notificările contului vor apărea aici când există activitate nouă.',action:null,label:null},
-    credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
-    transactions:{title:'Tranzacții',text:'Comenzile tale, ca cumpărător și ca vânzător.',action:null,label:null},
-    invoices:{title:'Facturi',text:'Facturile emise pentru contul tău.',action:null,label:null}
-  };
-  const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
+const TOOL_STATIC={
+  cart:{title:'Coșul meu',text:'Coșul este pregătit. Anunțurile adăugate în coș vor apărea aici.',action:'rezultate',label:'Vezi piesele'},
+  credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.'},
+  transactions:{title:'Tranzacții',text:'Istoricul tranzacțiilor va apărea aici după implementarea plăților.'},
+  invoices:{title:'Facturi',text:'Facturile vor apărea aici după implementarea plăților și facturării.'}
+};
+const TOOL_LIVE={
+  offers:{title:'Oferte la cereri',sub:'Ofertele pe care le-ai trimis cumpărătorilor.'},
+  'offers-received':{title:'Ofertele primite',sub:'Ofertele vânzătorilor la cererile tale. Acceptă una ca să creezi comanda.'},
+  orders:{title:'Comenzile mele',sub:'Comenzile tale ca cumpărător.'},
+  'orders-seller':{title:'Comenzi din oferte',sub:'Comenzile create din ofertele tale acceptate.'},
+  messages:{title:'Mesaje',sub:'Conversațiile tale cu cumpărători și vânzători.'},
+  notifications:{title:'Notificări',sub:'Activitatea recentă din contul tău.'}
+};
+const OFFER_ST={pending:'În așteptare',accepted:'Acceptată',rejected:'Respinsă',withdrawn:'Retrasă'};
+const ORDER_ST={new:'Nouă',confirmed:'Confirmată',shipped:'Expediată',completed:'Finalizată',cancelled:'Anulată'};
+const ST_CLASS={pending:'warn',new:'warn',confirmed:'info',shipped:'info',accepted:'ok',completed:'ok',rejected:'bad',cancelled:'bad',withdrawn:'bad'};
+const stBadge=(map,s)=>`<span class="st st-${ST_CLASS[s]||'info'}">${esc(map[s]||s)}</span>`;
+const reqTitles=new Map();
+let toolSeq=0, chatTimer=null, chatState=null;
+function stopChatPoll(){ if(chatTimer){ clearInterval(chatTimer); chatTimer=null; } chatState=null; }
+const hhmm=iso=>{ const d=new Date(iso); return isNaN(d)?'':d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}); };
+function shortTime(iso){ const d=new Date(iso); if(isNaN(d)) return ''; const n=new Date(); return d.toDateString()===n.toDateString()?hhmm(iso):d.toLocaleDateString('ro-RO',{day:'2-digit',month:'2-digit'}); }
+const msgLink=(uid,extra)=>`account-tool?view=messages&with=${encodeURIComponent(uid)}${extra||''}`;
+
+function renderAccountTool(view, withId, params){
+  stopChatPoll();
+  const seq=++toolSeq;
+  const live=TOOL_LIVE[view], st=TOOL_STATIC[view];
+  const d=live||st||{title:'Cont',sub:'Secțiunea nu a fost găsită.'};
   $('#accountToolTitle').textContent=d.title;
-  $('#accountToolSub').textContent=d.text;
-  const content=$('#accountToolContent');
-  if(content){
-    content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
-    if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices'].includes(view)) safe(()=>loadToolData(view,content,withId))();
+  $('#accountToolSub').textContent=d.sub||d.text||'';
+  const content=$('#accountToolContent'); if(!content) return;
+  if(live){ content.innerHTML='<p class="muted">Se încarcă…</p>'; loadToolData(view,content,withId,params,seq); return; }
+  content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text||d.sub||'')}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
+}
+function reloadTool(){ const {params}=parseHash(); renderAccountTool(params.get('view'),params.get('with'),params); refreshCounts(true); }
+
+async function loadToolData(view, box, withId, params, seq){
+  try{
+    if(view==='messages') return await (withId?renderChat(box,withId,params,seq):renderThreads(box,seq));
+    const money=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei';
+    const empty=(txt,cta)=>`<div class="empty">${esc(txt)}${cta?`<p><button class="btn primary" data-action="${esc(cta[0])}">${esc(cta[1])}</button></p>`:''}</div>`;
+    let html='';
+    if(view==='offers'||view==='offers-received'){
+      const recv=view==='offers-received';
+      const r=await api(recv?'/api/offers/received':'/api/offers/mine');
+      html=r.offers.map(o=>{
+        const who=recv?o.seller_id:o.buyer_id, whoName=recv?o.seller_name:o.buyer_name;
+        const acts=[];
+        if(recv&&o.status==='pending') acts.push(`<button class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button>`,`<button class="btn danger small" data-offer-reject="${o.id}">Respinge</button>`);
+        if(!recv&&o.status==='pending') acts.push(`<button class="btn danger small" data-offer-withdraw="${o.id}">Retrage oferta</button>`);
+        if(who) acts.push(`<button class="btn ghost small" data-go="${msgLink(who,'&request='+o.request_id)}">✉️ Scrie mesaj</button>`);
+        reqTitles.set(String(o.request_id),o.request_title);
+        return `<div class="info-card tool-item"><div class="ti-head"><b>${esc(o.request_title)}</b>${stBadge(OFFER_ST,o.status)}</div><p class="ti-price">${money(o.price)}${whoName?' · '+esc(whoName):''}</p>${o.message?`<p class="ti-msg">${esc(o.message)}</p>`:''}<p class="muted">${fmtDate(o.created_at)}</p><div class="row">${acts.join('')}</div></div>`;
+      }).join('')||empty(recv?'Nu ai primit nicio ofertă încă.':'Nu ai trimis nicio ofertă încă.',recv?['requests?t=mine','Vezi cererile mele']:['requests','Vezi cererile disponibile']);
+    }else if(view==='orders'||view==='orders-seller'){
+      const role=view==='orders'?'buyer':'seller';
+      const r=await api('/api/orders');
+      html=r.orders.filter(o=>o.role===role).map(o=>{
+        const acts=[];
+        if(role==='seller'){
+          if(o.status==='new') acts.push(['confirmed','Confirmă comanda','primary']);
+          if(o.status==='confirmed') acts.push(['shipped','Marchează expediată','primary']);
+          if(o.status==='new'||o.status==='confirmed') acts.push(['cancelled','Anulează','danger']);
+        }else{
+          if(o.status==='shipped') acts.push(['completed','Am primit piesa','primary']);
+          if(o.status==='new'||o.status==='confirmed') acts.push(['cancelled','Anulează comanda','danger']);
+        }
+        const btns=acts.map(a=>`<button class="btn ${a[2]} small" data-order-status="${o.id}" data-to="${a[0]}">${a[1]}</button>`);
+        if(o.other_id) btns.push(`<button class="btn ghost small" data-go="${msgLink(o.other_id)}">✉️ Scrie mesaj</button>`);
+        return `<div class="info-card tool-item"><div class="ti-head"><b>${esc(o.title||'Comandă')}</b>${stBadge(ORDER_ST,o.status)}</div><p class="ti-price">${money(o.price)}${o.other_name?' · '+(role==='seller'?'Cumpărător: ':'Vânzător: ')+esc(o.other_name):''}</p><p class="muted">Comanda #${o.id} · ${fmtDate(o.created_at)}</p><div class="row">${btns.join('')}</div></div>`;
+      }).join('')||empty(role==='buyer'?'Nu ai nicio comandă. Comenzile apar când accepți o ofertă la o cerere.':'Nu ai nicio comandă. Apar când un cumpărător îți acceptă oferta.',role==='buyer'?['requests?t=mine','Vezi cererile mele']:['requests','Vezi cererile disponibile']);
+    }else if(view==='notifications'){
+      const r=await api('/api/notifications');
+      const items=r.notifications.map(n=>{
+        const cls='info-card tool-item notif'+(n.is_read?'':' unread');
+        const inner=`<p>${esc(n.text)}</p><p class="muted">${fmtDate(n.created_at)}${n.link?' · Deschide ›':''}</p>`;
+        return n.link?`<button type="button" class="${cls}" data-go="${esc(n.link)}">${inner}</button>`:`<div class="${cls}">${inner}</div>`;
+      });
+      html=items.length?`<div class="row" style="margin-bottom:4px"><button class="btn ghost small" data-notif="clear">Șterge notificările</button></div>${items.join('')}`:empty('Nu ai notificări.');
+      if(r.notifications.some(n=>!n.is_read)) api('/api/notifications/read',{method:'POST'}).then(()=>refreshCounts(true)).catch(()=>{});
+    }
+    if(seq!==toolSeq) return;
+    box.innerHTML=`<div class="tool-list">${html}</div>`;
+  }catch(e){
+    if(seq!==toolSeq) return;
+    box.innerHTML=`<div class="empty">${esc(e.message)}<p><button class="btn ghost" data-go="account-tool?view=messages">‹ Înapoi la mesaje</button></p></div>`;
   }
 }
 
-const OFFER_ST={pending:'În așteptare',accepted:'Acceptată',rejected:'Respinsă'}, ORDER_ST={new:'Nouă'};
-async function loadToolData(view, box, withId){
-  const money=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei';
-  let items=[];
-  if(view==='cart'){
-    const ids=cartIds(); const res=await Promise.allSettled(ids.map(id=>api('/api/listings/'+id+'?noview=1')));
-    const ok=[],gone=[]; res.forEach((r,i)=>{ if(r.status==='fulfilled') ok.push(r.value.listing); else if(r.reason&&r.reason.status===404) gone.push(ids[i]); });
-    if(gone.length) writeJSON('autopiese_cart',ids.filter(i=>!gone.includes(i)));
-    const total=ok.reduce((n,x)=>n+(Number(x.price)||0),0);
-    items=ok.map(x=>`<div class="info-card tool-item"><b>${esc(x.title)}</b><p>${esc(money(x.price))} · ${esc(x.county||'')}${x.seller_name?' · '+esc(x.seller_name):''}</p><div class="row"><button class="btn primary small" data-open="${x.id}">Vezi anunțul</button><button class="btn ghost small" data-cart-del="${x.id}">Elimină</button></div></div>`);
-    if(ok.length) items.push(`<div class="info-card tool-item"><b>Total estimat: ${esc(money(total))}</b><p class="muted">Plata se face direct cu vânzătorul. Contactează-l din fiecare anunț.</p></div>`);
-  }else if(view==='transactions'){
-    const r=await api('/api/orders');
-    items=r.orders.map(o=>`<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}</b><p>${o.role==='buyer'?'Cumpărare':'Vânzare'} · ${money(o.price)} · ${esc(ORDER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p></div>`);
-  }else if(view==='invoices'){
-    items=['<div class="info-card tool-item"><p>Nu există facturi emise. Completează datele de facturare în Setări cont ca să fie gata când vei avea nevoie.</p><div class="row"><button class="btn ghost small" data-go="settings">Deschide Setări cont</button></div></div>'];
-  }else if(view==='offers'||view==='offers-received'){
-    const r=await api(view==='offers'?'/api/offers/mine':'/api/offers/received');
-    items=r.offers.map(o=>`<div class="info-card tool-item"><b>${esc(o.request_title)}</b><p>${money(o.price)}${view==='offers-received'&&o.seller_name?' · '+esc(o.seller_name):''} · ${esc(OFFER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row">${view==='offers-received'&&o.status==='pending'?`<button class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button>`:''}<button class="btn ghost small" data-go="account-tool?view=messages&with=${view==='offers'?o.buyer_id:o.seller_id}">Scrie mesaj</button></div></div>`);
-  }else if(view==='orders'||view==='orders-seller'){
-    const r=await api('/api/orders'), role=view==='orders'?'buyer':'seller';
-    items=r.orders.filter(o=>o.role===role).map(o=>`<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}</b><p>${money(o.price)} · ${esc(ORDER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p></div>`);
-  }else if(view==='messages'){
-    if(withId){
-      const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
-      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><b>${nm}</b>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p><p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}<form class="clean-form" id="msgForm" data-to="${esc(withId)}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form></div>`);
-      return;
-    }
-    const r=await api('/api/messages');
-    items=r.threads.map(t=>`<button type="button" class="info-card tool-item" data-go="account-tool?view=messages&with=${t.other}" style="text-align:left"><b>${esc(t.name||'Utilizator')}${t.unread>0?' ●':''}</b><p>${esc(t.body.slice(0,120))}</p><p class="muted">${fmtDate(t.created_at)}</p></button>`);
-  }else if(view==='notifications'){
-    const r=await api('/api/notifications');
-    items=r.notifications.map(n=>`<div class="info-card tool-item"><p>${n.is_read?'':'● '}${esc(n.text)}</p><p class="muted">${fmtDate(n.created_at)}</p></div>`);
-    api('/api/notifications/read',{method:'POST'}).catch(()=>{});
+async function renderThreads(box, seq){
+  const r=await api('/api/messages');
+  if(seq!==toolSeq) return;
+  if(!r.threads.length){ box.innerHTML='<div class="empty">Nu ai conversații încă.<p class="muted">Deschide un anunț sau o cerere și apasă „Trimite mesaj”.</p><p><button class="btn primary" data-action="rezultate">Vezi anunțurile</button></p></div>'; return; }
+  box.innerHTML=`<div class="thread-list">${r.threads.map(t=>`<button type="button" class="thread${t.unread>0?' unread':''}" data-go="${msgLink(t.other)}"><span class="av">${esc((t.name||'?').trim().charAt(0).toUpperCase())}</span><span class="tb"><span class="t-top"><b>${esc(t.name||'Utilizator')}</b><em>${esc(shortTime(t.created_at))}</em></span>${t.subject?`<small class="t-subj">${esc(t.subject)}</small>`:''}<span class="t-prev">${t.last_mine?'Tu: ':''}${esc(String(t.body).slice(0,110))}</span></span>${t.unread>0?`<span class="cnt">${t.unread}</span>`:''}</button>`).join('')}</div>`;
+}
+
+function appendMessages(list){
+  const body=$('#chatBody'); if(!body||!chatState) return;
+  const first=chatState.seen.size===0;
+  const stick=first||body.scrollHeight-body.scrollTop-body.clientHeight<90;
+  let html='';
+  for(const m of list){
+    if(chatState.seen.has(m.id)) continue;
+    chatState.seen.add(m.id);
+    const day=new Date(m.created_at).toLocaleDateString('ro-RO');
+    if(day!==chatState.day){ chatState.day=day; html+=`<div class="chat-day">${esc(day)}</div>`; }
+    if(m.subject&&m.subject!==chatState.subject){ chatState.subject=m.subject; html+=`<div class="chat-subj">Despre: ${m.listing_id?`<button type="button" data-open="${m.listing_id}">${esc(m.subject)}</button>`:`<b>${esc(m.subject)}</b>`}</div>`; }
+    html+=`<div class="bubble ${m.mine?'mine':'theirs'}"><p>${esc(m.body)}</p><time>${esc(hhmm(m.created_at))}</time></div>`;
+    chatState.last=Math.max(chatState.last,m.id); if(m.mine) chatState.mine++;
   }
-  box.insertAdjacentHTML('beforeend',`<div class="tool-list">${items.join('')||'<p class="muted">Nu există nimic de afișat încă.</p>'}</div>`);
+  if(!html) return;
+  body.insertAdjacentHTML('beforeend',html);
+  if(stick) body.scrollTop=body.scrollHeight;
+}
+const QUICK_REPLIES=['Mai este disponibilă?','Care este ultimul preț?','Se poate livra prin curier?','Pot vedea piesa azi?'];
+async function renderChat(box, uid, params, seq){
+  const r=await api('/api/messages/'+encodeURIComponent(uid));
+  if(seq!==toolSeq) return;
+  let ctx=null; const lid=params&&params.get('listing'), rid=params&&params.get('request');
+  if(lid&&/^\d+$/.test(lid)){ try{ const l=(await api('/api/listings/'+lid+'?noview=1')).listing; ctx={listing_id:Number(lid),title:l.title}; }catch{} }
+  else if(rid&&/^\d+$/.test(rid)) ctx={request_id:Number(rid),title:'Cerere: '+(reqTitles.get(rid)||'cerere de piese')};
+  if(seq!==toolSeq) return;
+  const nm=esc(r.other.name||'Utilizator');
+  $('#accountToolTitle').textContent=r.other.name||'Conversație'; $('#accountToolSub').textContent='';
+  box.innerHTML=`<div class="chat"><div class="chat-head"><button type="button" class="back" data-go="account-tool?view=messages">‹ Conversații</button><b>${nm}</b><button type="button" class="text-btn chat-del" data-del-thread="${esc(uid)}">Șterge</button></div>
+   <div class="chat-body" id="chatBody"></div>
+   ${ctx?`<div class="chat-ctx">Despre: <b>${esc(ctx.title)}</b></div>`:''}
+   <div class="chat-quick" id="chatQuick"></div>
+   <form id="msgForm" class="chat-form" data-to="${esc(uid)}"${ctx&&ctx.listing_id?` data-listing="${ctx.listing_id}"`:''}${ctx&&ctx.request_id?` data-request="${ctx.request_id}"`:''}><textarea id="msgBody" rows="1" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary" id="msgSend">Trimite</button></form></div>`;
+  chatState={uid:String(uid),last:0,seen:new Set(),mine:0,day:null,subject:null};
+  appendMessages(r.messages);
+  if(!chatState.mine) $('#chatQuick').innerHTML=QUICK_REPLIES.map(q=>`<button type="button" data-quick="${esc(q)}">${esc(q)}</button>`).join('');
+  refreshCounts(true);
+  chatTimer=setInterval(async()=>{
+    if(document.hidden||!chatState) return;
+    const st=chatState;
+    try{ const p=await api(`/api/messages/${encodeURIComponent(st.uid)}?after=${st.last}`); if(chatState===st&&p.messages.length){ appendMessages(p.messages); refreshCounts(true); } }catch{}
+  },8000);
+}
+async function sendChat(f){
+  const ta=$('#msgBody'), btn=$('#msgSend'); if(!ta||!btn||btn.disabled) return;
+  const text=ta.value.trim(); if(!text) return;
+  btn.disabled=true;
+  try{
+    const payload={to:Number(f.dataset.to),body:text};
+    if(f.dataset.listing) payload.listing_id=Number(f.dataset.listing); else if(f.dataset.request) payload.request_id=Number(f.dataset.request);
+    const r=await api('/api/messages',{method:'POST',body:JSON.stringify(payload)});
+    ta.value=''; ta.style.height='auto'; appendMessages([r.message]);
+    const q=$('#chatQuick'); if(q) q.innerHTML='';
+  }catch(err){ toast(err.message); }
+  finally{ btn.disabled=false; ta.focus(); }
+}
+
+/* ---------- contoare / badge-uri ---------- */
+let counts={messages:0,notifications:0,offers_received:0,orders_seller:0}, countsAt=0;
+async function refreshCounts(force){
+  if(!currentUser){ counts={messages:0,notifications:0,offers_received:0,orders_seller:0}; paintCounts(); return; }
+  if(!force&&Date.now()-countsAt<5000) return;
+  countsAt=Date.now();
+  try{ counts=await api('/api/counts'); }catch{ return; }
+  paintCounts();
+}
+function paintCounts(){
+  const total=(counts.messages||0)+(counts.notifications||0)+(counts.offers_received||0)+(counts.orders_seller||0);
+  const put=(host,cls,txt)=>{ if(!host) return; let b=host.querySelector('.'+cls.split(' ')[0]); if(!b){ b=document.createElement('span'); b.className=cls; host.appendChild(b); } b.textContent=txt; b.classList.toggle('hidden',!total); };
+  put($('#accountBtn'),'nbadge',total>99?'99+':String(total));
+  put($('#menuBtn'),'nbadge dot','');
+  const map={messages:'messages',notifications:'notifications','offers-received':'offers_received','orders-seller':'orders_seller'};
+  $$('[data-account]').forEach(b=>{
+    const k=map[b.dataset.account]; if(!k) return;
+    const n=counts[k]||0; let c=b.querySelector('.cnt');
+    if(!c){ c=document.createElement('span'); c.className='cnt'; const i=b.querySelector('i'); if(i) b.insertBefore(c,i); else b.appendChild(c); }
+    c.textContent=n; c.classList.toggle('hidden',!n);
+  });
 }
 
 /* ---------- selecturi / catalog ---------- */
@@ -339,15 +458,6 @@ async function syncFavorites(){
     merged.filter(id=>!f.includes(id)).forEach(id=>api('/api/favorites/'+id,{method:'POST'}).catch(()=>{}));
   }catch{}
   updateFavUI();
-}
-
-/* ---------- coș (salvat pe dispozitiv) ---------- */
-function cartIds(){ return readJSON('autopiese_cart',[]).map(Number).filter(Number.isFinite); }
-function toggleCart(id,btn){
-  const c=cartIds(), has=c.includes(id), n=has?c.filter(x=>x!==id):[...c,id];
-  writeJSON('autopiese_cart',n.slice(0,50));
-  if(btn&&btn.dataset.cart) btn.textContent=has?'🛒 Adaugă în coș':'✓ În coș';
-  toast(has?'Eliminat din coș.':'Adăugat în coș.');
 }
 
 /* ---------- acasă ---------- */
@@ -533,8 +643,9 @@ function fmtPhone(p){
   if(/^0\d{9}$/.test(d)) return d.slice(0,4)+' '+d.slice(4,7)+' '+d.slice(7);
   return raw;
 }
-function contactHtml(phones, who, sellerId, own){
-  const msgBtn = (sellerId && !own) ? `<button type="button" class="btn ghost msg-btn" data-go="account-tool?view=messages&with=${esc(String(sellerId))}">✉️ Trimite mesaj</button>` : '';
+function contactHtml(phones, who, sellerId, own, listingId, requestId){
+  const ctxQs = listingId ? '&listing='+encodeURIComponent(listingId) : (requestId ? '&request='+encodeURIComponent(requestId) : '');
+  const msgBtn = (sellerId && !own) ? `<button type="button" class="btn ghost msg-btn" data-go="account-tool?view=messages&with=${esc(String(sellerId))}${esc(ctxQs)}">✉️ Trimite mesaj</button>` : '';
   if(!phones || !phones.length) return `<p class="phone-none">📵 ${who} nu a afișat un număr de telefon.</p>${msgBtn}`;
   return phones.map(p=>{
     const tel=String(p.phone).replace(/[^\d+]/g,'');
@@ -570,11 +681,11 @@ function detailHtml(x, phones, canContact){
     </div>
     <div class="ad-card">
       <div class="seller-head"><span class="seller-avatar">${seller.charAt(0).toUpperCase()}</span><div><b>${seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small></div></div>
-      ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
+      ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
     <div class="contact-row">
       <button class="btn ghost small" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'} Favorit</button>
-      ${canContact?`<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
+      ${canContact?`<button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
     </div>
   </aside>
   </div>
@@ -633,19 +744,20 @@ async function loadRequests(mine){
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
     const r = await api(mine ? '/api/requests/mine' : '/api/requests');
+    r.requests.forEach(x=>reqTitles.set(String(x.id),x.title));
     grid.innerHTML = r.requests.map(x=>`<article class="info-card" data-request="${x.id}">
       <b>${esc([x.make,x.model,x.year].filter(Boolean).join(' · ')||'Orice mașină')}</b><h3>${esc(x.title)}</h3>
       ${x.description?`<p>${esc(x.description.slice(0,160))}${x.description.length>160?'…':''}</p>`:''}
       ${extraPartsHtml(x)}
       <p class="muted">${esc(mine ? (x.status==='open'?'Deschisă':x.status) : (x.user_name||'Cumpărător'))} · ${fmtDate(x.created_at)}</p>
-      <div class="contact-slot">${mine?`<button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:`<button class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button>`}</div></article>`).join('');
+      <div class="contact-slot">${mine?`<button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:(currentUser&&x.user_id===currentUser.id)?'<span class="muted">Cererea ta</span>':`<button class="btn ghost small" data-req-contact="${x.id}" data-req-user="${x.user_id}">Contactează</button> <button class="btn ghost small" data-go="account-tool?view=messages&with=${x.user_id}&request=${x.id}">✉️ Mesaj</button> <button class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button>`}</div></article>`).join('');
     $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 async function requestContact(id, btn){
   if(!currentUser){ openAuth('requests'); return; }
   const r = await api(`/api/requests/${id}/contact`);
-  btn.closest('.contact-slot').innerHTML = contactHtml(r.phones,'Cumpărătorul');
+  btn.closest('.contact-slot').innerHTML = contactHtml(r.phones,'Cumpărătorul',btn.dataset.reqUser,false,null,id);
 }
 async function loadStores(parks){
   const grid = $('#storesGrid'); $('#storesEmpty').classList.add('hidden');
@@ -1396,14 +1508,12 @@ document.addEventListener('click', e=>{
   if(t.classList && t.classList.contains('modal')){ closeModal(t); return; }
   let el;
   if((el=t.closest('[data-fav]'))){ e.stopPropagation(); toggleFavorite(Number(el.dataset.fav)); return; }
-  if((el=t.closest('[data-cart]'))){ e.stopPropagation(); toggleCart(Number(el.dataset.cart),el); return; }
-  if((el=t.closest('[data-cart-del]'))){ toggleCart(Number(el.dataset.cartDel)); renderAccountTool('cart'); return; }
   if((el=t.closest('[data-edit-listing]'))){ e.stopPropagation(); navigate('vinde?edit='+Number(el.dataset.editListing)); return; }
   if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); loadRequests(true); })(); return; }
   if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
-  if((el=t.closest('[data-offer-accept]'))){ if(confirm('Accepți această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerAccept+'/accept',{method:'POST'}); toast('Ofertă acceptată. Comanda a fost creată.'); renderAccountTool('offers-received'); })(); return; }
+  if((el=t.closest('[data-offer-accept]'))){ if(confirm('Accepți această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerAccept+'/accept',{method:'POST'}); toast('Ofertă acceptată. Comanda a fost creată.'); reloadTool(); })(); return; }
   if((el=t.closest('[data-req-contact]'))){ safe(requestContact)(el.dataset.reqContact, el); return; }
   if((el=t.closest('[data-seller]'))){ openSearch({seller_id:el.dataset.seller, sname:el.dataset.sname}); return; }
   if((el=t.closest('[data-cat]'))){ openSearch({category:el.dataset.cat}); return; }
@@ -1443,7 +1553,18 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-open]'))){ openDetail(Number(el.dataset.open)); return; }
 });
 document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); } });
-document.addEventListener('submit', e=>{ const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault(); safe(async()=>{ await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(f.dataset.to),body:$('#msgBody').value})}); renderAccountTool('messages',f.dataset.to); })(); });
+document.addEventListener('submit', e=>{ const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault(); sendChat(f); });
+document.addEventListener('keydown', e=>{ if(e.target&&e.target.id==='msgBody'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!matchMedia('(pointer:coarse)').matches){ e.preventDefault(); const f=$('#msgForm'); if(f) sendChat(f); } });
+document.addEventListener('input', e=>{ if(e.target&&e.target.id==='msgBody'){ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,140)+'px'; } });
+document.addEventListener('click', e=>{
+  const t=e.target; let el;
+  if((el=t.closest('[data-quick]'))){ const ta=$('#msgBody'); if(ta){ ta.value=el.dataset.quick; ta.focus(); } return; }
+  if((el=t.closest('[data-del-thread]'))){ if(confirm('Ștergi această conversație? Dispare doar din contul tău.')) safe(async()=>{ await api('/api/messages/'+encodeURIComponent(el.dataset.delThread),{method:'DELETE'}); toast('Conversația a fost ștearsă.'); refreshCounts(true); navigate('account-tool?view=messages'); })(); return; }
+  if((el=t.closest('[data-order-status]'))){ const to=el.dataset.to; const msg={cancelled:'Anulezi această comandă?',completed:'Confirmi că ai primit piesa?',confirmed:'Confirmi comanda?',shipped:'Marchezi comanda ca expediată?'}[to]||'Continui?'; if(confirm(msg)) safe(async()=>{ await api('/api/orders/'+el.dataset.orderStatus+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); toast('Comanda a fost actualizată.'); reloadTool(); })(); return; }
+  if((el=t.closest('[data-offer-reject]'))){ if(confirm('Respingi această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerReject+'/reject',{method:'POST'}); toast('Oferta a fost respinsă.'); reloadTool(); })(); return; }
+  if((el=t.closest('[data-offer-withdraw]'))){ if(confirm('Retragi această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerWithdraw+'/withdraw',{method:'POST'}); toast('Oferta a fost retrasă.'); reloadTool(); })(); return; }
+  if((el=t.closest('[data-notif]'))){ safe(async()=>{ await api('/api/notifications',{method:'DELETE'}); reloadTool(); })(); return; }
+});
 document.addEventListener('keydown', e=>{
   if(!$('#imageLightbox')?.classList.contains('hidden')){
     if(e.key==='Escape'){ e.preventDefault(); closeLightbox(); return; }
@@ -1696,6 +1817,8 @@ document.addEventListener('submit', e=>{
   try{ const r = await api('/api/me'); currentUser = r.user || null; }catch{ currentUser = null; }
   renderHeader();
   syncFavorites();
+  setInterval(()=>{ if(!document.hidden&&currentUser) refreshCounts(true); },30000);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&currentUser) refreshCounts(true); });
   route();
   loadCatalog().then(()=>{ if(parseHash().name==='rezultate') applyFiltersToUI(); });
 })();
