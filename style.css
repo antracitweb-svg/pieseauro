@@ -506,3 +506,63 @@ body.no-scroll{overflow:hidden}
 .cp-or{text-align:center;font-weight:700;font-size:18px;margin:26px 0 18px}
 .cp-new{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 auto;background:none;border:0;font:inherit;font-size:18px;color:var(--blue);text-decoration:underline;cursor:pointer;padding:8px 16px}
 .cp-new i{text-decoration:none}
+
+/* ---------- feedback la apăsare ---------- */
+.btn,.menu-btn,.icon-btn,.text-btn,.cp-new,.pick-btn,.set-btn,.filter-toggle,.save-search,.result-search button,.menu-card>button,.account-sections details button{transition:transform .12s ease,filter .12s ease,box-shadow .12s ease,background-color .12s ease;-webkit-tap-highlight-color:transparent}
+.btn{position:relative;overflow:hidden}
+.btn::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.38);opacity:0;transition:opacity .35s ease;pointer-events:none}
+.btn:active::after{opacity:1;transition:none}
+.btn:active,.menu-btn:active,.filter-toggle:active,.save-search:active,.pick-btn:active,.set-btn:active,.result-search button:active{transform:scale(.96);filter:brightness(.92)}
+.icon-btn:active,.text-btn:active,.cp-new:active{transform:scale(.92)}
+.menu-card>button:active,.account-sections details button:active{background:#e9f3ff}
+.btn:disabled{opacity:.65;cursor:progress}
+:focus-visible{outline:3px solid rgba(25,183,255,.55);outline-offset:2px;border-radius:8px}
+.dism-add{margin-top:14px}
+
+/* ---------- garaj, dezmembrări, piese ---------- */
+.garage-btn{display:inline-flex;align-items:center;gap:6px;max-width:150px;border:1px solid rgba(25,183,255,.35);background:rgba(25,183,255,.08);color:#dff3ff;border-radius:999px;padding:7px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s,transform .12s}
+.garage-btn span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.garage-btn.on{background:rgba(25,183,255,.22);border-color:var(--cyan);color:#fff}
+.garage-btn:active{transform:scale(.95)}
+.garage-list{display:grid;gap:8px;margin:14px 0}
+.garage-item{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.garage-item.active{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,183,255,.18)}
+.garage-pick{flex:1;text-align:left;border:0;background:none;padding:11px 14px;cursor:pointer;font:inherit;display:flex;flex-direction:column;gap:2px}
+.garage-pick small{color:var(--muted);font-size:12px}
+.garage-del{border:0;border-left:1px solid var(--line);background:#fff;width:44px;font-size:22px;color:#8092a8;cursor:pointer}
+.garage-del:active{background:#fff0f1}
+.garage-form{margin-top:14px;box-shadow:none}
+.garage-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:11px 14px;border:1px solid rgba(25,183,255,.35);background:#eef9ff;border-radius:10px;font-size:14px}
+.garage-banner button{border:0;background:none;color:#0a6cb0;font-weight:800;cursor:pointer;white-space:nowrap}
+.sell-dism-block{margin:14px 0}
+.part-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
+.part-chips b{font-size:11px;font-weight:700;background:#eef6ff;color:#275b8f;border-radius:6px;padding:4px 8px}
+.part-chips.big b{font-size:13px;padding:6px 10px}
+@keyframes heartPulse{0%{transform:scale(1)}35%{transform:scale(1.35)}100%{transform:scale(1)}}
+.listing-fav.pulse,.btn.pulse{animation:heartPulse .36s ease}
+
+/* ---------- design rafinat, discret ---------- */
+:root{--accent:#0b7fd1}
+.header{border-bottom:1px solid rgba(25,183,255,.2)}
+.btn.primary{background:var(--accent);box-shadow:none}
+.btn.primary:hover{filter:brightness(1.08)}
+.eyebrow{letter-spacing:2.6px;color:#0a7bc4}
+.home-wrap{background:radial-gradient(900px 340px at 50% -60px,rgba(25,183,255,.11),transparent 70%)}
+.home-center h1{font-weight:700;letter-spacing:-2.4px}
+.page-head h2,.narrow h2{font-weight:700;letter-spacing:-1.2px}
+.page-head h2::after{content:"";display:block;width:34px;height:3px;border-radius:2px;background:var(--cyan);margin-top:10px}
+.home-search{border-radius:14px;box-shadow:0 10px 34px rgba(16,52,94,.08)}
+.listing,.filters,.clean-form,.info-card,.menu-card,.account-sections details,.modal-card{border-radius:10px}
+.listing{border-color:#e3eaf2;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.listing:hover{transform:translateY(-2px);border-color:rgba(25,183,255,.5);box-shadow:0 12px 28px rgba(16,52,94,.09)}
+.clean-form{box-shadow:0 6px 22px rgba(16,52,94,.05)}
+.filters select:focus,.filters input:focus,.clean-form input:focus,.clean-form select:focus,.clean-form textarea:focus{outline:0;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(25,183,255,.16)}
+.home-entries{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:760px;margin:22px auto 0}
+.home-entries button{display:flex;flex-direction:column;gap:4px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;cursor:pointer;font:inherit;color:var(--ink);transition:transform .16s,border-color .16s,box-shadow .16s}
+.home-entries button b{font-size:15px}
+.home-entries button span{font-size:12px;color:var(--muted)}
+.home-entries button:hover{border-color:rgba(25,183,255,.55);box-shadow:0 10px 24px rgba(16,52,94,.08);transform:translateY(-2px)}
+.home-entries button:active{transform:scale(.97)}
+.toast{bottom:auto;right:auto;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);border-left:4px solid var(--cyan);max-width:min(92vw,440px);text-align:left}
+@media(max-width:800px){.home-entries{grid-template-columns:1fr}.garage-btn{max-width:110px;padding:6px 9px;font-size:12px}}
+@media(max-width:480px){.garage-btn .g-ico{display:none}.garage-btn{max-width:96px}}

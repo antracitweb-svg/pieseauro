@@ -109,6 +109,7 @@ function initFormValidation(){
 let currentUser = null;
 let favorites = readJSON('autopiese_fav', []).map(Number).filter(Number.isFinite);
 const modelCache = new Map();
+let catalogMakes = [];
 const state = { mode:'search', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{}, sellImages:[] };
 
 async function api(url, opt={}){
@@ -150,7 +151,7 @@ function route(){
   else if(name==='rezultate') enterResults(params);
   else if(name==='cerere') safe(enterCarPick)();
   else if(name==='cerere-noua') safe(enterRequestForm)(params.get('from'));
-  else if(name==='vinde') safe(enterSell)(params.get('edit'));
+  else if(name==='vinde') safe(enterSell)(params.get('edit'),params.get('t'));
   else if(name==='dezmembrari') loadDism();
   else if(name==='requests') loadRequests(params.get('t')==='mine');
   else if(name==='stores') loadStores(params.get('t')==='parks');
@@ -244,8 +245,9 @@ function fillStaticSelects(){
 async function loadCatalog(attempt=0){
   let makes = [];
   try{ makes = ((await api('/api/catalog/makes')).makes||[]).map(x=>x.name); }catch{}
+  if(makes.length) catalogMakes = makes;
   if(!makes.length){ if(attempt<3) setTimeout(()=>loadCatalog(attempt+1), 4000*(attempt+1)); else toast('Nu am putut încărca lista de mărci. Reîncarcă pagina.'); return; }
-  for(const [id,first] of [['filterMake','Toate mărcile'],['homeMake','Alege marca'],['matchMake','Alege marca'],['sellMake','Alege marca'],['reqMake','Alege marca']]){
+  for(const [id,first] of [['filterMake','Toate mărcile'],['homeMake','Alege marca'],['matchMake','Alege marca'],['sellMake','Alege marca'],['reqMake','Alege marca'],['garageMake','Alege marca']]){
     const el = $('#'+id); if(el) setOptions(el, first, makes);
   }
 }
@@ -277,6 +279,8 @@ async function loadYears(make, model){
 function card(x, o={}){
   const fav = favorites.includes(x.id);
   const meta = [x.make,x.model,x.year].filter(Boolean).join(' · ') || (x.category || 'Piesă auto');
+  const kmTxt = x.type==='dezmembrari' && x.km!=null ? Number(x.km).toLocaleString('ro-RO')+' km' : '';
+  const partChips = x.type==='dezmembrari' && x.parts_avail ? `<div class="part-chips">${String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).slice(0,5).map(t=>`<b>${esc(t)}</b>`).join('')}</div>` : '';
   const st = o.mine ? (STATUS_LABEL[x.status]||['',''] ) : null;
   const firstImage = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
   const img = firstImage
@@ -286,7 +290,7 @@ function card(x, o={}){
     <div class="listing-image">${img}</div>
     <div class="listing-body">
       <div class="listing-top"><h3>${esc(x.title)}</h3>${o.mine?'':`<button class="listing-fav" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'}</button>`}</div>
-      <div class="listing-meta">${esc(meta)}${x.category?` · ${esc(x.category)}`:''}</div>
+      <div class="listing-meta">${esc(meta)}${x.type==='dezmembrari'?(kmTxt?` · ${esc(kmTxt)}`:''):(x.category?` · ${esc(x.category)}`:'')}</div>${partChips}
       ${x.description?`<p class="listing-desc">${esc(x.description)}</p>`:''}
       <div class="listing-bottom">
         <div><div class="listing-price">${money(x.price)}</div><div class="listing-location">${esc(x.county||'România')}${x.delivery?' · Livrare':''}${x.seller_name?` · ${esc(x.seller_name)}`:''}</div></div>
@@ -308,6 +312,7 @@ function toggleFavorite(id){
   favorites = was ? favorites.filter(x=>x!==id) : [...favorites, id];
   writeJSON('autopiese_fav', favorites);
   updateFavUI();
+  $$('[data-fav="'+id+'"]').forEach(b=>{ b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse'); });
   if(currentUser) api('/api/favorites/'+id,{method:was?'DELETE':'POST'}).catch(()=>{});
   if(state.mode==='fav' && was){ state.loaded = state.loaded.filter(x=>x.id!==id); state.total = state.loaded.length; renderList(); }
   toast(was ? 'Eliminat din favorite.' : 'Adăugat la favorite.');
@@ -352,6 +357,10 @@ function enterResults(params){
   state.filters = {}; state.extra = {};
   for(const k of ['q','type','category','make','model','condition','county','maxPrice','seller_type','sort','delivery']) if(params.get(k)) state.filters[k]=params.get(k);
   for(const k of ['seller_id','sname']) if(params.get(k)) state.extra[k]=params.get(k);
+  if(params.get('g')==='0') state.extra.g='0';
+  const g = garageActive();
+  if(g && state.mode==='search' && !state.extra.seller_id && !params.get('make') && params.get('g')!=='0'){ state.filters.make = g.make; state.filters.model = g.model; }
+  renderGarageBanner();
   applyFiltersToUI().then(()=>loadResults(true));
 }
 async function applyFiltersToUI(){
@@ -374,6 +383,7 @@ function onFilterChange(){
   state.filters = collectFilters();
   history.replaceState(null,'','#/rezultate'+(filtersToParams().toString()?'?'+filtersToParams().toString():''));
   $('#topSearchInput').value = state.filters.q || '';
+  renderGarageBanner();
   loadResults(true);
 }
 async function loadResults(reset){
@@ -511,7 +521,7 @@ function contactHtml(phones, who, sellerId, own){
 }
 function detailHtml(x, phones, canContact){
   const fav = favorites.includes(x.id);
-  const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Motor',x.engine],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
+  const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
   const spec = [['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
   const phone1 = (phones||[]).slice(0,1);
   const callbar = (canContact && phone1.length) ? `<div class="ad-callbar"><a class="btn primary" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(phone1[0].phone))}</a>${phone1[0].is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(phone1[0].phone))}">WhatsApp</a>`:''}</div>` : '';
@@ -525,6 +535,7 @@ function detailHtml(x, phones, canContact){
     <p class="ad-sub">${[x.county,fmtDate(x.created_at)].filter(Boolean).map(esc).join(' · ')}</p>
     <div class="ad-price-m">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
     ${spec.length?`<div class="ad-car"><small>Compatibil cu</small><div class="ad-spec">${spec.map(r=>`<div><span>${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('')}</div></div>`:''}
+    ${x.type==='dezmembrari'&&x.parts_avail?`<h3 class="ad-h">Piese disponibile</h3><div class="part-chips big">${String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<b>${esc(t)}</b>`).join('')}</div>`:''}
     ${x.description?`<h3 class="ad-h">Descriere</h3><p class="detail-desc">${esc(x.description)}</p>`:''}
     <h3 class="ad-h">Detalii</h3>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
@@ -586,7 +597,7 @@ async function loadDism(){
 }
 async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
-  $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Cereri de piese';
+  $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
   $('#requestsCrumb').textContent = $('#requestsTitle').textContent;
   $('#requestsSub').textContent = mine ? 'Cererile publicate de tine.' : 'Cereri publicate de cumpărători. Ai piesa? Contactează-l.';
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
@@ -607,7 +618,7 @@ async function requestContact(id, btn){
 }
 async function loadStores(parks){
   const grid = $('#storesGrid'); $('#storesEmpty').classList.add('hidden');
-  const title = parks ? 'Parcuri de dezmembrări auto' : 'Magazine de piese auto';
+  const title = parks ? 'Parcuri partenere' : 'Magazine verificate';
   $('#storesTitle').textContent = title; $('#storesCrumb').textContent = title;
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
@@ -960,7 +971,11 @@ function ensureOption(el, val){
 async function enterRequestForm(fromId){
   const form = $('#requestForm'); form.reset(); $('#reqExtra').innerHTML = ''; setMsg($('#requestMessage'),'');
   await loadModels('','reqModel');
-  if(!fromId) return;
+  if(!fromId){
+    const g = garageActive();
+    if(g){ ensureOption($('#reqMake'), g.make); await loadModels(g.make,'reqModel'); ensureOption($('#reqModel'), g.model); loadYears(g.make,g.model); if(g.year) $('#reqYear').value = g.year; }
+    return;
+  }
   let c = savedCars.find(x=>String(x.id)===String(fromId));
   if(!c){ try{ await loadSavedCars(); }catch{} c = savedCars.find(x=>String(x.id)===String(fromId)); }
   if(!c) return;
@@ -992,21 +1007,38 @@ async function submitRequest(e){
     setMsg(msg,'Cererea a fost trimisă. O găsești în Cererile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
+function syncSellType(){
+  const d = $('#sellType').value==='dezmembrari';
+  $('#sellConditionWrap').classList.toggle('hidden', d);
+  $('#sellDismBlock').classList.toggle('hidden', !d);
+  $('#sellCategoryField').classList.toggle('hidden', d);
+}
 function setSellMode(editId){
   state.editId = editId || null;
-  $('#sellHeading').textContent = editId ? 'Editează anunțul' : 'Vinde o piesă';
+  $('#sellHeading').textContent = editId ? 'Editează anunțul' : 'Adaugă o piesă';
   $('#sellSub').textContent = editId ? 'Modificările la titlu, descriere, poze sau datele mașinii trec din nou prin verificare.' : 'Publicarea unui anunț necesită autentificare.';
   $('#sellSubmit').textContent = editId ? 'Salvează modificările' : 'Publică anunțul';
   $('#sellCancelEdit').classList.toggle('hidden', !editId);
 }
 function resetSellForm(){
   $('#sellForm').reset(); state.sellImages=[]; renderSellImages(); $('#sellDelivery').checked=true;
-  $('#sellConditionWrap').classList.remove('hidden'); loadModels('','sellModel'); setCategory('',''); resetCarAuto(false);
+  syncSellType(); loadModels('','sellModel'); setCategory('',''); resetCarAuto(false);
 }
-async function enterSell(editParam){
+async function enterSell(editParam,mode){
   const id = Number(editParam)||0;
   loadSellPhone();
-  if(!id){ if(state.editId){ resetSellForm(); } state.sellFilled=null; setSellMode(null); return; }
+  if(!id){
+    if(state.editId){ resetSellForm(); } state.sellFilled=null; setSellMode(null);
+    const dism = mode==='dism';
+    if(dism){
+      $('#sellType').value='dezmembrari'; syncSellType();
+      $('#sellHeading').textContent='Adaugă o mașină la dezmembrat';
+      $('#sellSub').textContent='Spune ce mașină dezmembrezi și ce piese sunt disponibile.';
+    } else if(state.sellDism){
+      $('#sellType').value='piesa'; syncSellType();
+    }
+    state.sellDism = dism; return;
+  }
   const wasEditing = state.editId===id;
   setSellMode(id); setMsg($('#sellMessage'),'');
   const r = await api('/api/listings/mine/'+id).catch(err=>{ setSellMode(null); toast(err.message); navigate('anunturile-mele'); return null; });
@@ -1014,13 +1046,14 @@ async function enterSell(editParam){
   if(wasEditing && state.sellFilled===id) return;
   const x = r.listing;
   $('#sellType').value = x.type; $('#sellSellerType').value = x.seller_type || 'Persoană fizică';
-  $('#sellConditionWrap').classList.toggle('hidden', x.type==='dezmembrari');
+  syncSellType();
   $('#sellTitle').value = x.title||''; $('#sellDescription').value = x.description||'';
   setCategory(x.category||'', x.subcategory||''); resetCarAuto(true); $('#sellMake').value = x.make||'';
   await loadModels(x.make||'','sellModel'); $('#sellModel').value = x.model||''; loadYears(x.make||'',x.model||'');
   if(x.model && $('#sellModel').value!==x.model){ const o=document.createElement('option'); o.value=o.textContent=x.model; $('#sellModel').appendChild(o); $('#sellModel').value=x.model; }
   if(x.make && $('#sellMake').value!==x.make){ const o=document.createElement('option'); o.value=o.textContent=x.make; $('#sellMake').appendChild(o); $('#sellMake').value=x.make; }
   $('#sellYear').value = x.year||''; $('#sellOem').value = x.oem||'';
+  $('#sellEngine').value = x.engine||''; $('#sellKm').value = x.km!=null ? String(x.km) : ''; $('#sellVin').value = x.vin||''; $('#sellParts').value = x.parts_avail||'';
   $('#sellPrice').value = Number(x.price)>0 ? String(Number(x.price)) : '';
   $('#sellCondition').value = x.condition || 'Second-hand'; $('#sellCounty').value = x.county||'';
   $('#sellDelivery').checked = !!x.delivery; $('#sellNegotiable').checked = !!x.negotiable;
@@ -1037,14 +1070,14 @@ async function submitSell(e){
   const focusBad = (el, text)=>{ setMsg(msg,text,'error'); if(el){ el.classList.add('field-error'); el.scrollIntoView({block:'center',behavior:'smooth'}); if(el.focus) el.focus({preventScroll:true}); } };
   ['sellTitle','sellMake','sellModel','sellCounty'].forEach(i=>$('#'+i).classList.remove('field-error')); $('#sellCategoryBtn').classList.remove('field-error');
   if($('#sellTitle').value.trim().length<3){ focusBad($('#sellTitle'),'Scrie piesa pe care o vinzi (minimum 3 caractere).'); return; }
-  if(!$('#sellCategory').value){ focusBad($('#sellCategoryBtn'),'Alege categoria piesei.'); return; }
+  if(type!=='dezmembrari' && !$('#sellCategory').value){ focusBad($('#sellCategoryBtn'),'Alege categoria piesei.'); return; }
   if(!$('#sellMake').value){ focusBad($('#sellMake'),'Alege marca mașinii. Se completează automat dacă o scrii în titlu sau descriere.'); return; }
   if(!$('#sellModel').value){ focusBad($('#sellModel'),'Alege modelul mașinii (sau „Alt model”).'); return; }
   if(!$('#sellCounty').value){ focusBad($('#sellCounty'),'Alege județul.'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Se trimite…'; }
   try{
     await applySellPhone();
-    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages});
+    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim()});
     const editing = state.editId;
     const r = editing ? await api('/api/listings/'+editing,{method:'PATCH',body:payload}) : await api('/api/listings',{method:'POST',body:payload});
     resetSellForm(); setSellMode(null); state.sellFilled=null;
@@ -1220,11 +1253,84 @@ async function adminAction(el){
   await loadAdmin();
 }
 
+
+/* ---------- garajul meu ---------- */
+function garageData(){ const g = readJSON('autopiese_garage',{cars:[],active:null}); if(!Array.isArray(g.cars)) g.cars=[]; return g; }
+function garageActive(){ const g=garageData(); return g.cars.find(c=>c.id===g.active) || null; }
+function garageName(c){ return c ? [c.make,c.model].filter(Boolean).join(' ') + (c.year?' '+c.year:'') : ''; }
+function updateGarageUI(){
+  const c = garageActive(), el = $('#garageLabel'); if(!el) return;
+  el.textContent = c ? [c.make,c.model].filter(Boolean).join(' ') : 'Garajul meu';
+  $('#garageBtn').classList.toggle('on', !!c);
+  const hm = $('#homeMake'); if(c && hm && !hm.value){ hm.value = c.make; loadModels(c.make,'homeModel').then(()=>{ $('#homeModel').value = c.model; }); }
+}
+function renderGarageList(){
+  const g = garageData(), box = $('#garageList');
+  box.innerHTML = g.cars.length ? g.cars.map(c=>`<div class="garage-item${c.id===g.active?' active':''}"><button type="button" class="garage-pick" data-garage-use="${esc(c.id)}"><b>${esc(garageName(c))}</b><small>${c.id===g.active?'Mașina activă':'Folosește această mașină'}</small></button><button type="button" class="garage-del" data-garage-del="${esc(c.id)}" aria-label="Șterge">×</button></div>`).join('')
+    + (g.active ? '<button type="button" class="text-btn" data-garage-off>Fără mașină activă</button>' : '')
+    : '<p class="muted">Garajul e gol. Adaugă prima mașină mai jos.</p>';
+}
+function openGarage(){ renderGarageList(); setMsg($('#garageMsg'),''); $('#garageModal').classList.remove('hidden'); }
+function renderGarageBanner(){
+  const b = $('#garageBanner'); if(!b) return;
+  const g = garageActive(), f = state.filters||{};
+  if(g && state.mode==='search' && f.make===g.make && (f.model||'')===g.model){
+    b.innerHTML = `<span>🚗 Piese pentru <b>${esc(garageName(g))}</b></span><button type="button" data-garage-all>Arată toate piesele</button>`;
+    b.classList.remove('hidden');
+  } else b.classList.add('hidden');
+}
+function garageSave(e){
+  e.preventDefault();
+  const make=$('#garageMake').value, model=$('#garageModel').value, year=$('#garageYear').value.trim(), msg=$('#garageMsg');
+  if(!make||!model){ setMsg(msg,'Alege marca și modelul.','error'); return; }
+  if(year && (!/^\d{4}$/.test(year) || Number(year)<1950 || Number(year)>new Date().getFullYear()+1)){ setMsg(msg,'Anul trebuie să aibă 4 cifre.','error'); return; }
+  const g = garageData(); if(g.cars.length>=10){ setMsg(msg,'Poți ține maximum 10 mașini în garaj.','error'); return; }
+  const id = 'c'+Date.now().toString(36);
+  g.cars.push({id,make,model,year}); g.active = id; writeJSON('autopiese_garage',g);
+  $('#garageForm').reset(); loadModels('','garageModel'); renderGarageList(); updateGarageUI();
+  setMsg(msg,'Mașina a fost salvată în garaj.','ok');
+}
+function garageUse(id){ const g=garageData(); g.active=id; writeJSON('autopiese_garage',g); renderGarageList(); updateGarageUI(); toast('Mașina activă: '+garageName(garageActive())); }
+function garageDelete(id){ const g=garageData(); g.cars=g.cars.filter(c=>c.id!==id); if(g.active===id) g.active=null; writeJSON('autopiese_garage',g); renderGarageList(); updateGarageUI(); }
+function garageOff(){ const g=garageData(); g.active=null; writeJSON('autopiese_garage',g); renderGarageList(); updateGarageUI(); }
+
+/* ---------- căutare care recunoaște mașina din text ---------- */
+const foldTxt = t => String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+const MAKE_ALIAS = { vw:'volkswagen', merc:'mercedes', mercedes:'mercedes', benz:'mercedes' };
+async function smartSearch(q){
+  const out = { make:'', model:'', rest:q };
+  if(!catalogMakes.length) return out;
+  let t = ' '+foldTxt(q)+' ';
+  let make = '', hit = '';
+  const byLen = [...catalogMakes].sort((a,b)=>foldTxt(b).length-foldTxt(a).length);
+  for(const m of byLen){
+    const fm = foldTxt(m), first = fm.split(' ')[0];
+    if(t.includes(' '+fm+' ')){ make=m; hit=fm; break; }
+    if(fm.includes(' ') && t.includes(' '+first+' ')){ make=m; hit=first; break; }
+  }
+  if(!make){
+    for(const [al,full] of Object.entries(MAKE_ALIAS)){
+      if(t.includes(' '+al+' ')){ const m = byLen.find(x=>foldTxt(x).startsWith(full)); if(m){ make=m; hit=al; break; } }
+    }
+  }
+  if(!make) return out;
+  t = t.replace(' '+hit+' ',' ');
+  let models = modelCache.get(make);
+  if(!models){ try{ models=((await api('/api/catalog/models?make='+encodeURIComponent(make))).models||[]).map(x=>x.name); modelCache.set(make,models); }catch{ models=[]; } }
+  let model = '';
+  for(const m of [...models].sort((a,b)=>foldTxt(b).length-foldTxt(a).length)){
+    const fm = foldTxt(m); if(fm && t.includes(' '+fm+' ')){ model=m; t=t.replace(' '+fm+' ',' '); break; }
+  }
+  t = t.replace(/ (19[5-9]\d|20[0-3]\d) /g,' ').replace(/\s+/g,' ').trim();
+  return { make, model, rest:t };
+}
+
 /* ---------- acțiuni UI ---------- */
 function doAction(a){
   if(a==='account') currentUser ? navigate('cont') : openAuth('cont');
   else if(a==='request') navigate('cerere');
   else if(a==='sell') navigate('vinde');
+  else if(a==='sell-dism') navigate('vinde?t=dism');
   else if(a==='requests') navigate('requests');
   else if(a==='parks') navigate('stores?t=parks');
   else if(a==='stores') navigate('stores');
@@ -1329,7 +1435,8 @@ function closeSearchOverlay(){
 function submitSearchQuery(q){
   q=String(q||'').trim();
   if(!q){ toast('Scrie ce piesă cauți.'); return; }
-  saveRecentSearch(q); $('#topSearchInput').value=q; closeSearchOverlay(); openSearch({q});
+  saveRecentSearch(q); $('#topSearchInput').value=q; closeSearchOverlay();
+  smartSearch(q).then(r=>{ if(r.make){ toast('Am recunoscut mașina: '+[r.make,r.model].filter(Boolean).join(' ')); openSearch({q:r.rest, make:r.make, model:r.model}); } else openSearch({q}); }).catch(()=>openSearch({q}));
 }
 
 function wire(){
@@ -1340,8 +1447,17 @@ function wire(){
   $('#clearRecentSearches').addEventListener('click', ()=>{ localStorage.removeItem('autopiese_recent_searches'); renderRecentSearches(); });
   $('#recentSearchList').addEventListener('click', e=>{ const b=e.target.closest('[data-recent-search]'); if(b) submitSearchQuery(b.dataset.recentSearch); });
   $('#homeRequestBtn').addEventListener('click', ()=>doAction('request'));
+  $('#garageBtn').addEventListener('click', openGarage);
+  $('#garageForm').addEventListener('submit', garageSave);
+  $('#garageMake').addEventListener('change', e=>loadModels(e.target.value,'garageModel'));
+  $('#garageModal').addEventListener('click', e=>{
+    const u=e.target.closest('[data-garage-use]'), d=e.target.closest('[data-garage-del]'), o=e.target.closest('[data-garage-off]');
+    if(u) garageUse(u.dataset.garageUse); else if(d) garageDelete(d.dataset.garageDel); else if(o) garageOff();
+  });
+  $('#garageBanner').addEventListener('click', async e=>{ if(e.target.closest('[data-garage-all]')){ $('#filterMake').value=''; await loadModels('','filterModel','Toate modelele'); state.extra.g='0'; onFilterChange(); } });
+  updateGarageUI();
   $('#cartBtn').addEventListener('click', ()=>doAction('cart'));
-  $('#heroSearchForm').addEventListener('submit', e=>{ e.preventDefault(); openSearch({q:$('#searchInput').value.trim()}); });
+  $('#heroSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#searchInput').value); });
   $('#resultsSearchForm').addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
   $('#homeMake').addEventListener('change', e=>loadModels(e.target.value,'homeModel'));
   $('#homeVehicleBtn').addEventListener('click', ()=>{ const make=$('#homeMake').value; if(!make){ toast('Alege marca mașinii.'); return; } openSearch({make, model:$('#homeModel').value}); });
@@ -1367,7 +1483,7 @@ function wire(){
   $('#matchModel').addEventListener('change', ()=>loadYears($('#matchMake').value,$('#matchModel').value));
   $('#reqModel').addEventListener('change', ()=>loadYears($('#reqMake').value,$('#reqModel').value));
   $('#matchForm').addEventListener('submit', e=>{ e.preventDefault(); const make=$('#matchMake').value, model=$('#matchModel').value, q=[$('#matchEngine').value.trim(),$('#matchPart').value.trim()].filter(Boolean).join(' '); if(!make&&!q){ toast('Alege marca sau scrie piesa căutată.'); return; } openSearch({q,make,model}); });
-  $('#sellType').addEventListener('change', e=>$('#sellConditionWrap').classList.toggle('hidden', e.target.value==='dezmembrari'));
+  $('#sellType').addEventListener('change', syncSellType);
   Object.keys(FILTER_FIELDS).forEach(id=>{ if(id!=='filterMake') $('#'+id).addEventListener('change', onFilterChange); });
   $('#filterMake').addEventListener('change', async e=>{ await loadModels(e.target.value,'filterModel','Toate modelele'); onFilterChange(); });
   $('#withDelivery').addEventListener('change', onFilterChange);
@@ -1536,3 +1652,6 @@ document.addEventListener('submit', e=>{
   route();
   loadCatalog().then(()=>{ if(parseHash().name==='rezultate') applyFiltersToUI(); });
 })();
+
+/* apăsare vizibilă pe telefon */
+document.addEventListener('touchstart',()=>{},{passive:true});
