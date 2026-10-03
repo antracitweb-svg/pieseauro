@@ -74,7 +74,7 @@ app.use(helmet({
 app.use(express.json({limit:'6mb'}));
 app.use(cookieParser());
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
-for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control',f==='index.html'?'no-cache':'public, max-age=300');res.sendFile(path.join(__dirname,f));});
+for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,f));});
 app.use('/assets',express.static(ASSETS_DIR,{index:false,dotfiles:'ignore',maxAge:'7d'}));
 
 const VEHICLE_SCHEMA=[
