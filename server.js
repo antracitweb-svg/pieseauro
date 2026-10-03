@@ -832,7 +832,7 @@ app.get('/api/requests',requireDb,async(req,res)=>{
  res.json({requests:r.rows});
 });
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query('SELECT id,title,make,model,year,description,status,created_at FROM part_requests WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.id]);
+ const r=await pool.query('SELECT id,title,make,model,year,variant,engine,vin,description,status,created_at FROM part_requests WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.id]);
  res.json({requests:r.rows});
 });
 app.get('/api/requests/:id/contact',auth,requireDb,async(req,res)=>{

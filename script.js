@@ -43,8 +43,8 @@ const CATEGORIES = CATEGORY_TREE.map(c=>[c[0],c[1]]);
 const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],sold:['Vândut','pending'],rejected:['Respins','bad'],blocked:['Blocat','bad'],deleted:['Șters','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
-const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
-const AUTH_ROUTES = new Set(['cont','cerere','vinde','settings','admin','anunturile-mele']);
+const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
+const AUTH_ROUTES = new Set(['cont','cerere','cerere-noua','vinde','settings','admin','anunturile-mele']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',maxPrice:'maxPrice',filterSeller:'seller_type',sortListings:'sort'};
 
 /* ---------- utilitare ---------- */
@@ -148,6 +148,8 @@ function route(){
   showPage(id);
   if(name==='home'){ $('#topSearchInput').value=''; loadHome(); }
   else if(name==='rezultate') enterResults(params);
+  else if(name==='cerere') safe(enterCarPick)();
+  else if(name==='cerere-noua') safe(enterRequestForm)(params.get('from'));
   else if(name==='vinde') safe(enterSell)(params.get('edit'));
   else if(name==='dezmembrari') loadDism();
   else if(name==='requests') loadRequests(params.get('t')==='mine');
@@ -928,6 +930,48 @@ async function handleSellImages(e){
   finally{ state.sellBusy=false; renderSellImages(); }
 }
 
+
+/* ---------- preselecție mașină pentru cereri ---------- */
+// Mașinile salvate sunt cele din cererile anterioare ale utilizatorului (fără duplicate).
+let savedCars = [];
+async function loadSavedCars(){
+  const r = await api('/api/requests/mine');
+  const seen = new Set(); savedCars = [];
+  for(const x of r.requests||[]){
+    if(!x.make || !x.model) continue;
+    const key = [x.make,x.model,x.year,x.variant,x.engine,x.vin].map(v=>String(v||'').trim().toLowerCase()).join('|');
+    if(seen.has(key)) continue; seen.add(key);
+    savedCars.push({id:x.id,make:x.make,model:x.model,year:x.year||'',variant:x.variant||'',engine:x.engine||'',vin:x.vin||''});
+  }
+  return savedCars;
+}
+function carLabel(c){ return [c.make,c.model,c.year,c.engine].filter(Boolean).join(' '); }
+async function enterCarPick(){
+  const list = $('#carPickList'); list.innerHTML = '';
+  try{ await loadSavedCars(); }catch{ savedCars = []; }
+  // Fără mașini salvate, trimitem direct la formularul gol.
+  if(!savedCars.length){ history.replaceState(null,'','#/cerere-noua'); route(); return; }
+  list.innerHTML = savedCars.map(c=>`<button type="button" class="cp-item" data-car-from="${c.id}"><span>${esc(carLabel(c))}</span><i>›</i></button>`).join('');
+}
+function ensureOption(el, val){
+  if(val && ![...el.options].some(o=>o.value===val)){ const o=document.createElement('option'); o.value=val; o.textContent=val; el.appendChild(o); }
+  el.value = val || '';
+}
+async function enterRequestForm(fromId){
+  const form = $('#requestForm'); form.reset(); $('#reqExtra').innerHTML = ''; setMsg($('#requestMessage'),'');
+  await loadModels('','reqModel');
+  if(!fromId) return;
+  let c = savedCars.find(x=>String(x.id)===String(fromId));
+  if(!c){ try{ await loadSavedCars(); }catch{} c = savedCars.find(x=>String(x.id)===String(fromId)); }
+  if(!c) return;
+  ensureOption($('#reqMake'), c.make);
+  await loadModels(c.make,'reqModel');
+  ensureOption($('#reqModel'), c.model);
+  loadYears(c.make,c.model);
+  $('#reqYear').value = c.year; $('#reqVariant').value = c.variant; $('#reqEngine').value = c.engine; $('#reqVin').value = c.vin;
+  $('#reqTitle').focus();
+}
+
 /* ---------- formulare ---------- */
 function addReqPart(){
   const box=$('#reqExtra'); if(box.children.length>=9){ toast('Maximum 10 piese într-o cerere.'); return; }
@@ -1296,7 +1340,6 @@ function wire(){
   $('#clearRecentSearches').addEventListener('click', ()=>{ localStorage.removeItem('autopiese_recent_searches'); renderRecentSearches(); });
   $('#recentSearchList').addEventListener('click', e=>{ const b=e.target.closest('[data-recent-search]'); if(b) submitSearchQuery(b.dataset.recentSearch); });
   $('#homeRequestBtn').addEventListener('click', ()=>doAction('request'));
-  $('#homeDismBtn').addEventListener('click', ()=>doAction('dism'));
   $('#cartBtn').addEventListener('click', ()=>doAction('cart'));
   $('#heroSearchForm').addEventListener('submit', e=>{ e.preventDefault(); openSearch({q:$('#searchInput').value.trim()}); });
   $('#resultsSearchForm').addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
@@ -1349,6 +1392,8 @@ function wire(){
   $('#forgotForm').addEventListener('submit', forgotPassword);
   $('#resetPasswordForm').addEventListener('submit', resetPasswordSubmit);
   $('#requestForm').addEventListener('submit', submitRequest);
+  $('#carPickList').addEventListener('click', e=>{ const b=e.target.closest('[data-car-from]'); if(b) navigate('cerere-noua?from='+b.dataset.carFrom); });
+  $('#carPickNew').addEventListener('click', ()=>navigate('cerere-noua'));
   $('#reqAddPart').addEventListener('click', addReqPart);
   $('#reqExtra').addEventListener('click', e=>{ const b=e.target.closest('.rp-del'); if(b) b.closest('.req-part').remove(); });
   $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);

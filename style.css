@@ -494,3 +494,15 @@ body.no-scroll{overflow:hidden}
 @media(max-width:700px){.catpick-search{width:100%;flex:none}}
 
 .req-sec{font-size:17px;margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid var(--blue)}.req-sec:first-child{margin-top:0}.req-part{border:1px dashed var(--line);border-radius:12px;padding:0 14px 14px;margin:12px 0}#reqAddPart{margin-top:6px}#reqKind,#reqCounty{margin:0}
+
+/* Preselecție mașină (cerere de oferte) */
+.cp-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 0 26px;box-shadow:var(--shadow)}
+.cp-title{display:flex;align-items:center;justify-content:center;gap:10px;font-size:22px;margin:0 0 8px}
+.cp-sub{text-align:center;color:var(--ink);margin:0 0 14px;padding:0 16px}
+.cp-list{padding:0 16px}
+.cp-item{display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;background:none;border:0;border-bottom:1px solid var(--line);padding:16px 6px;font:inherit;font-size:18px;color:var(--ink);text-align:left;cursor:pointer}
+.cp-item i,.cp-new i{font-style:normal;color:var(--blue);font-size:28px;line-height:1}
+.cp-item:hover{background:var(--pale)}
+.cp-or{text-align:center;font-weight:700;font-size:18px;margin:26px 0 18px}
+.cp-new{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 auto;background:none;border:0;font:inherit;font-size:18px;color:var(--blue);text-decoration:underline;cursor:pointer;padding:8px 16px}
+.cp-new i{text-decoration:none}
