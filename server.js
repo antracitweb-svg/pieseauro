@@ -193,13 +193,13 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)',
   'CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at)',
   'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)',
+  ...VEHICLE_SCHEMA,
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS listing_id INTEGER',
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS ref_title TEXT',
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE',
   'CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,created_at DESC)',
-  'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)',
-  ...VEHICLE_SCHEMA
+  'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)'
  );
  for(const q of migrations) await pool.query(q);
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
