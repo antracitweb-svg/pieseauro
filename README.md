@@ -19,7 +19,6 @@ Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și con
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | da (prima pornire) | creează contul de administrator |
 | `APP_URL` | recomandat | adresa publică, folosită în linkurile din emailuri |
 | `RESEND_API_KEY`, `RESEND_FROM` | pentru emailuri | recuperare parolă, schimbare email (sender verificat în Resend) |
-| `EMAIL_NOTIFICATIONS` | nu | `off` oprește emailurile „ai primit un mesaj nou” (implicit pornite dacă `RESEND_*` e configurat) |
 | `VEHICLE_CATALOG_URL` | nu | sursa catalogului de vehicule (setată deja în `render.yaml`) |
 
 Fără `RESEND_*`, „Ai uitat parola?” răspunde că emailul nu este configurat.
@@ -102,14 +101,3 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - „Anunțurile mele” → buton **Editează** (nu apare la anunțurile blocate de admin). Se deschide același formular, completat, la `#/vinde?edit=<id>`.
 - Prețul, livrarea, negocierea, județul, starea și tipul de vânzător se salvează direct. Titlul, descrierea, pozele, categoria, marca/modelul, anul, OEM-ul sau tipul anunțului trimit anunțul din nou la moderare (apare „În așteptare”). Anunțurile respinse revin la moderare după editare.
 - Endpointuri noi: `GET /api/listings/mine/:id` (anunțul propriu, cu toate pozele) și `PATCH /api/listings/:id`. Validarea e comună cu publicarea (`parseListing`).
-
-## Mesagerie, oferte, comenzi, notificări (completare)
-- **Mesaje**: conversații ca în chat (bule, zile, ora), contor de necitite în header și în Contul meu, actualizare automată la 8 secunde cât timp conversația e deschisă, `Enter` trimite (Shift+Enter = rând nou; pe telefon Enter = rând nou), răspunsuri rapide („Mai este disponibilă?”, „Care este ultimul preț?” etc.), ștergerea conversației (doar din contul tău).
-- **Context**: „Trimite mesaj” din anunț trimite și `listing_id`; din cerere trimite `request_id`. Titlul se ia din baza de date (nu de la client) și apare ca „Despre: …” în conversație și în listă.
-- **Notificări**: cu link direct (mesaj, ofertă, comandă), dedublate (un singur semnal pentru o rafală de mesaje necitite), ștergere. Opțional email la mesaj nou.
-- **Oferte**: cumpărătorul poate accepta sau **respinge**; vânzătorul poate **retrage** oferta (`POST /api/offers/:id/reject`, `/withdraw`). Vânzătorii ale căror oferte pierd primesc notificare când cererea se închide.
-- **Comenzi**: flux `nouă → confirmată → expediată → finalizată`, plus anulare (`PATCH /api/orders/:id/status`). Vânzătorul confirmă/expediază, cumpărătorul confirmă primirea. La anulare cererea se redeschide.
-- Endpointuri noi: `GET /api/counts`, `DELETE /api/messages/:uid`, `DELETE /api/notifications`; `POST /api/notifications/read` acceptă `{id}`.
-- Corecturi: rutele din „Contul meu” (mesaje, oferte, comenzi, notificări) cer acum autentificare; fereastra de detaliu anunț se închide când navighezi la mesaje (înainte rămânea deschisă deasupra paginii).
-- Migrații automate la pornire: coloane noi în `messages`, `notifications`, `orders` și indecși.
-- SEO: `/piese/<id>-<slug>` pentru un anunț inexistent sau retras răspunde acum cu **404** (înainte 200), ca să nu fie indexate pagini goale.

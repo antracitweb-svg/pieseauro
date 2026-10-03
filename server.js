@@ -193,17 +193,6 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)',
   'CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at)',
   'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)',
-  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS listing_id INTEGER',
-  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS subject TEXT',
-  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS del_sender BOOLEAN NOT NULL DEFAULT FALSE',
-  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS del_recipient BOOLEAN NOT NULL DEFAULT FALSE',
-  'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT',
-  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()',
-  'CREATE INDEX IF NOT EXISTS messages_rec_idx ON messages(recipient_id,is_read)',
-  'CREATE INDEX IF NOT EXISTS messages_pair_idx ON messages(sender_id,recipient_id,id)',
-  'CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id,is_read,created_at DESC)',
-  'CREATE INDEX IF NOT EXISTS offers_request_idx ON offers(request_id,status)',
-  'CREATE INDEX IF NOT EXISTS orders_users_idx ON orders(buyer_id,seller_id)',
   ...VEHICLE_SCHEMA
  );
  for(const q of migrations) await pool.query(q);
@@ -846,7 +835,7 @@ app.patch('/api/listings/:id',auth,requireDb,async(req,res)=>{
 });
 
 app.get('/api/requests',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.user_id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,COALESCE(u.nickname,u.name) user_name FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,COALESCE(u.nickname,u.name) user_name FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
  res.json({requests:r.rows});
 });
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
@@ -884,29 +873,10 @@ app.patch('/api/admin/reports/:id',auth,admin,requireDb,async(req,res)=>{const s
 app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempts,'rep:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {listing_id,reason,details}=req.body||{};if(!/^\d{1,10}$/.test(String(listing_id))||typeof reason!=='string'||!reason.trim()||reason.length>200)return res.status(400).json({error:'DATE_INVALIDE'});if(!(await pool.query('SELECT 1 FROM listings WHERE id=$1',[listing_id])).rowCount)return res.status(404).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO reports(listing_id,reporter_id,reason,details) VALUES($1,$2,$3,$4) RETURNING *',[listing_id,req.user.id,reason.trim(),String(details||'').slice(0,2000)]);res.status(201).json({report:r.rows[0]});});
 
 
-/* ---------- oferte, comenzi, mesaje, notificări ---------- */
-const ID_RE=/^\d{1,10}$/;
-const notify=(uid,text,link,dedupe)=>{
- if(!uid)return null;
- return (async()=>{try{
-  if(dedupe&&(await pool.query('SELECT 1 FROM notifications WHERE user_id=$1 AND text=$2 AND NOT is_read',[uid,String(text).slice(0,300)])).rowCount)return;
-  await pool.query('INSERT INTO notifications(user_id,text,link) VALUES($1,$2,$3)',[uid,String(text).slice(0,300),link||null]);
- }catch(e){console.error('notify',e.message);}})();
-};
-// Email „ai un mesaj nou” – doar dacă Resend e configurat; se poate opri cu EMAIL_NOTIFICATIONS=off
-function emailNewMessage(req,toId,fromName){
- if(String(process.env.EMAIL_NOTIFICATIONS||'').toLowerCase()==='off'||!process.env.RESEND_API_KEY||!process.env.RESEND_FROM)return;
- (async()=>{try{
-  const u=(await pool.query("SELECT email,name FROM users WHERE id=$1 AND status='active'",[toId])).rows[0];
-  if(!u||!u.email)return;
-  await sendMail(u.email,'AutoPiese – mesaj nou de la '+fromName,
-   `Salut, ${u.name||''}\n\nAi primit un mesaj nou de la ${fromName}. Îl poți citi și răspunde aici: ${appBaseUrl(req)}/#/account-tool?view=messages\n`,
-   `<p>Salut, ${escapeHtml(u.name||'')}</p><p>Ai primit un mesaj nou de la <b>${escapeHtml(fromName)}</b>.</p><p><a href="${escapeHtml(appBaseUrl(req))}/#/account-tool?view=messages">Deschide mesajele</a></p>`);
- }catch(e){console.error('email mesaj nou:',e.message);}})();
-}
-
+/* ---------- oferte, comenzi, notificări ---------- */
+const notify=(uid,text)=>uid?pool.query('INSERT INTO notifications(user_id,text) VALUES($1,$2)',[uid,String(text).slice(0,300)]).catch(()=>{}):null;
 app.post('/api/requests/:id/offers',auth,requireDb,ah(async(req,res)=>{
- if(!ID_RE.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
+ if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
  if(!throttle(authAttempts,'offer:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_OFERTE'});
  const price=Number(req.body&&req.body.price),message=String((req.body&&req.body.message)||'').trim().slice(0,2000);
  if(!isFinite(price)||price<0||price>10000000)return res.status(400).json({error:'PRET_INVALID'});
@@ -915,21 +885,20 @@ app.post('/api/requests/:id/offers',auth,requireDb,ah(async(req,res)=>{
  if(r.user_id===req.user.id)return res.status(400).json({error:'CERERE_PROPRIE'});
  if((await pool.query("SELECT 1 FROM offers WHERE request_id=$1 AND seller_id=$2 AND status='pending'",[r.id,req.user.id])).rowCount)return res.status(409).json({error:'OFERTA_EXISTA'});
  const o=await pool.query('INSERT INTO offers(request_id,seller_id,price,message) VALUES($1,$2,$3,$4) RETURNING id',[r.id,req.user.id,price,message]);
- await notify(r.user_id,'Ofertă nouă de la '+(req.user.nickname||req.user.name||'un vânzător')+' la cererea „'+r.title+'”: '+price+' lei','account-tool?view=offers-received');
+ await notify(r.user_id,'Ofertă nouă la cererea „'+r.title+'”: '+price+' lei');
  res.json({ok:true,id:o.rows[0].id});
 }));
 app.get('/api/offers/mine',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT o.id,o.request_id,o.price,o.message,o.status,o.created_at,q.title request_title,q.user_id buyer_id,COALESCE(b.nickname,b.name) buyer_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users b ON b.id=q.user_id WHERE o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
+ const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,q.title request_title,q.user_id buyer_id FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
  res.json({offers:r.rows});
 }));
 app.get('/api/offers/received',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT o.id,o.request_id,o.price,o.message,o.status,o.created_at,o.seller_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY (o.status=\'pending\') DESC,o.created_at DESC LIMIT 200',[req.user.id]);
+ const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,o.seller_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
  res.json({offers:r.rows});
 }));
 app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
- if(!ID_RE.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
+ if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
  const c=await pool.connect();
- let out=null,lost=[];
  try{
   await c.query('BEGIN');
   const o=(await c.query('SELECT o.*,q.user_id buyer_id,q.status rstatus,q.title FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE o.id=$1 FOR UPDATE OF o,q',[req.params.id])).rows[0];
@@ -937,38 +906,15 @@ app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
   if(o.buyer_id!==req.user.id){await c.query('ROLLBACK');return res.status(403).json({error:'INTERZIS'});}
   if(o.status!=='pending'||o.rstatus!=='open'){await c.query('ROLLBACK');return res.status(409).json({error:'OFERTA_NU_MAI_E_DISPONIBILA'});}
   await c.query("UPDATE offers SET status='accepted' WHERE id=$1",[o.id]);
-  lost=(await c.query("UPDATE offers SET status='rejected' WHERE request_id=$1 AND id<>$2 AND status='pending' RETURNING seller_id",[o.request_id,o.id])).rows;
+  await c.query("UPDATE offers SET status='rejected' WHERE request_id=$1 AND id<>$2 AND status='pending'",[o.request_id,o.id]);
   await c.query("UPDATE part_requests SET status='matched' WHERE id=$1",[o.request_id]);
   const ord=await c.query('INSERT INTO orders(offer_id,request_id,buyer_id,seller_id,title,price) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[o.id,o.request_id,o.buyer_id,o.seller_id,o.title,o.price]);
   await c.query('COMMIT');
-  out={o,order_id:ord.rows[0].id};
+  await notify(o.seller_id,'Oferta ta pentru „'+o.title+'” a fost acceptată. Comandă nouă.');
+  res.json({ok:true,order_id:ord.rows[0].id});
  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
- await notify(out.o.seller_id,'Oferta ta pentru „'+out.o.title+'” a fost acceptată. Comandă nouă – confirm-o din Comenzi din oferte.','account-tool?view=orders-seller');
- for(const l of lost)await notify(l.seller_id,'Cererea „'+out.o.title+'” s-a închis: cumpărătorul a ales altă ofertă.','account-tool?view=offers');
- res.json({ok:true,order_id:out.order_id});
-}));
-app.post('/api/offers/:id/reject',auth,requireDb,ah(async(req,res)=>{
- if(!ID_RE.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
- const o=(await pool.query("SELECT o.id,o.seller_id,o.status,q.user_id buyer_id,q.title FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE o.id=$1",[req.params.id])).rows[0];
- if(!o)return res.status(404).json({error:'NOT_FOUND'});
- if(o.buyer_id!==req.user.id)return res.status(403).json({error:'INTERZIS'});
- const u=await pool.query("UPDATE offers SET status='rejected' WHERE id=$1 AND status='pending'",[o.id]);
- if(!u.rowCount)return res.status(409).json({error:'OFERTA_NU_MAI_E_DISPONIBILA'});
- await notify(o.seller_id,'Oferta ta pentru „'+o.title+'” a fost respinsă.','account-tool?view=offers');
- res.json({ok:true});
-}));
-app.post('/api/offers/:id/withdraw',auth,requireDb,ah(async(req,res)=>{
- if(!ID_RE.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
- const o=(await pool.query("SELECT o.id,o.seller_id,q.user_id buyer_id,q.title FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE o.id=$1",[req.params.id])).rows[0];
- if(!o)return res.status(404).json({error:'NOT_FOUND'});
- if(o.seller_id!==req.user.id)return res.status(403).json({error:'INTERZIS'});
- const u=await pool.query("UPDATE offers SET status='withdrawn' WHERE id=$1 AND status='pending'",[o.id]);
- if(!u.rowCount)return res.status(409).json({error:'OFERTA_NU_MAI_E_DISPONIBILA'});
- await notify(o.buyer_id,(req.user.nickname||req.user.name||'Vânzătorul')+' și-a retras oferta pentru „'+o.title+'”.','account-tool?view=offers-received');
- res.json({ok:true});
 }));
 
-/* ----- mesaje ----- */
 app.post('/api/messages',auth,requireDb,ah(async(req,res)=>{
  const to=Number(req.body&&req.body.to),body=String((req.body&&req.body.body)||'').trim();
  if(!Number.isInteger(to)||to<=0||to===req.user.id)return res.status(400).json({error:'DESTINATAR_INVALID'});
@@ -976,111 +922,31 @@ app.post('/api/messages',auth,requireDb,ah(async(req,res)=>{
  if(!throttle(authAttempts,'msg:'+req.user.id,60,60*60*1000))return res.status(429).json({error:'PREA_MULTE_MESAJE'});
  const u=(await pool.query("SELECT id FROM users WHERE id=$1 AND status='active'",[to])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
- // context opțional: anunțul sau cererea despre care se discută (titlul îl luăm din baza de date, nu de la client)
- let listingId=null,subject=null;
- const lid=req.body&&req.body.listing_id, rid=req.body&&req.body.request_id;
- if(lid!=null&&ID_RE.test(String(lid))){
-  const l=(await pool.query("SELECT id,title FROM listings WHERE id=$1 AND status IN ('approved','sold')",[lid])).rows[0];
-  if(l){listingId=l.id;subject=String(l.title).slice(0,150);}
- }else if(rid!=null&&ID_RE.test(String(rid))){
-  const q=(await pool.query('SELECT title FROM part_requests WHERE id=$1',[rid])).rows[0];
-  if(q)subject='Cerere: '+String(q.title).slice(0,140);
- }
- const alreadyUnread=(await pool.query('SELECT 1 FROM messages WHERE sender_id=$1 AND recipient_id=$2 AND NOT is_read AND NOT del_recipient LIMIT 1',[req.user.id,to])).rowCount>0;
- const ins=await pool.query('INSERT INTO messages(sender_id,recipient_id,body,listing_id,subject) VALUES($1,$2,$3,$4,$5) RETURNING id,body,created_at,subject,listing_id',[req.user.id,to,body,listingId,subject]);
- const fromName=req.user.nickname||req.user.name||'un utilizator';
- if(!alreadyUnread){ // un singur semnal per „rafală” de mesaje necitite
-  await notify(to,'Mesaj nou de la '+fromName,'account-tool?view=messages&with='+req.user.id,true);
-  emailNewMessage(req,to,fromName);
- }
- res.json({ok:true,message:{...ins.rows[0],mine:true}});
+ await pool.query('INSERT INTO messages(sender_id,recipient_id,body) VALUES($1,$2,$3)',[req.user.id,to,body]);
+ await notify(to,'Mesaj nou de la '+(req.user.nickname||req.user.name||'un utilizator'));
+ res.json({ok:true});
 }));
 app.get('/api/messages',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query(`WITH my AS (
-   SELECT id,CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END AS other,(recipient_id=$1 AND NOT is_read) AS is_unread
-   FROM messages WHERE (sender_id=$1 AND NOT del_sender) OR (recipient_id=$1 AND NOT del_recipient)
-  ), agg AS (SELECT other,MAX(id) last_id,COUNT(*) FILTER (WHERE is_unread) unread FROM my GROUP BY other)
-  SELECT a.other,COALESCE(u.nickname,u.name) AS name,m.body,m.created_at,m.subject,m.listing_id,(m.sender_id=$1) last_mine,a.unread
-  FROM agg a JOIN messages m ON m.id=a.last_id JOIN users u ON u.id=a.other ORDER BY m.id DESC LIMIT 100`,[req.user.id]);
+ const r=await pool.query(`SELECT t.other,COALESCE(u.nickname,u.name) AS name,t.body,t.created_at,t.unread FROM (SELECT other,body,created_at,SUM(ui) OVER (PARTITION BY other) unread,ROW_NUMBER() OVER (PARTITION BY other ORDER BY created_at DESC,id DESC) rn FROM (SELECT CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END other,body,created_at,id,CASE WHEN recipient_id=$1 AND NOT is_read THEN 1 ELSE 0 END ui FROM messages WHERE sender_id=$1 OR recipient_id=$1) m) t JOIN users u ON u.id=t.other WHERE t.rn=1 ORDER BY t.created_at DESC LIMIT 100`,[req.user.id]);
  res.json({threads:r.rows.map(x=>({...x,unread:Number(x.unread)}))});
 }));
 app.get('/api/messages/:uid',auth,requireDb,ah(async(req,res)=>{
- if(!ID_RE.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
+ if(!/^\d{1,10}$/.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
  const other=(await pool.query("SELECT id,COALESCE(nickname,name) AS name FROM users WHERE id=$1 AND status='active'",[req.params.uid])).rows[0];
  if(!other)return res.status(404).json({error:'NOT_FOUND'});
- const after=ID_RE.test(String(req.query.after||''))?Number(req.query.after):0;
- const m=await pool.query(`SELECT * FROM (SELECT id,body,created_at,subject,listing_id,(sender_id=$1) mine FROM messages
-   WHERE ((sender_id=$1 AND recipient_id=$2 AND NOT del_sender) OR (sender_id=$2 AND recipient_id=$1 AND NOT del_recipient)) AND id>$3
-   ORDER BY id DESC LIMIT 300) x ORDER BY id`,[req.user.id,other.id,after]);
+ const m=await pool.query('SELECT id,body,created_at,(sender_id=$1) mine FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at,id LIMIT 500',[req.user.id,other.id]);
  await pool.query('UPDATE messages SET is_read=TRUE WHERE recipient_id=$1 AND sender_id=$2 AND NOT is_read',[req.user.id,other.id]);
  res.json({other,messages:m.rows});
 }));
-app.delete('/api/messages/:uid',auth,requireDb,ah(async(req,res)=>{
- if(!ID_RE.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
- const uid=Number(req.params.uid);
- await pool.query('UPDATE messages SET del_sender=TRUE WHERE sender_id=$1 AND recipient_id=$2',[req.user.id,uid]);
- await pool.query('UPDATE messages SET del_recipient=TRUE,is_read=TRUE WHERE recipient_id=$1 AND sender_id=$2',[req.user.id,uid]);
- await pool.query('DELETE FROM messages WHERE del_sender AND del_recipient AND (sender_id=$1 OR recipient_id=$1)',[req.user.id]);
- res.json({ok:true});
-}));
-
-/* ----- contoare pentru badge-uri ----- */
-app.get('/api/counts',auth,requireDb,ah(async(req,res)=>{
- const n=async(sql)=>Number((await pool.query(sql,[req.user.id])).rows[0].n);
- res.json({
-  messages:await n('SELECT COUNT(*) n FROM messages WHERE recipient_id=$1 AND NOT is_read AND NOT del_recipient'),
-  notifications:await n('SELECT COUNT(*) n FROM notifications WHERE user_id=$1 AND NOT is_read'),
-  offers_received:await n("SELECT COUNT(*) n FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE q.user_id=$1 AND o.status='pending' AND q.status='open'"),
-  orders_seller:await n("SELECT COUNT(*) n FROM orders WHERE seller_id=$1 AND status='new'")
- });
-}));
-
-/* ----- comenzi ----- */
 app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query(`SELECT o.id,o.title,o.price,o.status,o.created_at,o.updated_at,
-   CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,
-   CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,
-   COALESCE(u.nickname,u.name) other_name
-  FROM orders o LEFT JOIN users u ON u.id=CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END
-  WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200`,[req.user.id]);
+ const r=await pool.query("SELECT id,title,price,status,created_at,CASE WHEN buyer_id=$1 THEN 'buyer' ELSE 'seller' END role FROM orders WHERE buyer_id=$1 OR seller_id=$1 ORDER BY created_at DESC LIMIT 200",[req.user.id]);
  res.json({orders:r.rows});
 }));
-// Flux: nouă → confirmată (vânzător) → expediată (vânzător) → finalizată (cumpărător); anulare cât timp nu e expediată
-const ORDER_FLOW={
- seller:{new:['confirmed','cancelled'],confirmed:['shipped','cancelled']},
- buyer:{new:['cancelled'],confirmed:['cancelled'],shipped:['completed']}
-};
-const ORDER_NOTE={confirmed:'a confirmat comanda',shipped:'a expediat comanda',completed:'a confirmat primirea comenzii',cancelled:'a anulat comanda'};
-app.patch('/api/orders/:id/status',auth,requireDb,ah(async(req,res)=>{
- if(!ID_RE.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
- const to=String((req.body&&req.body.status)||'');
- const o=(await pool.query('SELECT id,buyer_id,seller_id,request_id,title,status FROM orders WHERE id=$1',[req.params.id])).rows[0];
- if(!o||(o.buyer_id!==req.user.id&&o.seller_id!==req.user.id))return res.status(404).json({error:'NOT_FOUND'});
- const role=o.seller_id===req.user.id?'seller':'buyer';
- if(!((ORDER_FLOW[role][o.status]||[]).includes(to)))return res.status(409).json({error:'STATUS_INVALIDE'});
- const u=await pool.query('UPDATE orders SET status=$1,updated_at=NOW() WHERE id=$2 AND status=$3',[to,o.id,o.status]);
- if(!u.rowCount)return res.status(409).json({error:'STATUS_INVALIDE'});
- if(to==='cancelled'&&o.request_id)await pool.query("UPDATE part_requests SET status='open' WHERE id=$1 AND status='matched'",[o.request_id]);
- const other=role==='seller'?o.buyer_id:o.seller_id;
- await notify(other,(req.user.nickname||req.user.name||'Partenerul')+' '+ORDER_NOTE[to]+' „'+(o.title||'')+'”.','account-tool?view='+(role==='seller'?'orders':'orders-seller'));
- res.json({ok:true,status:to});
-}));
-
-/* ----- notificări ----- */
 app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT id,text,link,is_read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100',[req.user.id]);
+ const r=await pool.query('SELECT id,text,is_read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.id]);
  res.json({notifications:r.rows});
 }));
-app.post('/api/notifications/read',auth,requireDb,ah(async(req,res)=>{
- const id=req.body&&req.body.id;
- if(id!=null&&ID_RE.test(String(id)))await pool.query('UPDATE notifications SET is_read=TRUE WHERE user_id=$1 AND id=$2',[req.user.id,id]);
- else await pool.query('UPDATE notifications SET is_read=TRUE WHERE user_id=$1',[req.user.id]);
- res.json({ok:true});
-}));
-app.delete('/api/notifications',auth,requireDb,ah(async(req,res)=>{
- await pool.query('DELETE FROM notifications WHERE user_id=$1 AND is_read',[req.user.id]);
- res.json({ok:true});
-}));
+app.post('/api/notifications/read',auth,requireDb,ah(async(req,res)=>{await pool.query('UPDATE notifications SET is_read=TRUE WHERE user_id=$1',[req.user.id]);res.json({ok:true});}));
 
 app.get('/robots.txt',(req,res)=>{res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${appBaseUrl(req)}/sitemap.xml\n`);});
 app.get('/sitemap.xml',async(req,res)=>{
@@ -1089,14 +955,12 @@ app.get('/sitemap.xml',async(req,res)=>{
  res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map(u=>`<url><loc>${escapeXml(u)}</loc></url>`).join('')+'</urlset>');
 });
 function escapeXml(s){return String(s).replace(/[<>&'"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]));}
-// Anunț inexistent/retras: aplicația se încarcă normal, dar cu status 404 (nu 200), ca Google să nu indexeze pagini goale.
-const spa404=res=>{res.status(404).set('Cache-Control','no-cache').type('html').send(fs.readFileSync(path.join(__dirname,'index.html')));};
 app.get('/piese/:idSlug',async(req,res,next)=>{
  if(!pool)return next();
- const id=Number(String(req.params.idSlug).split('-')[0]); if(!Number.isInteger(id)||id<=0)return spa404(res);
+ const id=Number(String(req.params.idSlug).split('-')[0]); if(!Number.isInteger(id)||id<=0)return next();
  try{
   const r=await pool.query("SELECT l.*,COALESCE(u.nickname,u.name) seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[id]);
-  if(!r.rowCount)return spa404(res);
+  if(!r.rowCount)return next();
   const x=r.rows[0]; const base=appBaseUrl(req); const slug=slugify(x.title);
   if(req.params.idSlug!==`${x.id}-${slug}`)return res.redirect(301,`/piese/${x.id}-${slug}`);
   const canonical=`${escapeHtml(base)}/piese/${x.id}-${slug}`;
