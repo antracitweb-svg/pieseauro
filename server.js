@@ -769,6 +769,16 @@ app.get('/api/sellers',requireDb,async(req,res)=>{
  const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
  res.json({sellers:r.rows});
 });
+app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
+ const id=Number(req.params.id);
+ if(!Number.isInteger(id)||id<=0)return res.status(404).json({error:'NOT_FOUND'});
+ const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,created_at FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
+ if(!u)return res.status(404).json({error:'NOT_FOUND'});
+ const s=(await pool.query("SELECT COUNT(*)::int n,COALESCE(BOOL_OR(type='dezmembrari'),FALSE) dism,(ARRAY_AGG(seller_type ORDER BY created_at DESC))[1] seller_type,(ARRAY_AGG(county ORDER BY created_at DESC) FILTER (WHERE county IS NOT NULL AND county<>''))[1] county FROM listings WHERE user_id=$1 AND status='approved'",[id])).rows[0];
+ const phones=u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[id])).rows:[];
+ const isCompany=s.dism||(s.seller_type&&s.seller_type!=='Persoană fizică');
+ res.json({seller:{id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones}});
+}));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 function parseListing(x){
  const bad=(error,status=400)=>({error,status});

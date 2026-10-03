@@ -538,7 +538,7 @@ function fmtPhone(p){
   return raw;
 }
 function contactHtml(phones, who, sellerId, own, listingId){
-  const msgBtn = (sellerId && !own) ? `<button type="button" class="btn ghost msg-btn" data-go="account-tool?view=messages&with=${esc(String(sellerId))}${listingId?'&ref='+Number(listingId):''}">✉️ Trimite mesaj</button>` : '';
+  const msgBtn = '';
   if(!phones || !phones.length) return `<p class="phone-none">📵 ${who} nu a afișat un număr de telefon.</p>${msgBtn}`;
   return phones.map(p=>{
     const tel=String(p.phone).replace(/[^\d+]/g,'');
@@ -573,13 +573,18 @@ function detailHtml(x, phones, canContact){
       <p class="ad-ship">${x.delivery?'🚚 Livrare disponibilă':'📍 Ridicare personală'}</p>
     </div>
     <div class="ad-card">
-      <div class="seller-head"><span class="seller-avatar">${seller.charAt(0).toUpperCase()}</span><div><b>${seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small></div></div>
+      <div class="seller-head"><span class="seller-avatar">${seller.charAt(0).toUpperCase()}</span><div><b>${x.user_id?`<button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">${seller}</button>`:seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small></div></div>
       ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
     <div class="contact-row">
+      ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<button class="btn ghost small" data-msg-open="1">✉️ Mesaj</button>`:''}
       <button class="btn ghost small" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'} Favorit</button>
       ${canContact?`<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
     </div>
+    ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<div class="msg-box hidden" id="msgBox" data-to="${Number(x.user_id)}" data-listing="${x.id}"><b>Mesaj pentru ${seller}</b>
+      <div class="msg-quick"><button type="button" data-msg-quick="Bună ziua! Mai este disponibilă piesa?">Mai este disponibilă?</button><button type="button" data-msg-quick="Bună ziua! Care este ultimul preț?">Ultimul preț?</button><button type="button" data-msg-quick="Bună ziua! Se poate livra în ">Se poate livra?</button></div>
+      <textarea id="msgText" rows="3" maxlength="2000" placeholder="Scrie mesajul tău…">Bună ziua! Mai este disponibilă piesa?</textarea>
+      <button type="button" class="btn primary small" data-send-msg="1">Trimite mesajul</button><p class="form-note" id="msgStatus"></p></div>`:''}
   </aside>
   </div>
   <div class="report-box hidden" id="reportBox"><b>Raportează anunțul</b>
@@ -1396,6 +1401,33 @@ function accountAction(a){
   else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
 }
 
+
+async function sendListingMessage(btn){
+  const box=$('#msgBox'); if(!box) return;
+  const body=$('#msgText').value.trim(), st=$('#msgStatus');
+  if(!body){ setMsg(st,'Scrie un mesaj.','error'); return; }
+  btn.disabled=true; setMsg(st,'Se trimite…');
+  try{
+    await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(box.dataset.to),body,listing_id:Number(box.dataset.listing)})});
+    setMsg(st,'Mesaj trimis. Răspunsul îl vei primi în Contul meu → Mesaje.','ok');
+    $('#msgText').value=''; toast('Mesaj trimis.');
+  }catch(e){ setMsg(st,e.message||'Mesajul nu a putut fi trimis.','error'); }
+  finally{ btn.disabled=false; }
+}
+async function openSellerProfile(id){
+  const modal=$('#sellerModal'), box=$('#sellerContent');
+  box.innerHTML='<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden');
+  try{
+    const s=(await api('/api/sellers/'+id)).seller, nm=esc(s.name||'Vânzător');
+    const own=currentUser&&currentUser.id===s.id;
+    const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
+    const phones=(s.phones||[]).map(p=>`<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(String(p.phone).replace(/[^\d+]/g,''))}">Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}">WhatsApp</a>`:''}</div></div>`).join('');
+    box.innerHTML=`<div class="seller-head"><span class="seller-avatar">${nm.charAt(0).toUpperCase()}</span><div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small></div></div>
+    <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
+    ${phones||'<p class="muted">Vânzătorul nu a afișat un număr de telefon.</p>'}
+    <div class="contact-row"><button type="button" class="btn ghost small" data-seller="${s.id}" data-sname="${nm}">Vezi anunțurile</button>${own?'':`<button type="button" class="btn primary small" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`}</div>`;
+  }catch(e){ box.innerHTML=`<p>${esc(e.message||'Profilul nu a putut fi încărcat.')}</p>`; }
+}
 document.addEventListener('click', e=>{
   const t = e.target;
   if(t.classList && t.classList.contains('modal')){ closeModal(t); return; }
@@ -1410,7 +1442,19 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
   if((el=t.closest('[data-offer-accept]'))){ if(confirm('Accepți această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerAccept+'/accept',{method:'POST'}); toast('Ofertă acceptată. Comanda a fost creată.'); renderAccountTool('offers-received'); })(); return; }
   if((el=t.closest('[data-req-contact]'))){ safe(requestContact)(el.dataset.reqContact, el); return; }
-  if((el=t.closest('[data-seller]'))){ openSearch({seller_id:el.dataset.seller, sname:el.dataset.sname}); return; }
+  if((el=t.closest('[data-msg-open]'))){
+    if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
+    const b=$('#msgBox'); if(b){ b.classList.toggle('hidden'); if(!b.classList.contains('hidden')){ b.scrollIntoView({block:'nearest',behavior:'smooth'}); const ta=$('#msgText'); ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } }
+    return;
+  }
+  if((el=t.closest('[data-msg-quick]'))){ const ta=$('#msgText'); if(ta){ ta.value=el.dataset.msgQuick; ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } return; }
+  if((el=t.closest('[data-send-msg]'))){ sendListingMessage(el); return; }
+  if((el=t.closest('[data-seller-profile]'))){ openSellerProfile(Number(el.dataset.sellerProfile)); return; }
+  if((el=t.closest('[data-seller-msg]'))){
+    if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
+    $$('.modal').forEach(m=>m.classList.add('hidden')); navigate('account-tool?view=messages&with='+Number(el.dataset.sellerMsg)); return;
+  }
+  if((el=t.closest('[data-seller]'))){ $$('.modal').forEach(m=>m.classList.add('hidden')); openSearch({seller_id:el.dataset.seller, sname:el.dataset.sname}); return; }
   if((el=t.closest('[data-cat]'))){ openSearch({category:el.dataset.cat}); return; }
   if((el=t.closest('[data-search-dism]'))){ openSearch({q:el.dataset.searchDism}); return; }
   if((el=t.closest('[data-saved-open]'))){ const s=getSaved()[Number(el.dataset.savedOpen)]; if(s) navigate('rezultate?'+s.qs); return; }
