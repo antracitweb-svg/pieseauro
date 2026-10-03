@@ -492,3 +492,5 @@ body.no-scroll{overflow:hidden}
 .ad-price-m{display:none;font-size:26px;font-weight:900;letter-spacing:-.5px;color:var(--ink);margin:-4px 0 14px}
 @media(max-width:820px){.ad-price-m{display:block}}
 @media(max-width:700px){.catpick-search{width:100%;flex:none}}
+
+.req-sec{font-size:17px;margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid var(--blue)}.req-sec:first-child{margin-top:0}.req-part{border:1px dashed var(--line);border-radius:12px;padding:0 14px 14px;margin:12px 0}#reqAddPart{margin-top:6px}#reqKind,#reqCounty{margin:0}

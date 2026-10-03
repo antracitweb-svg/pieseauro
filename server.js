@@ -160,6 +160,13 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS ship_county TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS ship_city TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS ship_details TEXT',
+  'ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS variant TEXT',
+  'ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS engine TEXT',
+  'ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS vin TEXT',
+  'ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS kind TEXT',
+  'ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS county TEXT',
+  'ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS city TEXT',
+  "ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS extra_parts TEXT DEFAULT '[]'",
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_company TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_cui TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_regcom TEXT',
@@ -821,7 +828,7 @@ app.patch('/api/listings/:id',auth,requireDb,async(req,res)=>{
 });
 
 app.get('/api/requests',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.description,r.created_at,COALESCE(u.nickname,u.name) user_name FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,COALESCE(u.nickname,u.name) user_name FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
  res.json({requests:r.rows});
 });
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
@@ -840,7 +847,7 @@ app.delete('/api/requests/:id',auth,requireDb,async(req,res)=>{
  if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  res.json({ok:true});
 });
-app.post('/api/requests',auth,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000)]);res.status(201).json({request:r.rows[0]});});
+app.post('/api/requests',auth,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title))]);res.status(201).json({request:r.rows[0]});});
 
 app.get('/api/admin/overview',auth,admin,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.get('/api/admin/listings',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});

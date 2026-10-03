@@ -236,6 +236,7 @@ function fillStaticSelects(){
   setOptions($('#filterCategory'),'Toate',cats);
   setOptions($('#filterCounty'),'Toate județele',COUNTIES);
   setOptions($('#sellCounty'),'Alege județul',COUNTIES);
+  setOptions($('#reqCounty'),'Alege județul',COUNTIES);
   $('#catGrid').innerHTML = CATEGORIES.map(([n,i])=>`<button class="cat" data-cat="${esc(n)}"><span>${i}</span>${esc(n)}</button>`).join('');
 }
 async function loadCatalog(attempt=0){
@@ -928,13 +929,22 @@ async function handleSellImages(e){
 }
 
 /* ---------- formulare ---------- */
+function addReqPart(){
+  const box=$('#reqExtra'); if(box.children.length>=9){ toast('Maximum 10 piese într-o cerere.'); return; }
+  const d=document.createElement('div'); d.className='req-part';
+  d.innerHTML='<label>Piesă suplimentară<input class="rp-title" maxlength="150" placeholder="Denumire piesă"></label><label>Cod sau detalii<textarea class="rp-details" rows="2" maxlength="500"></textarea></label><button type="button" class="btn ghost rp-del">Șterge piesa</button>';
+  box.appendChild(d);
+}
 async function submitRequest(e){
   e.preventDefault(); const msg = $('#requestMessage'); setMsg(msg,'');
   const year = $('#reqYear').value.trim();
   if(year && !/^\d{4}$/.test(year)){ setMsg(msg,'Anul trebuie să aibă 4 cifre.','error'); return; }
+  if(!$('#reqKind').value){ setMsg(msg,'Alege ce oferte vrei (noi, second-hand sau ambele).','error'); return; }
+  if(!$('#reqCounty').value){ setMsg(msg,'Alege județul de livrare.','error'); return; }
+  const extra=[...document.querySelectorAll('#reqExtra .req-part')].map(p=>({title:p.querySelector('.rp-title').value.trim(),details:p.querySelector('.rp-details').value.trim()})).filter(x=>x.title);
   try{
-    await api('/api/requests',{method:'POST',body:JSON.stringify({title:$('#reqTitle').value.trim(),make:$('#reqMake').value,model:$('#reqModel').value,year,description:$('#reqDescription').value})});
-    e.target.reset(); await loadModels('','reqModel');
+    await api('/api/requests',{method:'POST',body:JSON.stringify({title:$('#reqTitle').value.trim(),make:$('#reqMake').value,model:$('#reqModel').value,year,description:$('#reqDescription').value,variant:$('#reqVariant').value.trim(),engine:$('#reqEngine').value.trim(),vin:$('#reqVin').value.trim(),kind:$('#reqKind').value,county:$('#reqCounty').value,city:$('#reqCity').value.trim(),extra_parts:extra})});
+    e.target.reset(); $('#reqExtra').innerHTML=''; await loadModels('','reqModel');
     setMsg(msg,'Cererea a fost trimisă. O găsești în Cererile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
@@ -1339,6 +1349,8 @@ function wire(){
   $('#forgotForm').addEventListener('submit', forgotPassword);
   $('#resetPasswordForm').addEventListener('submit', resetPasswordSubmit);
   $('#requestForm').addEventListener('submit', submitRequest);
+  $('#reqAddPart').addEventListener('click', addReqPart);
+  $('#reqExtra').addEventListener('click', e=>{ const b=e.target.closest('.rp-del'); if(b) b.closest('.req-part').remove(); });
   $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
   $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const id=$('#offerRequestId').value; await api('/api/requests/'+id+'/offers',{method:'POST',body:JSON.stringify({price:$('#offerPrice').value,message:$('#offerMessage').value})}); $('#offerModal').classList.add('hidden'); toast('Oferta a fost trimisă.'); })(); });
   $('#sellForm').addEventListener('submit', submitSell);
