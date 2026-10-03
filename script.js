@@ -15,7 +15,7 @@ const ERR = {
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
   PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
-  CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.'
+  CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',DESTINATAR_NEGASIT:'Nu am găsit niciun utilizator cu acest nickname.'
 };
 const CATEGORY_TREE = [
  ['Accesorii auto','🧰',['Covorașe și protecții','Huse scaune','Portbagaje și bare transversale','Cârlige de remorcare','Parasolare','Suporturi telefon','Alte accesorii']],
@@ -43,8 +43,8 @@ const CATEGORIES = CATEGORY_TREE.map(c=>[c[0],c[1]]);
 const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],sold:['Vândut','pending'],rejected:['Respins','bad'],blocked:['Blocat','bad'],deleted:['Șters','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
-const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
-const AUTH_ROUTES = new Set(['cont','cerere','cerere-noua','vinde','settings','admin','anunturile-mele']);
+const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',mesagerie:'page-messages',privacy:'page-privacy',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
+const AUTH_ROUTES = new Set(['cont','cerere','cerere-noua','vinde','settings','admin','anunturile-mele','mesagerie']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',maxPrice:'maxPrice',filterSeller:'seller_type',sortListings:'sort'};
 
 /* ---------- utilitare ---------- */
@@ -134,7 +134,7 @@ function parseHash(){
   return { name: name || 'home', params: new URLSearchParams(qs||'') };
 }
 function navigate(x){ const target='#/'+x; if(location.hash===target) route(); else location.hash=target; }
-function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='requests' && params.get('t')==='mine') || (name==='rezultate' && ['mine'].includes(params.get('mode'))); }
+function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='account-tool' && params.get('view')!=='cart') || (name==='requests' && params.get('t')==='mine') || (name==='rezultate' && ['mine'].includes(params.get('mode'))); }
 function showPage(id){ $$('.page').forEach(p=>p.classList.toggle('active',p.id===id)); window.scrollTo(0,0); }
 
 function route(){
@@ -163,7 +163,11 @@ function route(){
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
   else if(name==='admin') safe(loadAdmin)();
   else if(name==='menu') renderHeader();
-  else if(name==='account-tool') renderAccountTool(params.get('view'), params.get('with'));
+  else if(name==='mesagerie') safe(enterMessages)(params.get('box'));
+  else if(name==='account-tool'){
+    if(params.get('view')==='messages' && !params.get('with')){ history.replaceState(null,'','#/mesagerie'); route(); return; }
+    renderAccountTool(params.get('view'), params.get('with'), params.get('ref'));
+  }
 }
 
 function renderHeader(){
@@ -180,7 +184,7 @@ function renderAccount(){
   renderHeader();
 }
 
-function renderAccountTool(view, withId){
+function renderAccountTool(view, withId, refId){
   const data = {
     cart:{title:'Coșul meu',text:'Anunțurile pe care vrei să le ții la îndemână.',action:'rezultate',label:'Vezi piesele'},
     offers:{title:'Oferte la cereri',text:'Aici vei putea trimite și gestiona ofertele pentru cererile de piese.',action:'requests',label:'Vezi cererile disponibile'},
@@ -199,12 +203,12 @@ function renderAccountTool(view, withId){
   const content=$('#accountToolContent');
   if(content){
     content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
-    if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices'].includes(view)) safe(()=>loadToolData(view,content,withId))();
+    if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
   }
 }
 
 const OFFER_ST={pending:'În așteptare',accepted:'Acceptată',rejected:'Respinsă'}, ORDER_ST={new:'Nouă'};
-async function loadToolData(view, box, withId){
+async function loadToolData(view, box, withId, refId){
   const money=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei';
   let items=[];
   if(view==='cart'){
@@ -228,7 +232,7 @@ async function loadToolData(view, box, withId){
   }else if(view==='messages'){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
-      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><b>${nm}</b>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p><p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}<form class="clean-form" id="msgForm" data-to="${esc(withId)}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form></div>`);
+      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><b>${nm}</b>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p>${m.ref_title&&m.listing_id?`<p class="muted">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></p>`:''}<p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}<form class="clean-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form></div>`);
       return;
     }
     const r=await api('/api/messages');
@@ -533,8 +537,8 @@ function fmtPhone(p){
   if(/^0\d{9}$/.test(d)) return d.slice(0,4)+' '+d.slice(4,7)+' '+d.slice(7);
   return raw;
 }
-function contactHtml(phones, who, sellerId, own){
-  const msgBtn = (sellerId && !own) ? `<button type="button" class="btn ghost msg-btn" data-go="account-tool?view=messages&with=${esc(String(sellerId))}">✉️ Trimite mesaj</button>` : '';
+function contactHtml(phones, who, sellerId, own, listingId){
+  const msgBtn = (sellerId && !own) ? `<button type="button" class="btn ghost msg-btn" data-go="account-tool?view=messages&with=${esc(String(sellerId))}${listingId?'&ref='+Number(listingId):''}">✉️ Trimite mesaj</button>` : '';
   if(!phones || !phones.length) return `<p class="phone-none">📵 ${who} nu a afișat un număr de telefon.</p>${msgBtn}`;
   return phones.map(p=>{
     const tel=String(p.phone).replace(/[^\d+]/g,'');
@@ -570,7 +574,7 @@ function detailHtml(x, phones, canContact){
     </div>
     <div class="ad-card">
       <div class="seller-head"><span class="seller-avatar">${seller.charAt(0).toUpperCase()}</span><div><b>${seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small></div></div>
-      ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
+      ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
     <div class="contact-row">
       <button class="btn ghost small" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'} Favorit</button>
@@ -1388,6 +1392,7 @@ function accountAction(a){
   else if(a==='favorites') navigate('rezultate?mode=fav');
   else if(a==='requests') navigate('requests?t=mine');
   else if(a==='saved') navigate('saved');
+  else if(a==='messages') navigate('mesagerie');
   else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
 }
 
@@ -1443,7 +1448,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-open]'))){ openDetail(Number(el.dataset.open)); return; }
 });
 document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); } });
-document.addEventListener('submit', e=>{ const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault(); safe(async()=>{ await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(f.dataset.to),body:$('#msgBody').value})}); renderAccountTool('messages',f.dataset.to); })(); });
+document.addEventListener('submit', e=>{ const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault(); safe(async()=>{ await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(f.dataset.to),body:$('#msgBody').value,listing_id:f.dataset.ref?Number(f.dataset.ref):undefined})}); renderAccountTool('messages',f.dataset.to,f.dataset.ref); })(); });
 document.addEventListener('keydown', e=>{
   if(!$('#imageLightbox')?.classList.contains('hidden')){
     if(e.key==='Escape'){ e.preventDefault(); closeLightbox(); return; }
@@ -1687,6 +1692,110 @@ document.addEventListener('change', e=>{
 document.addEventListener('submit', e=>{
   if(e.target.id!=='mineSearchForm') return; e.preventDefault();
   mine.q = $('#mineSearch').value; mine.page=1; renderMine();
+});
+
+
+/* ---------- Mesagerie (Primite / Trimise / Arhivate / Trimite un mesaj) ---------- */
+const MSG_PER_PAGE = 30;
+const MSG_TABS = [['inbox','Primite'],['sent','Trimise'],['archived','Arhivate'],['compose','Trimite un mesaj']];
+const msgs = { box:'inbox', items:[], unread:0, q:'', unreadOnly:false, page:1, sel:new Set() };
+const msgFmtDate = iso => { const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('ro-RO',{day:'2-digit',month:'short',year:'numeric'}); };
+const MSG_USER_ICO = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6z"/></svg>';
+async function enterMessages(box){
+  msgs.box = MSG_TABS.some(t=>t[0]===box) ? box : 'inbox';
+  msgs.q=''; msgs.unreadOnly=false; msgs.page=1; msgs.sel.clear();
+  $('#msgSearch').value=''; $('#msgUnreadOnly').checked=false; setMsg($('#msgComposeMsg'),'');
+  await loadMessages();
+}
+async function loadMessages(){
+  if(msgs.box==='compose'){ renderMessages(); return; }
+  renderMessagesChrome();
+  $('#msgList').innerHTML = '<p class="muted">Se încarcă…</p>';
+  try{
+    const r = await api('/api/messages/box?box='+msgs.box);
+    msgs.items = r.messages || []; msgs.unread = r.unread || 0;
+  }catch(e){ msgs.items=[]; $('#msgList').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  renderMessages();
+}
+function msgVisible(){
+  const q = mineNorm(msgs.q).trim();
+  return msgs.items.filter(m=>{
+    if(msgs.unreadOnly && !(msgs.box==='inbox' && !m.is_read)) return false;
+    if(!q) return true;
+    const hay = mineNorm([m.other_name,m.body,m.ref_title].join(' '));
+    return q.split(/\s+/).every(t=>hay.includes(t));
+  });
+}
+function renderMessagesChrome(){
+  $('#msgTabs').innerHTML = MSG_TABS.map(([k,l])=>`<button type="button" role="tab" class="mine-tab ${msgs.box===k?'on':''}" data-ms-tab="${k}">${l}${k==='inbox'&&msgs.unread?` <small>${msgs.unread}</small>`:''}</button>`).join('');
+  const compose = msgs.box==='compose';
+  $('#msgBoxView').classList.toggle('hidden', compose);
+  $('#msgComposeWrap').classList.toggle('hidden', !compose);
+}
+function msgRow(m){
+  const go = `account-tool?view=messages&with=${m.other}${m.listing_id?'&ref='+m.listing_id:''}`;
+  const unread = msgs.box==='inbox' && !m.is_read;
+  const name = esc(m.other_name || 'Utilizator');
+  return `<article class="mrow${unread?' unread':''}">
+    <label class="mine-check"><input type="checkbox" data-ms-check="${m.id}" ${msgs.sel.has(m.id)?'checked':''} aria-label="Selectează mesajul"></label>
+    <div class="mrow-main">
+      <button type="button" class="mrow-head" data-go="${esc(go)}"><span class="mrow-user">${MSG_USER_ICO}<span class="mrow-name">${m.mine&&msgs.box!=='inbox'?'Către ':''}${name}</span>${unread?'<em class="mrow-dot" aria-label="Necitit"></em>':''}</span><span class="mrow-date">${msgFmtDate(m.created_at)}</span></button>
+      <button type="button" class="mrow-body" data-go="${esc(go)}">${m.mine?'<span class="mrow-ok">✓</span> ':''}${esc(m.body)}</button>
+      ${m.ref_title&&m.listing_id?`<div class="mrow-ref">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></div>`:''}
+    </div></article>`;
+}
+function renderMessages(){
+  renderMessagesChrome();
+  if(msgs.box==='compose') return;
+  const all = msgVisible(), total = all.length, pages = Math.max(1, Math.ceil(total/MSG_PER_PAGE));
+  msgs.page = Math.min(Math.max(1, msgs.page), pages);
+  const from = (msgs.page-1)*MSG_PER_PAGE, slice = all.slice(from, from+MSG_PER_PAGE);
+  $('#msgCount').textContent = total ? `Mesaje (${from+1} - ${from+slice.length} din ${total})` : 'Mesaje (0)';
+  const empty = {inbox:'Nu ai mesaje primite.',sent:'Nu ai mesaje trimise.',archived:'Nu ai mesaje arhivate.'};
+  $('#msgList').innerHTML = slice.length ? slice.map(msgRow).join('') : `<div class="empty">${(msgs.q||msgs.unreadOnly)?'Niciun mesaj nu corespunde filtrelor.':empty[msgs.box]}</div>`;
+  $('#msgPager').innerHTML = pages>1 ? `<button type="button" class="btn ghost small" data-ms-page="${msgs.page-1}" ${msgs.page<=1?'disabled':''}>‹ Înapoi</button><span>Pagina ${msgs.page} din ${pages}</span><button type="button" class="btn ghost small" data-ms-page="${msgs.page+1}" ${msgs.page>=pages?'disabled':''}>Înainte ›</button>` : '';
+  const ids = slice.map(m=>m.id);
+  $('#msgAll').checked = ids.length>0 && ids.every(i=>msgs.sel.has(i));
+  const n = msgs.sel.size, bulk = $('#msgBulk');
+  bulk.classList.toggle('hidden', !n);
+  bulk.innerHTML = n ? `<span>${n} selectate</span>` + (msgs.box==='inbox'?'<button type="button" class="btn ghost small" data-ms-bulk="read">Marchează citite</button>':'') + (msgs.box==='archived'?'<button type="button" class="btn ghost small" data-ms-bulk="unarchive">Dezarhivează</button>':'<button type="button" class="btn ghost small" data-ms-bulk="archive">Arhivează</button>') : '';
+}
+async function msgBulk(kind){
+  const ids = [...msgs.sel]; if(!ids.length) return;
+  if(kind==='read') await api('/api/messages/read',{method:'POST',body:JSON.stringify({ids})});
+  else await api('/api/messages/archive',{method:'POST',body:JSON.stringify({ids,archive:kind==='archive'})});
+  msgs.sel.clear(); await loadMessages();
+  toast(kind==='archive'?'Mesajele au fost arhivate.':kind==='unarchive'?'Mesajele au fost dezarhivate.':'Mesajele au fost marcate ca citite.');
+}
+document.addEventListener('click', e=>{
+  if(!(e.target.closest && e.target.closest('#page-messages'))) return;
+  let el;
+  if((el=e.target.closest('[data-ms-tab]'))){ msgs.box=el.dataset.msTab; msgs.page=1; msgs.sel.clear(); safe(loadMessages)(); return; }
+  if((el=e.target.closest('[data-ms-page]'))){ msgs.page=Number(el.dataset.msPage)||1; renderMessages(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  if((el=e.target.closest('[data-ms-bulk]'))){ safe(msgBulk)(el.dataset.msBulk); return; }
+  if(e.target.closest('#msgFilterBtn')){ $('#msgFilterPanel').classList.toggle('hidden'); return; }
+});
+document.addEventListener('change', e=>{
+  if(!(e.target.closest && e.target.closest('#page-messages'))) return;
+  const t = e.target;
+  if(t.matches('[data-ms-check]')){ const id=Number(t.dataset.msCheck); t.checked? msgs.sel.add(id) : msgs.sel.delete(id); renderMessages(); }
+  else if(t.id==='msgAll'){ msgVisible().slice((msgs.page-1)*MSG_PER_PAGE, msgs.page*MSG_PER_PAGE).forEach(m=> t.checked? msgs.sel.add(m.id) : msgs.sel.delete(m.id)); renderMessages(); }
+  else if(t.id==='msgUnreadOnly'){ msgs.unreadOnly=t.checked; msgs.page=1; renderMessages(); }
+});
+document.addEventListener('input', e=>{
+  if(e.target.id!=='msgSearch') return;
+  msgs.q=e.target.value; msgs.page=1; renderMessages();
+});
+document.addEventListener('submit', e=>{
+  if(e.target.id!=='msgComposeForm') return; e.preventDefault(); if(!$('#msgToNick').value.trim() || !$('#msgComposeBody').value.trim()) return;
+  const msg=$('#msgComposeMsg'); setMsg(msg,'');
+  (async()=>{
+    try{
+      await api('/api/messages',{method:'POST',body:JSON.stringify({to_nick:$('#msgToNick').value.trim(),body:$('#msgComposeBody').value})});
+      $('#msgComposeForm').reset(); toast('Mesajul a fost trimis.');
+      msgs.box='sent'; msgs.page=1; msgs.sel.clear(); await loadMessages();
+    }catch(err){ setMsg(msg,err.message,'error'); }
+  })();
 });
 
 (async function init(){

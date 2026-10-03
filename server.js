@@ -193,6 +193,12 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)',
   'CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at)',
   'CREATE INDEX IF NOT EXISTS part_requests_status_idx ON part_requests(status,created_at DESC)',
+  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS listing_id INTEGER',
+  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS ref_title TEXT',
+  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE',
+  'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE',
+  'CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)',
   ...VEHICLE_SCHEMA
  );
  for(const q of migrations) await pool.query(q);
@@ -916,14 +922,56 @@ app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
 }));
 
 app.post('/api/messages',auth,requireDb,ah(async(req,res)=>{
- const to=Number(req.body&&req.body.to),body=String((req.body&&req.body.body)||'').trim();
+ const b=req.body||{}, body=String(b.body||'').trim();
+ let to=Number(b.to);
+ // „Trimite un mesaj”: destinatarul poate fi ales după nickname.
+ if(!Number.isInteger(to)&&typeof b.to_nick==='string'&&b.to_nick.trim()){
+  const f=(await pool.query("SELECT id FROM users WHERE LOWER(nickname)=LOWER($1) AND status='active'",[b.to_nick.trim().slice(0,30)])).rows[0];
+  if(!f)return res.status(404).json({error:'DESTINATAR_NEGASIT'});
+  to=f.id;
+ }
  if(!Number.isInteger(to)||to<=0||to===req.user.id)return res.status(400).json({error:'DESTINATAR_INVALID'});
  if(!body||body.length>2000)return res.status(400).json({error:'MESAJ_INVALID'});
  if(!throttle(authAttempts,'msg:'+req.user.id,60,60*60*1000))return res.status(429).json({error:'PREA_MULTE_MESAJE'});
  const u=(await pool.query("SELECT id FROM users WHERE id=$1 AND status='active'",[to])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
- await pool.query('INSERT INTO messages(sender_id,recipient_id,body) VALUES($1,$2,$3)',[req.user.id,to,body]);
+ // Referință opțională către un anunț (apare ca „Ref: titlu” în Mesagerie).
+ let listingId=null, refTitle=null;
+ if(/^\d{1,10}$/.test(String(b.listing_id||''))){
+  const l=(await pool.query("SELECT id,title FROM listings WHERE id=$1 AND status='approved'",[Number(b.listing_id)])).rows[0];
+  if(l){listingId=l.id;refTitle=l.title;}
+ }
+ await pool.query('INSERT INTO messages(sender_id,recipient_id,body,listing_id,ref_title) VALUES($1,$2,$3,$4,$5)',[req.user.id,to,body,listingId,refTitle]);
  await notify(to,'Mesaj nou de la '+(req.user.nickname||req.user.name||'un utilizator'));
+ res.json({ok:true});
+}));
+// Mesagerie: lista de mesaje pe căsuțe (primite / trimise / arhivate). Definit înaintea rutei /:uid.
+app.get('/api/messages/box',auth,requireDb,ah(async(req,res)=>{
+ const box=['inbox','sent','archived'].includes(req.query.box)?req.query.box:'inbox';
+ const where={
+  inbox:'m.recipient_id=$1 AND NOT m.arch_r',
+  sent:'m.sender_id=$1 AND NOT m.arch_s',
+  archived:'((m.recipient_id=$1 AND m.arch_r) OR (m.sender_id=$1 AND m.arch_s))'
+ }[box];
+ const r=await pool.query(`SELECT m.id,m.body,m.created_at,m.is_read,m.listing_id,m.ref_title,(m.sender_id=$1) mine,
+   CASE WHEN m.sender_id=$1 THEN m.recipient_id ELSE m.sender_id END other,
+   COALESCE(u.nickname,u.name) other_name
+  FROM messages m JOIN users u ON u.id=(CASE WHEN m.sender_id=$1 THEN m.recipient_id ELSE m.sender_id END)
+  WHERE ${where} ORDER BY m.created_at DESC,m.id DESC LIMIT 300`,[req.user.id]);
+ const c=(await pool.query(`SELECT COUNT(*) FILTER (WHERE recipient_id=$1 AND NOT arch_r AND NOT is_read)::int unread FROM messages WHERE recipient_id=$1`,[req.user.id])).rows[0];
+ res.json({messages:r.rows,unread:c.unread,box});
+}));
+app.post('/api/messages/archive',auth,requireDb,ah(async(req,res)=>{
+ const ids=(Array.isArray(req.body&&req.body.ids)?req.body.ids:[]).map(Number).filter(n=>Number.isInteger(n)&&n>0).slice(0,200);
+ if(!ids.length)return res.status(400).json({error:'DATE_INVALIDE'});
+ const on=!(req.body&&req.body.archive===false);
+ await pool.query('UPDATE messages SET arch_r=$3 WHERE id=ANY($1::int[]) AND recipient_id=$2',[ids,req.user.id,on]);
+ await pool.query('UPDATE messages SET arch_s=$3 WHERE id=ANY($1::int[]) AND sender_id=$2',[ids,req.user.id,on]);
+ res.json({ok:true});
+}));
+app.post('/api/messages/read',auth,requireDb,ah(async(req,res)=>{
+ const ids=(Array.isArray(req.body&&req.body.ids)?req.body.ids:[]).map(Number).filter(n=>Number.isInteger(n)&&n>0).slice(0,200);
+ if(ids.length)await pool.query('UPDATE messages SET is_read=TRUE WHERE id=ANY($1::int[]) AND recipient_id=$2',[ids,req.user.id]);
  res.json({ok:true});
 }));
 app.get('/api/messages',auth,requireDb,ah(async(req,res)=>{
@@ -934,7 +982,7 @@ app.get('/api/messages/:uid',auth,requireDb,ah(async(req,res)=>{
  if(!/^\d{1,10}$/.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
  const other=(await pool.query("SELECT id,COALESCE(nickname,name) AS name FROM users WHERE id=$1 AND status='active'",[req.params.uid])).rows[0];
  if(!other)return res.status(404).json({error:'NOT_FOUND'});
- const m=await pool.query('SELECT id,body,created_at,(sender_id=$1) mine FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at,id LIMIT 500',[req.user.id,other.id]);
+ const m=await pool.query('SELECT id,body,created_at,listing_id,ref_title,(sender_id=$1) mine FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at,id LIMIT 500',[req.user.id,other.id]);
  await pool.query('UPDATE messages SET is_read=TRUE WHERE recipient_id=$1 AND sender_id=$2 AND NOT is_read',[req.user.id,other.id]);
  res.json({other,messages:m.rows});
 }));

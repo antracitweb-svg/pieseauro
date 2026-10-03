@@ -587,3 +587,22 @@ body.no-scroll{overflow:hidden}
 
 /* imagini mai mici în liste pe telefon */
 @media(max-width:800px){.listing-image{height:clamp(190px,56vw,270px)!important}}
+
+/* ===== Mesagerie (stil PieseAuto.ro, culorile tale) ===== */
+.msg-tools{grid-template-columns:minmax(0,260px)}
+.msg-compose{box-shadow:none;border:0;padding:6px 2px 2px}
+.mrow{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px 12px;padding:16px 2px;border-bottom:1px solid var(--line)}
+.mrow-main{min-width:0;display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.mrow-head{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;background:none;padding:0;font:inherit;color:#33465e;cursor:pointer;text-align:left}
+.mrow-user{display:flex;align-items:center;gap:10px;min-width:0;font-size:18px;color:#3d4b5c}
+.mrow-user svg{flex:none;color:#7f8c9b}
+.mrow-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow-date{flex:none;font-size:17px;color:#3d4b5c}
+.mrow-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);flex:none}
+.mrow-body{border:0;background:none;padding:0;font:inherit;font-size:17px;line-height:1.35;color:#2b3846;text-align:left;cursor:pointer;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.mrow-ok{color:var(--blue);font-weight:900}
+.mrow-ref{font-size:17px;line-height:1.35;color:#6c7f97}
+.ref-link{border:0;background:none;padding:0;font:inherit;color:#0d5fa5;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.ref-link:hover{text-decoration:underline}
+.mrow.unread .mrow-name,.mrow.unread .mrow-body{font-weight:800}
+@media(max-width:420px){.mrow-user,.mrow-date{font-size:16px}.mrow-body,.mrow-ref{font-size:16px}}

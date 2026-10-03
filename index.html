@@ -90,6 +90,21 @@
 <div class="mine-list" id="mineList"></div>
 <div class="mine-pager" id="minePager"></div>
 </div></div></section>
+<section class="page" id="page-messages"><div class="container narrow mine-wrap">
+<div class="page-head"><button class="back" data-back>‹ Înapoi</button></div>
+<div class="mine-card">
+<h2 class="mine-title">Mesagerie <span class="mine-caret">▾</span></h2>
+<div class="mine-tabs" id="msgTabs" role="tablist"></div>
+<div id="msgBoxView">
+<div class="mine-tools msg-tools"><button type="button" class="mine-tool" id="msgFilterBtn">▼ Filtrare</button></div>
+<div class="mine-panel hidden" id="msgFilterPanel"><label>Caută în mesaje<input id="msgSearch" type="search" placeholder="Nume, mesaj sau titlu anunț" autocomplete="off"></label><label class="check"><input type="checkbox" id="msgUnreadOnly"> Doar necitite (Primite)</label></div>
+<div class="mine-head"><label class="mine-check"><input type="checkbox" id="msgAll" aria-label="Selectează tot"></label><b id="msgCount">Mesaje</b></div>
+<div class="mine-bulk hidden" id="msgBulk"></div>
+<div class="mine-list" id="msgList"></div>
+<div class="mine-pager" id="msgPager"></div>
+</div>
+<div id="msgComposeWrap" class="hidden"><form class="clean-form msg-compose" id="msgComposeForm"><label>Către (nickname)*<input id="msgToNick" maxlength="30" autocomplete="off" required placeholder="nickname-ul destinatarului"></label><label>Mesaj*<textarea id="msgComposeBody" rows="5" maxlength="2000" required placeholder="Scrie mesajul…"></textarea></label><button class="btn primary full">Trimite mesajul</button><p class="form-note" id="msgComposeMsg"></p></form></div>
+</div></div></section>
 <section class="page" id="page-saved"><div class="container narrow"><div class="page-head"><button class="back" data-back>← Înapoi</button><div><div class="eyebrow">SALVATE</div><h2>Căutări salvate</h2><p>Căutările tale sunt păstrate pe acest dispozitiv.</p></div></div><div class="menu-card" id="savedList"></div></div></section>
 <section class="page" id="page-privacy"><div class="container narrow legal-page"><div class="page-head"><button class="back" data-back>← Înapoi</button><div><div class="eyebrow">LEGAL</div><h2>Politica de confidențialitate</h2></div></div><p>AutoPiese prelucrează datele necesare pentru crearea și administrarea contului, autentificare, publicarea anunțurilor și comunicarea între utilizatori.</p><h3>Ce date putem folosi</h3><p>Nume/nickname, email, telefon dacă îl furnizezi, date despre anunțuri, cereri, favorite și sesiuni de autentificare. Nu stocăm parolele în clar.</p><h3>De ce le folosim</h3><p>Pentru furnizarea serviciilor site-ului, securitate, prevenirea abuzurilor, administrarea contului și respectarea obligațiilor legale.</p><h3>Drepturile tale</h3><p>În condițiile GDPR, poți solicita accesul, rectificarea, ștergerea, restricționarea sau portarea datelor, precum și informații despre prelucrare.</p><p class="form-note">Această pagină este un punct de pornire și trebuie revizuită juridic înainte de lansarea comercială.</p></div></section>
 <section class="page" id="page-cookies"><div class="container narrow legal-page"><div class="page-head"><button class="back" data-back>← Înapoi</button><div><div class="eyebrow">LEGAL</div><h2>Politica de cookies</h2></div></div><h3>Cookie-uri strict necesare</h3><p>AutoPiese folosește cookie-ul securizat de sesiune pentru autentificare și menținerea sesiunii. Este HttpOnly, Secure și SameSite=Lax și nu conține parola utilizatorului.</p><h3>Cookie-uri neesențiale</h3><p>În versiunea actuală nu folosim cookie-uri de publicitate sau analiză neesențiale.</p><h3>Memorarea pe dispozitiv</h3><p>Unele preferințe, cum ar fi favoritele și căutările salvate locale, pot fi păstrate în browser prin localStorage. Acestea nu sunt parole.</p></div></section>

@@ -101,3 +101,9 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - „Anunțurile mele” → buton **Editează** (nu apare la anunțurile blocate de admin). Se deschide același formular, completat, la `#/vinde?edit=<id>`.
 - Prețul, livrarea, negocierea, județul, starea și tipul de vânzător se salvează direct. Titlul, descrierea, pozele, categoria, marca/modelul, anul, OEM-ul sau tipul anunțului trimit anunțul din nou la moderare (apare „În așteptare”). Anunțurile respinse revin la moderare după editare.
 - Endpointuri noi: `GET /api/listings/mine/:id` (anunțul propriu, cu toate pozele) și `PATCH /api/listings/:id`. Validarea e comună cu publicarea (`parseListing`).
+
+## Mesagerie
+- Contul meu → **Mesaje** deschide pagina `#/mesagerie`, cu tab-uri **Primite**, **Trimise**, **Arhivate** și **Trimite un mesaj** (după nickname), buton **Filtrare** (căutare + doar necitite), selectare multiplă cu Arhivează / Dezarhivează / Marchează citite și paginare de 30.
+- Fiecare mesaj arată expeditorul, data, textul și, dacă a pornit dintr-un anunț, linia `Ref: <titlu anunț>` (link către anunț). Apăsarea pe mesaj deschide conversația.
+- Butonul „Trimite mesaj” din anunț atașează anunțul ca referință.
+- Endpointuri noi: `GET /api/messages/box?box=inbox|sent|archived`, `POST /api/messages/archive`, `POST /api/messages/read`; `POST /api/messages` acceptă `listing_id` și `to_nick`. Coloane noi în `messages` (`listing_id`, `ref_title`, `arch_r`, `arch_s`), create automat la pornire.
