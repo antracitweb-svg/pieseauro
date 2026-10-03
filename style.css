@@ -568,6 +568,7 @@ body.no-scroll{overflow:hidden}
 .home-search-form:focus-within{border-color:rgba(25,183,255,.7);box-shadow:0 10px 34px rgba(16,52,94,.08),0 0 0 3px rgba(25,183,255,.18)}
 .home-search-form input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;padding:0 8px 0 20px;font:inherit;font-size:17px;color:var(--ink);-webkit-appearance:none;appearance:none}
 .home-search-form input::placeholder{color:var(--muted);font-weight:600;opacity:1}
-.home-search-go{flex:none;width:64px;height:100%;border:0;background:transparent;color:#356188;font-size:28px;font-weight:800;line-height:1;cursor:pointer;transition:color .15s ease}
+.home-search-go{flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:100%;padding:0;border:0;background:transparent;color:#356188;cursor:pointer;transition:color .15s ease}
+.home-search-go svg{display:block;flex:none}
 .home-search-go:hover{color:var(--blue)}
 .home-search-go:active{transform:scale(.92)}

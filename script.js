@@ -595,6 +595,14 @@ async function loadDism(){
     $('#dismEmpty').classList.toggle('hidden', r.listings.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
+function extraPartsHtml(x){
+  let list = [];
+  try{ list = typeof x.extra_parts === 'string' ? JSON.parse(x.extra_parts || '[]') : (x.extra_parts || []); }catch{ list = []; }
+  if(!Array.isArray(list) || !list.length) return '';
+  const items = list.filter(p=>p && p.title).map(p=>esc(p.title) + (p.details ? ' (' + esc(String(p.details).slice(0,80)) + ')' : ''));
+  if(!items.length) return '';
+  return `<p class="muted">+ ${items.length} ${items.length===1?'piesă suplimentară':'piese suplimentare'}: ${items.join('; ')}</p>`;
+}
 async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
   $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
@@ -606,6 +614,7 @@ async function loadRequests(mine){
     grid.innerHTML = r.requests.map(x=>`<article class="info-card" data-request="${x.id}">
       <b>${esc([x.make,x.model,x.year].filter(Boolean).join(' · ')||'Orice mașină')}</b><h3>${esc(x.title)}</h3>
       ${x.description?`<p>${esc(x.description.slice(0,160))}${x.description.length>160?'…':''}</p>`:''}
+      ${extraPartsHtml(x)}
       <p class="muted">${esc(mine ? (x.status==='open'?'Deschisă':x.status) : (x.user_name||'Cumpărător'))} · ${fmtDate(x.created_at)}</p>
       <div class="contact-slot">${mine?`<button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:`<button class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button>`}</div></article>`).join('');
     $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0);
@@ -1007,11 +1016,20 @@ async function submitRequest(e){
     setMsg(msg,'Cererea a fost trimisă. O găsești în Cererile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
+const SELL_TEXT = {
+  piesa:{title:'Piesa care o vinzi', titleInfo:'Scrie ce piesă vinzi și pentru ce mașină. Ex: Far dreapta BMW Seria 3 E90.', titlePh:'ex. Far dreapta BMW Seria 3 2008',
+    desc:'Descrie piesa', descInfo:'Descrie starea piesei, codul OEM și orice detaliu important. Marca, modelul și anul se completează automat din text.', descPh:'Descrie piesa, starea și detaliile importante...'},
+  dezmembrari:{title:'Mașina de dezmembrat', titleInfo:'Scrie marca, modelul, anul și motorizarea mașinii. Ex: BMW Seria 3 E90 2008, 2.0 diesel.', titlePh:'ex. BMW Seria 3 E90 2008',
+    desc:'Descrie piesele', descInfo:'Scrie ce piese sunt disponibile, în ce stare se află și orice detaliu important. Marca, modelul și anul se completează automat din text.', descPh:'Descrie piesele disponibile, starea lor și detaliile importante...'}
+};
 function syncSellType(){
   const d = $('#sellType').value==='dezmembrari';
   $('#sellConditionWrap').classList.toggle('hidden', d);
   $('#sellDismBlock').classList.toggle('hidden', !d);
   $('#sellCategoryField').classList.toggle('hidden', d);
+  const T = SELL_TEXT[d?'dezmembrari':'piesa'];
+  $('#sellTitleLabel').textContent = T.title; $('#sellTitleInfo').dataset.info = T.titleInfo; $('#sellTitle').placeholder = T.titlePh;
+  $('#sellDescLabel').textContent = T.desc;   $('#sellDescInfo').dataset.info = T.descInfo;   $('#sellDescription').placeholder = T.descPh;
 }
 function setSellMode(editId){
   state.editId = editId || null;
@@ -1069,7 +1087,7 @@ async function submitSell(e){
   if(year && (Number(year)<1950 || Number(year)>new Date().getFullYear()+1)){ setMsg(msg,ERR.AN_INVALID,'error'); return; }
   const focusBad = (el, text)=>{ setMsg(msg,text,'error'); if(el){ el.classList.add('field-error'); el.scrollIntoView({block:'center',behavior:'smooth'}); if(el.focus) el.focus({preventScroll:true}); } };
   ['sellTitle','sellMake','sellModel','sellCounty'].forEach(i=>$('#'+i).classList.remove('field-error')); $('#sellCategoryBtn').classList.remove('field-error');
-  if($('#sellTitle').value.trim().length<3){ focusBad($('#sellTitle'),'Scrie piesa pe care o vinzi (minimum 3 caractere).'); return; }
+  if($('#sellTitle').value.trim().length<3){ focusBad($('#sellTitle'), type==='dezmembrari' ? 'Scrie mașina de dezmembrat (minimum 3 caractere).' : 'Scrie piesa pe care o vinzi (minimum 3 caractere).'); return; }
   if(type!=='dezmembrari' && !$('#sellCategory').value){ focusBad($('#sellCategoryBtn'),'Alege categoria piesei.'); return; }
   if(!$('#sellMake').value){ focusBad($('#sellMake'),'Alege marca mașinii. Se completează automat dacă o scrii în titlu sau descriere.'); return; }
   if(!$('#sellModel').value){ focusBad($('#sellModel'),'Alege modelul mașinii (sau „Alt model”).'); return; }
