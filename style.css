@@ -572,3 +572,15 @@ body.no-scroll{overflow:hidden}
 .home-search-go svg{display:block;flex:none}
 .home-search-go:hover{color:var(--blue)}
 .home-search-go:active{transform:scale(.92)}
+
+.mi-green{background:#16a34a}
+.mi svg{width:22px;height:22px;display:block}
+
+/* Desktop menu fix: columns depend on whether the item has an icon; lone items span full width */
+@media(min-width:801px){
+  #page-menu .menu-card>button{grid-template-columns:minmax(0,1fr) 28px;border-bottom:1px solid #edf1f5}
+  #page-menu .menu-card>button:has(.mi){grid-template-columns:42px minmax(0,1fr) 28px}
+  #page-menu .menu-card>button:last-child{border-bottom:0}
+  #page-menu .menu-card>button:nth-last-child(2):nth-child(odd){border-bottom:0}
+  #page-menu .menu-card>button:last-child:nth-child(odd){grid-column:1/-1;border-right:0}
+}
