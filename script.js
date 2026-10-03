@@ -138,6 +138,7 @@ function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='reque
 function showPage(id){ $$('.page').forEach(p=>p.classList.toggle('active',p.id===id)); window.scrollTo(0,0); }
 
 function route(){
+  const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); closeLightbox();
   const { name, params } = parseHash();
   const id = ROUTES[name];
   if(!id){ navigate('home'); return; }
@@ -181,7 +182,7 @@ function renderAccount(){
 
 function renderAccountTool(view, withId){
   const data = {
-    cart:{title:'Coșul meu',text:'Coșul este pregătit. Anunțurile adăugate în coș vor apărea aici.',action:'rezultate',label:'Vezi piesele'},
+    cart:{title:'Coșul meu',text:'Anunțurile pe care vrei să le ții la îndemână.',action:'rezultate',label:'Vezi piesele'},
     offers:{title:'Oferte la cereri',text:'Aici vei putea trimite și gestiona ofertele pentru cererile de piese.',action:'requests',label:'Vezi cererile disponibile'},
     'orders-seller':{title:'Comenzi din oferte',text:'Comenzile acceptate din ofertele tale vor apărea aici.',action:null,label:null},
     'offers-received':{title:'Ofertele primite',text:'Ofertele primite la cererile tale vor apărea aici.',action:'requests?t=mine',label:'Vezi cererile mele'},
@@ -189,8 +190,8 @@ function renderAccountTool(view, withId){
     messages:{title:'Mesaje',text:'Conversațiile tale cu cumpărători și vânzători.',action:null,label:null},
     notifications:{title:'Notificări',text:'Notificările contului vor apărea aici când există activitate nouă.',action:null,label:null},
     credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
-    transactions:{title:'Tranzacții',text:'Istoricul tranzacțiilor va apărea aici după implementarea plăților.',action:null,label:null},
-    invoices:{title:'Facturi',text:'Facturile vor apărea aici după implementarea plăților și facturării.',action:null,label:null}
+    transactions:{title:'Tranzacții',text:'Comenzile tale, ca cumpărător și ca vânzător.',action:null,label:null},
+    invoices:{title:'Facturi',text:'Facturile emise pentru contul tău.',action:null,label:null}
   };
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
   $('#accountToolTitle').textContent=d.title;
@@ -198,7 +199,7 @@ function renderAccountTool(view, withId){
   const content=$('#accountToolContent');
   if(content){
     content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
-    if(['offers','offers-received','orders','orders-seller','notifications','messages'].includes(view)) safe(()=>loadToolData(view,content,withId))();
+    if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices'].includes(view)) safe(()=>loadToolData(view,content,withId))();
   }
 }
 
@@ -206,7 +207,19 @@ const OFFER_ST={pending:'În așteptare',accepted:'Acceptată',rejected:'Respins
 async function loadToolData(view, box, withId){
   const money=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei';
   let items=[];
-  if(view==='offers'||view==='offers-received'){
+  if(view==='cart'){
+    const ids=cartIds(); const res=await Promise.allSettled(ids.map(id=>api('/api/listings/'+id+'?noview=1')));
+    const ok=[],gone=[]; res.forEach((r,i)=>{ if(r.status==='fulfilled') ok.push(r.value.listing); else if(r.reason&&r.reason.status===404) gone.push(ids[i]); });
+    if(gone.length) writeJSON('autopiese_cart',ids.filter(i=>!gone.includes(i)));
+    const total=ok.reduce((n,x)=>n+(Number(x.price)||0),0);
+    items=ok.map(x=>`<div class="info-card tool-item"><b>${esc(x.title)}</b><p>${esc(money(x.price))} · ${esc(x.county||'')}${x.seller_name?' · '+esc(x.seller_name):''}</p><div class="row"><button class="btn primary small" data-open="${x.id}">Vezi anunțul</button><button class="btn ghost small" data-cart-del="${x.id}">Elimină</button></div></div>`);
+    if(ok.length) items.push(`<div class="info-card tool-item"><b>Total estimat: ${esc(money(total))}</b><p class="muted">Plata se face direct cu vânzătorul. Contactează-l din fiecare anunț.</p></div>`);
+  }else if(view==='transactions'){
+    const r=await api('/api/orders');
+    items=r.orders.map(o=>`<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}</b><p>${o.role==='buyer'?'Cumpărare':'Vânzare'} · ${money(o.price)} · ${esc(ORDER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p></div>`);
+  }else if(view==='invoices'){
+    items=['<div class="info-card tool-item"><p>Nu există facturi emise. Completează datele de facturare în Setări cont ca să fie gata când vei avea nevoie.</p><div class="row"><button class="btn ghost small" data-go="settings">Deschide Setări cont</button></div></div>'];
+  }else if(view==='offers'||view==='offers-received'){
     const r=await api(view==='offers'?'/api/offers/mine':'/api/offers/received');
     items=r.offers.map(o=>`<div class="info-card tool-item"><b>${esc(o.request_title)}</b><p>${money(o.price)}${view==='offers-received'&&o.seller_name?' · '+esc(o.seller_name):''} · ${esc(OFFER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row">${view==='offers-received'&&o.status==='pending'?`<button class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button>`:''}<button class="btn ghost small" data-go="account-tool?view=messages&with=${view==='offers'?o.buyer_id:o.seller_id}">Scrie mesaj</button></div></div>`);
   }else if(view==='orders'||view==='orders-seller'){
@@ -326,6 +339,15 @@ async function syncFavorites(){
     merged.filter(id=>!f.includes(id)).forEach(id=>api('/api/favorites/'+id,{method:'POST'}).catch(()=>{}));
   }catch{}
   updateFavUI();
+}
+
+/* ---------- coș (salvat pe dispozitiv) ---------- */
+function cartIds(){ return readJSON('autopiese_cart',[]).map(Number).filter(Number.isFinite); }
+function toggleCart(id,btn){
+  const c=cartIds(), has=c.includes(id), n=has?c.filter(x=>x!==id):[...c,id];
+  writeJSON('autopiese_cart',n.slice(0,50));
+  if(btn&&btn.dataset.cart) btn.textContent=has?'🛒 Adaugă în coș':'✓ În coș';
+  toast(has?'Eliminat din coș.':'Adăugat în coș.');
 }
 
 /* ---------- acasă ---------- */
@@ -552,7 +574,7 @@ function detailHtml(x, phones, canContact){
     </div>
     <div class="contact-row">
       <button class="btn ghost small" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'} Favorit</button>
-      ${canContact?`<button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
+      ${canContact?`<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
     </div>
   </aside>
   </div>
@@ -1374,6 +1396,8 @@ document.addEventListener('click', e=>{
   if(t.classList && t.classList.contains('modal')){ closeModal(t); return; }
   let el;
   if((el=t.closest('[data-fav]'))){ e.stopPropagation(); toggleFavorite(Number(el.dataset.fav)); return; }
+  if((el=t.closest('[data-cart]'))){ e.stopPropagation(); toggleCart(Number(el.dataset.cart),el); return; }
+  if((el=t.closest('[data-cart-del]'))){ toggleCart(Number(el.dataset.cartDel)); renderAccountTool('cart'); return; }
   if((el=t.closest('[data-edit-listing]'))){ e.stopPropagation(); navigate('vinde?edit='+Number(el.dataset.editListing)); return; }
   if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); toast('Anunțul a fost șters.'); })(); return; }

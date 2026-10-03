@@ -584,3 +584,6 @@ body.no-scroll{overflow:hidden}
   #page-menu .menu-card>button:nth-last-child(2):nth-child(odd){border-bottom:0}
   #page-menu .menu-card>button:last-child:nth-child(odd){grid-column:1/-1;border-right:0}
 }
+
+/* imagini mai mici în liste pe telefon */
+@media(max-width:800px){.listing-image{height:clamp(190px,56vw,270px)!important}}
