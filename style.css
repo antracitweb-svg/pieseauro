@@ -547,22 +547,20 @@ body.no-scroll{overflow:hidden}
 .btn.primary{background:var(--accent);box-shadow:none}
 .btn.primary:hover{filter:brightness(1.08)}
 .eyebrow{letter-spacing:2.6px;color:#0a7bc4}
-.home-wrap{background:radial-gradient(900px 340px at 50% -60px,rgba(25,183,255,.11),transparent 70%)}
-.home-center h1{font-weight:700;letter-spacing:-2.4px}
 .page-head h2,.narrow h2{font-weight:700;letter-spacing:-1.2px}
 .page-head h2::after{content:"";display:block;width:34px;height:3px;border-radius:2px;background:var(--cyan);margin-top:10px}
-.home-search{border-radius:14px;box-shadow:0 10px 34px rgba(16,52,94,.08)}
 .listing,.filters,.clean-form,.info-card,.menu-card,.account-sections details,.modal-card{border-radius:10px}
 .listing{border-color:#e3eaf2;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
 .listing:hover{transform:translateY(-2px);border-color:rgba(25,183,255,.5);box-shadow:0 12px 28px rgba(16,52,94,.09)}
 .clean-form{box-shadow:0 6px 22px rgba(16,52,94,.05)}
 .filters select:focus,.filters input:focus,.clean-form input:focus,.clean-form select:focus,.clean-form textarea:focus{outline:0;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(25,183,255,.16)}
-.home-entries{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:760px;margin:22px auto 0}
-.home-entries button{display:flex;flex-direction:column;gap:4px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;cursor:pointer;font:inherit;color:var(--ink);transition:transform .16s,border-color .16s,box-shadow .16s}
-.home-entries button b{font-size:15px}
-.home-entries button span{font-size:12px;color:var(--muted)}
-.home-entries button:hover{border-color:rgba(25,183,255,.55);box-shadow:0 10px 24px rgba(16,52,94,.08);transform:translateY(-2px)}
-.home-entries button:active{transform:scale(.97)}
 .toast{bottom:auto;right:auto;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);border-left:4px solid var(--cyan);max-width:min(92vw,440px);text-align:left}
-@media(max-width:800px){.home-entries{grid-template-columns:1fr}.garage-btn{max-width:110px;padding:6px 9px;font-size:12px}}
+@media(max-width:800px){.garage-btn{max-width:110px;padding:6px 9px;font-size:12px}}
 @media(max-width:480px){.garage-btn .g-ico{display:none}.garage-btn{max-width:96px}}
+
+/* ---------- prima pagină: buton de căutare ---------- */
+.home-search-btn{display:flex;align-items:center;gap:12px;width:100%;max-width:760px;margin:auto;height:60px;padding:0 20px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 34px rgba(16,52,94,.08);font:inherit;font-size:17px;color:var(--muted);text-align:left;cursor:pointer;transition:transform .12s ease,border-color .15s ease,box-shadow .15s ease}
+.home-search-btn span{font-size:26px;color:#356188}
+.home-search-btn b{font-weight:600}
+.home-search-btn:hover{border-color:rgba(25,183,255,.55)}
+.home-search-btn:active{transform:scale(.98);box-shadow:0 4px 14px rgba(16,52,94,.1)}

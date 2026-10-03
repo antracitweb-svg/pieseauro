@@ -1457,7 +1457,7 @@ function wire(){
   $('#garageBanner').addEventListener('click', async e=>{ if(e.target.closest('[data-garage-all]')){ $('#filterMake').value=''; await loadModels('','filterModel','Toate modelele'); state.extra.g='0'; onFilterChange(); } });
   updateGarageUI();
   $('#cartBtn').addEventListener('click', ()=>doAction('cart'));
-  $('#heroSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#searchInput').value); });
+  $('#heroSearchOpen').addEventListener('click', ()=>openSearchOverlay());
   $('#resultsSearchForm').addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
   $('#homeMake').addEventListener('change', e=>loadModels(e.target.value,'homeModel'));
   $('#homeVehicleBtn').addEventListener('click', ()=>{ const make=$('#homeMake').value; if(!make){ toast('Alege marca mașinii.'); return; } openSearch({make, model:$('#homeModel').value}); });
