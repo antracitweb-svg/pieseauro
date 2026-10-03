@@ -147,7 +147,7 @@ function route(){
     return;
   }
   showPage(id);
-  if(name==='home'){ $('#topSearchInput').value=''; loadHome(); }
+  if(name==='home'){ $('#topSearchInput').value=''; $('#homeSearchInput').value=''; loadHome(); }
   else if(name==='rezultate') enterResults(params);
   else if(name==='cerere') safe(enterCarPick)();
   else if(name==='cerere-noua') safe(enterRequestForm)(params.get('from'));
@@ -1441,7 +1441,11 @@ function submitSearchQuery(q){
 
 function wire(){
   $('#topSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#topSearchInput').value); });
-  $('#topSearchBtn').addEventListener('click', ()=>openSearchOverlay());
+  $('#topSearchBtn').addEventListener('click', ()=>{
+    const hp=$('#page-home'), hi=$('#homeSearchInput');
+    if(hp && hp.classList.contains('active') && hi){ if(hi.value.trim()) submitSearchQuery(hi.value); else { hi.scrollIntoView({block:'center',behavior:'smooth'}); hi.focus({preventScroll:true}); } return; }
+    openSearchOverlay();
+  });
   $('#searchOverlayBack').addEventListener('click', closeSearchOverlay);
   $('#searchOverlayForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#searchOverlayInput').value); });
   $('#clearRecentSearches').addEventListener('click', ()=>{ localStorage.removeItem('autopiese_recent_searches'); renderRecentSearches(); });
@@ -1457,7 +1461,7 @@ function wire(){
   $('#garageBanner').addEventListener('click', async e=>{ if(e.target.closest('[data-garage-all]')){ $('#filterMake').value=''; await loadModels('','filterModel','Toate modelele'); state.extra.g='0'; onFilterChange(); } });
   updateGarageUI();
   $('#cartBtn').addEventListener('click', ()=>doAction('cart'));
-  $('#heroSearchOpen').addEventListener('click', ()=>openSearchOverlay());
+  $('#homeSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#homeSearchInput').value); });
   $('#resultsSearchForm').addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
   $('#homeMake').addEventListener('change', e=>loadModels(e.target.value,'homeModel'));
   $('#homeVehicleBtn').addEventListener('click', ()=>{ const make=$('#homeMake').value; if(!make){ toast('Alege marca mașinii.'); return; } openSearch({make, model:$('#homeModel').value}); });
