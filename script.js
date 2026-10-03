@@ -577,11 +577,11 @@ function detailHtml(x, phones, canContact){
       ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
     <div class="contact-row">
-      ${(canContact&&x.user_id)?`<button class="btn ghost small" data-msg-open="1">✉️ Mesaj</button>`:''}
+      ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<button class="btn ghost small" data-msg-open="1">✉️ Mesaj</button>`:''}
       <button class="btn ghost small" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'} Favorit</button>
       ${canContact?`<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
     </div>
-    ${(canContact&&x.user_id)?`<div class="msg-box hidden" id="msgBox" data-to="${Number(x.user_id)}" data-listing="${x.id}"><b>Mesaj pentru ${seller}</b>
+    ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<div class="msg-box hidden" id="msgBox" data-to="${Number(x.user_id)}" data-listing="${x.id}"><b>Mesaj pentru ${seller}</b>
       <div class="msg-quick"><button type="button" data-msg-quick="Bună ziua! Mai este disponibilă piesa?">Mai este disponibilă?</button><button type="button" data-msg-quick="Bună ziua! Care este ultimul preț?">Ultimul preț?</button><button type="button" data-msg-quick="Bună ziua! Se poate livra în ">Se poate livra?</button></div>
       <textarea id="msgText" rows="3" maxlength="2000" placeholder="Scrie mesajul tău…">Bună ziua! Mai este disponibilă piesa?</textarea>
       <button type="button" class="btn primary small" data-send-msg="1">Trimite mesajul</button><p class="form-note" id="msgStatus"></p></div>`:''}
@@ -1444,8 +1444,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-req-contact]'))){ safe(requestContact)(el.dataset.reqContact, el); return; }
   if((el=t.closest('[data-msg-open]'))){
     if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
-    const b=$('#msgBox');
-    if(b && currentUser.id===Number(b.dataset.to)){ toast('Acesta este anunțul tău. Cumpărătorii îți scriu prin Mesaj; pentru test folosește alt cont.'); return; } if(b){ b.classList.toggle('hidden'); if(!b.classList.contains('hidden')){ b.scrollIntoView({block:'nearest',behavior:'smooth'}); const ta=$('#msgText'); ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } }
+    const b=$('#msgBox'); if(b){ b.classList.toggle('hidden'); if(!b.classList.contains('hidden')){ b.scrollIntoView({block:'nearest',behavior:'smooth'}); const ta=$('#msgText'); ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } }
     return;
   }
   if((el=t.closest('[data-msg-quick]'))){ const ta=$('#msgText'); if(ta){ ta.value=el.dataset.msgQuick; ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } return; }
