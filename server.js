@@ -980,6 +980,12 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
   if(pool)await dbReady();
   const server=app.listen(PORT,()=>console.log(`AutoPiese V26 running on ${PORT}`));
   if(pool){ensureVehicleDb();setInterval(ensureVehicleDb,12*3600*1000).unref();}
+  /* anti-adormire: se apeleaza singur pe adresa publica, ca Render sa vada trafic (dezactivare: KEEP_AWAKE=0) */
+  const selfUrl=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;
+  if(selfUrl&&process.env.KEEP_AWAKE!=='0'&&typeof fetch==='function'){
+    const ping=()=>fetch(selfUrl.replace(/\/$/,'')+'/api/health',{signal:AbortSignal.timeout(15000)}).catch(()=>{});
+    setInterval(ping,10*60*1000).unref(); setTimeout(ping,60*1000).unref();
+  }
   if(pool)setInterval(()=>pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'").catch(()=>{}),30*60*1000).unref();
   if(pool)setInterval(()=>pool.query('DELETE FROM sessions WHERE expires_at < NOW()').catch(e=>console.error('session cleanup',e.message)),60*60*1000).unref();
   const stop=()=>{server.close(()=>{(pool?pool.end():Promise.resolve()).finally(()=>process.exit(0));});setTimeout(()=>process.exit(0),8000).unref();};
