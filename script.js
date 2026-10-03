@@ -1358,6 +1358,7 @@ function doAction(a){
   else if(a==='admin') navigate('admin');
   else if(a==='cart') navigate('account-tool?view=cart');
   else if(a==='rezultate') navigate('rezultate');
+  else if(a==='requests?t=mine') navigate('requests?t=mine');
 }
 function accountAction(a){
   if(a==='settings') navigate('settings');
