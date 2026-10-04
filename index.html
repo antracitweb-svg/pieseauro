@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>AutoPiese — Piese auto și dezmembrări</title>
 <meta name="description" content="Caută piese auto noi și second-hand, cere oferte și găsește dezmembrări auto din România.">
-<meta name="theme-color" content="#0e0f12"><link rel="stylesheet" href="style.css?v=prestige1">
+<meta name="theme-color" content="#0e0f12"><link rel="stylesheet" href="style.css?v=prestige2026">
 </head>
 <body>
 <div id="toast" class="toast hidden"></div>
@@ -31,7 +31,7 @@
 <div class="home-center"><div class="eyebrow">AUTO PIESE</div><h1>Piese auto online, simplu de găsit.</h1><p>Găsește rapid piesa nouă sau second hand de care ai nevoie. Căutarea este disponibilă fără cont.</p>
 <form class="home-search-form" id="homeSearchForm" role="search" autocomplete="off"><input id="homeSearchInput" type="search" maxlength="100" enterkeyhint="search" placeholder="Caută o piesă…" aria-label="Caută o piesă"><button type="submit" class="home-search-go" id="homeSearchGo" aria-label="Caută"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.6 15.6L21 21"/></svg></button></form><div class="hero-vehicle-compat"><select id="homeMake"><option value="">Alege marca</option></select><select id="homeModel"><option value="">Alege modelul</option></select><button class="btn dark" id="homeVehicleBtn" type="button">Piese pentru mașina mea</button></div>
 <div class="home-links"><button id="homeRequestBtn">Cere oferte de piese</button></div></div>
-<div class="home-bottom"><div><b>Cauți o piesă anume?</b><span>Scrie denumirea, codul OEM sau marca și modelul.</span></div><div class="trust"><span>✓ Fără cont pentru căutare</span><span>✓ Piese noi & second-hand</span><span>✓ Vânzători din România</span></div></div><div class="v26-data-compat hidden"><div id="catGrid"></div><div id="homeListings"></div></div>
+<div class="home-bottom"><div><b>Cauți o piesă anume?</b><span>Scrie denumirea, codul OEM sau marca și modelul.</span></div><div class="trust"><span>✓ Fără cont pentru căutare</span><span>✓ Piese noi & second-hand</span><span>✓ Vânzători din România</span></div></div><div class="home-cats"><div class="home-cats-head">Categorii populare</div><div id="catGrid"></div></div><div class="hidden"><div id="homeListings"></div></div>
 </div></section>
 
 <section class="page" id="page-results"><div class="container page-container"><div class="page-head"><button class="back" data-back>← Înapoi</button><div><div class="eyebrow">REZULTATE</div><h2 id="resultsTitle">Piese auto</h2><p><span id="crumbCurrent">Piese auto</span> · <span id="resultCount"></span></p></div></div>
@@ -160,6 +160,13 @@
 </div></div></div>
 <div class="info-pop hidden" id="infoPop" role="status"></div>
 
+<nav class="bottom-nav" id="bottomNav" aria-label="Navigare principală">
+<button type="button" data-go="home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Acasă</span></button>
+<button type="button" data-go="rezultate" data-tab="rezultate"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.6 15.6L21 21"/></svg><span>Caută</span></button>
+<button type="button" class="bn-sell" data-action="sell" data-tab="vinde"><span class="bn-plus"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span>Vinde</span></button>
+<button type="button" data-go="mesagerie" data-tab="mesagerie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><span>Mesaje</span></button>
+<button type="button" data-action="account" data-tab="cont"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span>Cont</span></button>
+</nav>
 <footer class="site-footer"><div class="container footer-inner footer-cols"><div class="footer-brand"><b>© AutoPiese</b></div><div class="footer-col"><h4>Asistență clienți</h4><button data-action="request">Primește oferte pentru piesa ta</button><button data-action="sell">Adaugă o piesă</button><button data-action="account">Contul meu</button></div><div class="footer-col"><h4>Informații</h4><button data-legal="terms">Termeni și condiții</button><button data-legal="cookies">Politica de cookie</button><button data-legal="privacy">Confidențialitate</button></div></div></footer>
 
 <div class="modal hidden" id="authModal"><div class="modal-card"><button class="close" data-close>×</button><div class="eyebrow">AUTOPIESE</div><h2 id="authTitle">Intră în cont</h2><form id="loginForm" class="clean-form"><label>Email sau nickname<input id="loginIdentifier" autocomplete="username" required></label><label>Parolă<div class="password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" required><button type="button" class="password-toggle" data-password-toggle="loginPassword" aria-label="Arată parola" title="Arată parola">◉</button></div></label><label class="check"><input id="rememberLogin" type="checkbox" checked> Ține-mă conectat</label><button class="btn primary full">Intră în cont</button><p class="form-note" id="loginMessage"></p><button type="button" class="text-btn" id="forgotPasswordBtn">Ai uitat parola?</button><button type="button" class="text-btn" id="showRegister">Nu ai cont? Creează unul</button></form><form id="registerForm" class="clean-form hidden" novalidate><div id="registerStep1"><label>Email<input id="regEmail" type="email" autocomplete="email" required></label><button type="button" class="btn primary full" id="registerNext">Continuă</button></div><div id="registerStep2" class="hidden"><label>Nickname<input id="regNickname" minlength="3" maxlength="30" autocomplete="nickname" required></label><label>Nume<input id="regName" autocomplete="name" required></label><label>Parolă<div class="password-wrap"><input id="regPassword" type="password" minlength="8" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="regPassword" aria-label="Arată parola" title="Arată parola">◉</button></div></label><label>Confirmă parola<div class="password-wrap"><input id="regPassword2" type="password" minlength="8" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="regPassword2" aria-label="Arată parola" title="Arată parola">◉</button></div></label><label>Telefon<input id="regPhone" type="tel" autocomplete="tel"></label><label class="check"><input id="rememberRegister" type="checkbox" checked> Ține-mă conectat</label><button class="btn primary full">Creează cont</button><button type="button" class="text-btn" id="registerBack">← Înapoi</button></div><p class="form-note" id="registerMessage"></p><button type="button" class="text-btn" id="showLogin">Am deja cont</button></form></div></div>
@@ -175,5 +182,5 @@
   <button type="button" class="image-lightbox-nav next" id="imageLightboxNext" data-image-next aria-label="Poza următoare">›</button>
   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
 </div>
-<script src="script.js?v=prestige1" defer></script>
+<script src="script.js?v=prestige2026" defer></script>
 </body></html>

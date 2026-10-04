@@ -137,6 +137,9 @@ function navigate(x){ const target='#/'+x; if(location.hash===target) route(); e
 function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='account-tool' && params.get('view')!=='cart') || (name==='requests' && params.get('t')==='mine') || (name==='rezultate' && ['mine'].includes(params.get('mode'))); }
 function showPage(id){ $$('.page').forEach(p=>p.classList.toggle('active',p.id===id)); window.scrollTo(0,0); }
 
+const BN_MAP={home:'home',rezultate:'rezultate',saved:'rezultate',vinde:'vinde',mesagerie:'mesagerie',cont:'cont',settings:'cont','anunturile-mele':'cont'};
+function setBottomNav(name){ const t=BN_MAP[name]||''; $$('#bottomNav [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t)); }
+const SKEL=Array(6).fill('<div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div>').join('');
 function route(){
   const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); closeLightbox();
   const { name, params } = parseHash();
@@ -147,7 +150,7 @@ function route(){
     openAuth(location.hash.replace(/^#\//,''));
     return;
   }
-  showPage(id);
+  showPage(id); setBottomNav(name);
   if(name==='home'){ $('#topSearchInput').value=''; $('#homeSearchInput').value=''; loadHome(); }
   else if(name==='rezultate') enterResults(params);
   else if(name==='cerere') safe(enterCarPick)();
@@ -418,7 +421,7 @@ async function loadResults(reset){
   if(reset){ state.page = 1; state.offset = 0; state.loaded = []; }
   const token = ++state.token;
   const qs = new URLSearchParams({...state.filters, ...(state.extra.seller_id?{seller_id:state.extra.seller_id}:{}), limit:'30', offset:String(state.offset)});
-  if(reset) $('#listingGrid').innerHTML = '<p class="muted">Se încarcă…</p>';
+  if(reset) $('#listingGrid').innerHTML = SKEL;
   try{
     const r = await api('/api/listings?'+qs.toString());
     if(token!==state.token) return;
@@ -441,14 +444,14 @@ async function goToResultsPage(page){
 
 async function loadMine(){
   const token = ++state.token;
-  $('#listingGrid').innerHTML = '<p class="muted">Se încarcă…</p>';
+  $('#listingGrid').innerHTML = SKEL;
   const r = await api('/api/listings/mine').catch(e=>{ $('#listingGrid').innerHTML=`<div class="empty">${esc(e.message)}</div>`; return null; });
   if(!r || token!==state.token) return;
   state.loaded = r.listings; state.total = r.listings.length; renderList();
 }
 async function loadFavoritesView(){
   const token = ++state.token;
-  $('#listingGrid').innerHTML = '<p class="muted">Se încarcă…</p>';
+  $('#listingGrid').innerHTML = SKEL;
   const ids = favorites.slice(0,60);
   const res = await Promise.allSettled(ids.map(id=>api('/api/listings/'+id)));
   if(token!==state.token) return;
