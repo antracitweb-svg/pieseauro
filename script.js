@@ -260,7 +260,6 @@ function fillStaticSelects(){
   setOptions($('#filterCounty'),'Toate județele',COUNTIES);
   setOptions($('#sellCounty'),'Alege județul',COUNTIES);
   setOptions($('#reqCounty'),'Alege județul',COUNTIES);
-  $('#catGrid').innerHTML = CATEGORIES.map(([n,i])=>`<button class="cat" data-cat="${esc(n)}"><span>${i}</span>${esc(n)}</button>`).join('');
 }
 async function loadCatalog(attempt=0){
   let makes = [];
@@ -1854,6 +1853,15 @@ document.addEventListener('submit', e=>{
   syncFavorites();
   route();
   loadCatalog().then(()=>{ if(parseHash().name==='rezultate') applyFiltersToUI(); });
+})();
+
+/* meniul de jos: ascuns implicit, apare când atingi ecranul și se ascunde după câteva secunde */
+(function(){
+  const nav=document.getElementById('bottomNav'); if(!nav) return;
+  let t;
+  const show=()=>{ nav.classList.add('show'); clearTimeout(t); t=setTimeout(()=>nav.classList.remove('show'),3000); };
+  ['touchstart','touchmove','pointerdown'].forEach(ev=>document.addEventListener(ev,show,{passive:true}));
+  nav.addEventListener('click',()=>{ clearTimeout(t); t=setTimeout(()=>nav.classList.remove('show'),1200); });
 })();
 
 /* apăsare vizibilă pe telefon */

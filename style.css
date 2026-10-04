@@ -989,3 +989,38 @@ h1,h2{text-wrap:balance}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
 }
+
+
+/* ===== Meniu de jos ascuns (apare la atingere) + rafinări de rezoluție ===== */
+@media(max-width:800px){
+  body{padding-bottom:env(safe-area-inset-bottom,0px)}
+  .bottom-nav{transform:translateY(110%);opacity:0;pointer-events:none;transition:transform .28s var(--ease),opacity .22s ease}
+  .bottom-nav.show{transform:none;opacity:1;pointer-events:auto}
+}
+@media(max-width:800px) and (hover:hover) and (pointer:fine){
+  .bottom-nav{transform:none;opacity:1;pointer-events:auto}
+}
+/* telefoane foarte mici (320–360px) */
+@media(max-width:360px){
+  .container,.narrow{width:calc(100% - 20px)}
+  .home-center h1{font-size:32px;letter-spacing:-1.4px}
+  .home-search-form{height:56px}
+  .home-search-form input{font-size:16px;padding-left:14px}
+  .home-search-go{width:48px}
+  .brand-copy strong{font-size:18px}
+  .garage-btn{max-width:80px}
+  .bottom-nav button{font-size:10px}
+  .btn{padding:10px 14px}
+  .modal-card{padding:16px}
+}
+/* telefoane în peisaj / ecrane joase */
+@media(max-height:480px) and (orientation:landscape){
+  .home-wrap{min-height:auto;padding:24px 0}
+  .catpick-card{max-height:100vh}
+}
+/* laptop / desktop mare: conținut centrat, fără întindere excesivă */
+@media(min-width:1600px){
+  .container{width:min(1360px,calc(100% - 96px))}
+  .home-center h1{font-size:78px}
+}
+img,video{max-width:100%}
