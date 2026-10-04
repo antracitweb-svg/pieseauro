@@ -143,6 +143,8 @@ const SKEL=Array(6).fill('<div class="skel-card"><div class="skel skel-img"></di
 function route(){
   const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); closeLightbox();
   const { name, params } = parseHash();
+  if(name==='menu'){ history.replaceState(null,'',location.pathname+location.search+'#/home'); route(); openMenu(); return; }
+  closeMenu(true);
   const id = ROUTES[name];
   if(!id){ navigate('home'); return; }
   if(needsAuth(name, params) && !currentUser){
@@ -165,12 +167,31 @@ function route(){
   else if(name==='settings') safe(loadSettings)();
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
   else if(name==='admin') safe(loadAdmin)();
-  else if(name==='menu') renderHeader();
   else if(name==='mesagerie') safe(enterMessages)(params.get('box'));
   else if(name==='account-tool'){
     if(params.get('view')==='messages' && !params.get('with')){ history.replaceState(null,'','#/mesagerie'); route(); return; }
     renderAccountTool(params.get('view'), params.get('with'), params.get('ref'));
   }
+}
+
+/* ---------- meniu lateral (panou suprapus, liquid glass) ---------- */
+function openMenu(){
+  const d=$('#menuDrawer'); if(!d || d.classList.contains('open')) return;
+  renderHeader();
+  d.removeAttribute('inert'); d.setAttribute('aria-hidden','false');
+  document.documentElement.classList.add('menu-open');
+  $('#menuBtn').setAttribute('aria-expanded','true');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ d.classList.add('open'); $('#menuScrim').classList.add('open'); }));
+  setTimeout(()=>{ if(d.classList.contains('open')) $('#closeMenu').focus({preventScroll:true}); },60);
+}
+function closeMenu(instant){
+  const d=$('#menuDrawer'); if(!d || !d.classList.contains('open')) return;
+  const hadFocus=d.contains(document.activeElement);
+  d.classList.remove('open'); $('#menuScrim').classList.remove('open');
+  d.setAttribute('aria-hidden','true'); d.setAttribute('inert','');
+  document.documentElement.classList.remove('menu-open');
+  $('#menuBtn').setAttribute('aria-expanded','false');
+  if(hadFocus && !instant) $('#menuBtn').focus({preventScroll:true});
 }
 
 function renderHeader(){
@@ -1591,8 +1612,11 @@ function wire(){
   $('#saveSearchBtn').addEventListener('click', saveCurrentSearch);
   $('#favoritesBtn').addEventListener('click', ()=>navigate('rezultate?mode=fav'));
   $('#accountBtn').addEventListener('click', ()=>doAction('account'));
-  $('#menuBtn').addEventListener('click', ()=>navigate('menu'));
-  $('#closeMenu').addEventListener('click', ()=>navigate('home'));
+  $('#menuBtn').addEventListener('click', ()=>{ if($('#menuDrawer').classList.contains('open')) closeMenu(); else openMenu(); });
+  $('#closeMenu').addEventListener('click', ()=>closeMenu());
+  $('#menuScrim').addEventListener('click', ()=>closeMenu());
+  $('#menuDrawer').addEventListener('click', e=>{ if(e.target.closest('[data-action],[data-go],[data-account]')) closeMenu(true); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#menuDrawer').classList.contains('open') && $('#imageLightbox')?.classList.contains('hidden') && !document.querySelector('.modal:not(.hidden)')){ e.preventDefault(); closeMenu(); } });
   $('#logoutBtn').addEventListener('click', logout);
   $('#passwordChangeForm').addEventListener('submit', e=>{ e.preventDefault(); const m=$('#pwChangeMsg'); setMsg(m,''); api('/api/account/password',{method:'POST',body:JSON.stringify({current:$('#pwCurrent').value,password:$('#pwNew').value})}).then(()=>{ $('#pwCurrent').value=$('#pwNew').value=''; setMsg(m,'Parola a fost schimbată. Celelalte dispozitive au fost deconectate.','ok'); }).catch(err=>setMsg(m,err.message,'error')); });
   $('#logoutAllBtn').addEventListener('click', safe(logoutAll));

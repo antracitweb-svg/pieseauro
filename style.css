@@ -1202,3 +1202,59 @@ img,video{max-width:100%}
   .home-wrap .home-search-form{height:46px}
   .home-wrap .home-search-go{width:40px}
 }
+
+/* ========== MENIU LATERAL — panou suprapus „liquid glass” (intră din dreapta, lasă un spațiu în stânga) ========== */
+.mdrawer-scrim{position:fixed;inset:0;z-index:90;background:rgba(8,8,10,.42);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s ease,visibility 0s linear .45s}
+.mdrawer-scrim.open{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .45s ease,visibility 0s}
+html.menu-open,html.menu-open body{overflow:hidden}
+
+.mdrawer{
+  position:fixed;top:0;right:0;bottom:0;z-index:95;
+  width:min(420px,84vw);
+  display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);
+  color:#f6efe0;
+  background:
+    radial-gradient(120% 60% at 100% 0%,rgba(212,180,131,.30),transparent 60%),
+    radial-gradient(90% 50% at 0% 100%,rgba(143,109,56,.22),transparent 65%),
+    linear-gradient(165deg,rgba(52,46,36,.58),rgba(14,15,18,.80));
+  -webkit-backdrop-filter:blur(42px) saturate(1.8) brightness(.78);
+  backdrop-filter:blur(42px) saturate(1.8) brightness(.78);
+  border-left:1px solid rgba(233,211,168,.38);
+  border-radius:26px 0 0 26px;
+  box-shadow:-30px 0 70px rgba(0,0,0,.48),inset 1.5px 0 0 rgba(255,255,255,.22),inset 0 1.5px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.06);
+  transform:translateX(104%);visibility:hidden;
+  transition:transform .55s cubic-bezier(.22,1,.36,1),visibility 0s linear .55s;
+  overflow:hidden;
+  will-change:transform;
+}
+.mdrawer.open{transform:translateX(0);visibility:visible;transition:transform .55s cubic-bezier(.22,1,.36,1),visibility 0s}
+/* reflexie de sticlă pe muchia din stânga */
+.mdrawer::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(100deg,rgba(255,255,255,.20) 0,rgba(255,255,255,.05) 14%,transparent 34%),linear-gradient(180deg,rgba(255,255,255,.09),transparent 22%)}
+
+.mdrawer-head{position:relative;display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px 24px}
+.mdrawer-title{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:24px;font-weight:600;letter-spacing:-.3px;color:#f6efe0}
+.mdrawer .close-menu{width:40px;height:40px;border-radius:50%;border:1px solid rgba(233,211,168,.4);background:rgba(255,255,255,.10);color:#f6efe0;font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;transition:background-color .15s ease,transform .12s ease}
+.mdrawer .close-menu:hover{background:rgba(255,255,255,.18)}
+.mdrawer .close-menu:active{transform:scale(.92)}
+
+.mdrawer-body{position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain;padding:4px 16px 28px;-webkit-overflow-scrolling:touch}
+.mdrawer .menu-card{display:block;margin:0 0 12px;background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:16px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;overflow:hidden}
+.mdrawer .menu-card>button{width:100%;min-height:58px;padding:14px 16px;border:0;border-bottom:1px solid rgba(255,255,255,.09);background:transparent!important;color:#f6efe0;display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:12px;align-items:center;text-align:left;cursor:pointer}
+.mdrawer .menu-card>button:has(.mi){grid-template-columns:40px minmax(0,1fr) 20px}
+.mdrawer .menu-card>button:last-child{border-bottom:0}
+.mdrawer .menu-card>button:hover{background:rgba(255,255,255,.09)!important}
+.mdrawer .menu-card>button:active{background:rgba(212,180,131,.22)!important}
+.mdrawer .menu-card>button:focus-visible,.mdrawer .close-menu:focus-visible{outline:2px solid #d4b483;outline-offset:-2px}
+.mdrawer .menu-card button b{font-size:15px;font-weight:650;color:#f6efe0;line-height:1.3}
+.mdrawer .menu-card button small{font-size:12px;color:rgba(246,239,224,.64)}
+.mdrawer .menu-card button i{color:rgba(233,211,168,.75);font-style:normal;font-size:22px}
+.mdrawer .mi{box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 4px 12px rgba(0,0,0,.25)}
+.mdrawer .mi-user{background:rgba(255,255,255,.16);color:#e9d3a8}
+
+@media (min-width:801px){.mdrawer{width:420px}}
+@media (max-width:360px){.mdrawer{width:86vw}.mdrawer-title{font-size:22px}}
+/* dacă browserul nu știe blur-ul de fundal, panoul rămâne opac ca scrisul din spate să nu se vadă */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.mdrawer{background:linear-gradient(165deg,#2b2822,#0e0f12)}}
+@media (prefers-reduced-motion:reduce){.mdrawer,.mdrawer.open,.mdrawer-scrim,.mdrawer-scrim.open{transition-duration:.01s!important}}
