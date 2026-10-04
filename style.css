@@ -1112,3 +1112,72 @@ img,video{max-width:100%}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   @media(max-width:800px){ .bottom-nav{background:rgba(14,15,18,.92)} }
 }
+
+/* =====================================================================
+   TELEFON – header cu un sfert mai îngust + bară de jos înjumătățită
+   ===================================================================== */
+@media(max-width:680px){
+  .header .nav{min-height:45px;gap:5px}
+  .header .brand{gap:5px}
+  .header .brand-mark{width:24px;height:18px}
+  .header .brand-copy strong{font-size:clamp(15px,4.6vw,18px)}
+  .header .icon-btn{min-height:36px;min-width:32px;font-size:19px;padding:4px 3px}
+  .header .search-top{font-size:20px}
+  .header .menu-btn{min-width:36px;width:36px;min-height:36px;height:36px;gap:3px;border-radius:9px}
+  .header .menu-btn i{width:17px}
+  .header .garage-btn{padding:4px 9px;font-size:11.5px}
+}
+@media(max-width:800px){
+  .bottom-nav{
+    left:14px;right:14px;
+    bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    padding:3px 6px;border-radius:22px;
+  }
+  .bottom-nav button{min-height:36px;gap:0;border-radius:16px}
+  .bottom-nav button>span:last-child{display:none}   /* doar iconițe (înainte: iconiță + text) */
+  .bottom-nav svg{width:21px;height:21px}
+  .bottom-nav .bn-sell span.bn-plus{width:34px;height:34px;margin-top:-9px}
+  .bottom-nav .bn-sell span.bn-plus svg{width:19px;height:19px}
+  .bottom-nav{transform:translateY(180%)}
+  .bottom-nav.show{transform:none}
+}
+@media(max-width:800px) and (hover:hover) and (pointer:fine){ .bottom-nav{transform:none} }
+
+/* ===== Bara de jos la o treime din înălțimea inițială (~24px) ===== */
+@media(max-width:800px){
+  .bottom-nav{left:22px;right:22px;padding:1px 6px;border-radius:16px;bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+  .bottom-nav button{min-height:24px;position:relative;border-radius:12px}
+  .bottom-nav button::after{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px} /* zonă de atingere mai mare, fără să crească bara */
+  .bottom-nav svg{width:16px;height:16px;stroke-width:2}
+  .bottom-nav .bn-sell span.bn-plus{width:26px;height:26px;margin-top:-7px;box-shadow:0 5px 12px rgba(184,147,90,.5),0 0 0 3px rgba(255,255,255,.22),inset 0 1px 0 rgba(255,255,255,.6)}
+  .bottom-nav .bn-sell span.bn-plus svg{width:14px;height:14px}
+  .bottom-nav{transform:translateY(200%)}
+  .bottom-nav.show{transform:none}
+}
+@media(max-width:800px) and (hover:hover) and (pointer:fine){ .bottom-nav{transform:none} }
+
+/* ===== TELEFON – bara de sus încă un sfert mai îngustă (45px → ~34px) ===== */
+@media(max-width:680px){
+  .header .nav{min-height:34px;gap:4px}
+  .header .brand{gap:4px}
+  .header .brand-mark{width:20px;height:15px}
+  .header .brand-mark:before{top:3px;height:11px;border-top-width:3px}
+  .header .brand-mark i{width:7px;height:7px;top:9px;box-shadow:-13px 2px 0 #d4b483}
+  .header .brand-copy strong{font-size:clamp(14px,4.2vw,16px);letter-spacing:-.4px}
+  .header .nav-actions{gap:0}
+  .header .icon-btn{min-height:30px;min-width:28px;padding:2px;font-size:17px;line-height:1;position:relative}
+  .header .icon-btn::after{content:"";position:absolute;left:-2px;right:-2px;top:-6px;bottom:-6px} /* zonă de atingere mai mare */
+  .header .icon-btn span{font-size:8px;padding:1px 4px;margin-left:1px}
+  .header .search-top{font-size:18px}
+  .header .menu-btn{min-width:30px;width:30px;min-height:30px;height:30px;gap:2.5px;border-radius:8px;position:relative;margin-left:2px}
+  .header .menu-btn::after{content:"";position:absolute;inset:-5px}
+  .header .menu-btn i{width:14px;height:1.8px}
+  .header .garage-btn{padding:3px 8px;font-size:11px;max-width:96px;margin-right:1px}
+}
+@media(max-width:420px){ .header .garage-btn{max-width:80px} }
+@media(max-width:360px){ .header .garage-btn{max-width:62px;padding:3px 7px} }
+
+/* ===== Buton meniu: liniile (hamburger) una sub alta, nu pe orizontală ===== */
+.menu-btn{display:inline-flex!important;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.menu-btn i{display:block;flex:0 0 auto}
+@media(max-width:680px){ .header .menu-btn{gap:3px} .header .menu-btn i{width:15px;height:2px} }
