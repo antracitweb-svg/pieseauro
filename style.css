@@ -660,16 +660,16 @@ h1,h2,h3,.home-center h1,.page-head h2,.narrow h2,.detail-price,.ad-price-m,.lis
 .site-footer h4,.site-footer b{color:#e9d3a8}.site-footer button{color:#a89c86}.site-footer button:hover{color:#d4b483}
 .toast{background:#14110c;color:#e9d3a8;border:1px solid #b8935a}
 
-/* ===== Anunțurile mele: aranjare în pagină (poză mare, titlu pe 3 rânduri, butoane pe un rând, rând de jos aerisit) ===== */
-.mine-row{grid-template-columns:28px 128px minmax(0,1fr);grid-template-areas:"chk thumb name" "chk thumb badge" "acts acts acts" "meta meta meta";gap:10px 12px;padding:18px 2px 16px;align-items:start}
+/* ===== Anunțurile mele: butoane mici lângă poză (în dreptul colțului de sus), titlul sub butoane ===== */
+.mine-row{grid-template-columns:28px 128px minmax(0,1fr);grid-template-areas:"chk thumb acts" "chk thumb name" "chk thumb badge" "meta meta meta";grid-template-rows:auto auto 1fr auto;gap:8px 12px;padding:18px 2px 16px;align-items:start}
 .mine-row>.mine-check{grid-area:chk;padding-top:4px}
 .mine-body{display:contents}
 .mine-thumb{grid-area:thumb;width:128px;height:128px;border:0;border-radius:8px;background:#f1f5f9}
 .mine-thumb img{width:100%;height:100%;object-fit:cover}
-.mine-name{grid-area:name;align-self:start;font-weight:500;font-size:17px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.mine-acts{grid-area:acts;display:flex;flex-wrap:nowrap;justify-content:flex-start;align-self:start;gap:5px;width:auto;margin:0;padding:0}
+.mine-act{flex:0 0 auto;width:34px;height:32px;padding:0;border-radius:8px;font-size:15px;line-height:1}
+.mine-name{grid-area:name;align-self:start;font-weight:500;font-size:16px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .mine-body>.badge{grid-area:badge;justify-self:start;align-self:start}
-.mine-acts{grid-area:acts;display:flex;flex-wrap:nowrap;justify-content:space-between;gap:8px;width:100%;margin:6px 0 0;padding-left:40px}
-.mine-act{flex:1 1 0;min-width:0;width:auto;height:42px;border-radius:9px;font-size:17px}
 .mine-meta{grid-area:meta;display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;padding:10px 6px 0 40px;font-size:16px}
 .mine-meta span:nth-child(2){text-align:center}
 .mine-meta b{text-align:right;font-size:18px}
@@ -678,14 +678,47 @@ h1,h2,h3,.home-center h1,.page-head h2,.narrow h2,.detail-price,.ad-price-m,.lis
 @media(max-width:420px){
   .mine-row{grid-template-columns:26px 112px minmax(0,1fr)}
   .mine-thumb{width:112px;height:112px}
-  .mine-name{font-size:16px}
-  .mine-acts,.mine-meta{padding-left:38px}
+  .mine-name{font-size:15px}
+  .mine-act{width:32px;height:30px}
+  .mine-meta{padding-left:38px}
 }
 @media(min-width:700px){
   .mine-row{grid-template-columns:30px 170px minmax(0,1fr)}
   .mine-thumb{width:170px;height:170px}
   .mine-name{font-size:19px}
-  .mine-acts{max-width:460px;justify-content:flex-start}
-  .mine-acts,.mine-meta{padding-left:0;margin-left:42px;width:auto}
-  .mine-meta{max-width:520px}
+  .mine-act{width:38px;height:34px;font-size:16px}
+  .mine-meta{max-width:520px;margin-left:42px;padding-left:0}
 }
+
+/* ===== Anunțurile mele: butoane „premium” (negru cărbune + auriu șampanie) ===== */
+.mine-acts{gap:6px}
+.mine-act{
+  position:relative;
+  display:inline-grid;place-items:center;
+  width:36px;height:34px;padding:0;
+  border:1px solid #b8935a;border-radius:7px;
+  background:linear-gradient(160deg,#23211c 0%,#0e0f12 100%);
+  color:#e9d3a8;font-size:15px;line-height:1;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),inset 0 0 0 1px rgba(0,0,0,.35),0 3px 8px rgba(20,17,12,.28);
+  cursor:pointer;
+  transition:transform .14s ease,box-shadow .18s ease,background .2s ease,color .2s ease,border-color .2s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.mine-act svg{width:17px;height:17px;display:block;stroke:currentColor}
+.mine-act:not(:has(svg)){filter:grayscale(1) sepia(.55) brightness(1.55) contrast(1.05)}
+.mine-act:hover,.mine-act:focus-visible{
+  background:linear-gradient(160deg,#e9d3a8 0%,#b8935a 100%);
+  color:#14110c;border-color:#e9d3a8;
+  box-shadow:0 6px 16px rgba(184,147,90,.38),inset 0 1px 0 rgba(255,255,255,.55);
+  transform:translateY(-1px);
+  outline:0;
+}
+.mine-act:hover:not(:has(svg)){filter:grayscale(1) brightness(.2)}
+.mine-act:active{transform:scale(.93);filter:brightness(.9)}
+.mine-act:last-child{border-color:#6b4a4a;color:#e3b5b5}
+.mine-act:last-child:hover,.mine-act:last-child:focus-visible{
+  background:linear-gradient(160deg,#8e2f3a 0%,#5c1620 100%);
+  color:#fff;border-color:#c0505c;
+  box-shadow:0 6px 16px rgba(142,47,58,.4),inset 0 1px 0 rgba(255,255,255,.2);
+}
+@media(min-width:700px){.mine-act{width:40px;height:36px}}
