@@ -1210,7 +1210,7 @@ html.menu-open,html.menu-open body{overflow:hidden}
 
 .mdrawer{
   position:fixed;top:0;right:0;bottom:0;z-index:95;
-  width:min(420px,84vw);
+  width:min(357px,71vw);
   display:flex;flex-direction:column;
   padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);
   color:#f6efe0;
@@ -1254,7 +1254,7 @@ html.menu-open,html.menu-open body{overflow:hidden}
 .mdrawer .mi-user{background:rgba(255,255,255,.16);color:#e9d3a8}
 
 @media (min-width:801px){.mdrawer{width:420px}}
-@media (max-width:360px){.mdrawer{width:86vw}.mdrawer-title{font-size:22px}}
+@media (max-width:360px){.mdrawer{width:73vw}.mdrawer-title{font-size:22px}}
 /* dacă browserul nu știe blur-ul de fundal, panoul rămâne opac ca scrisul din spate să nu se vadă */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.mdrawer{background:linear-gradient(165deg,#2b2822,#0e0f12)}}
 @media (prefers-reduced-motion:reduce){.mdrawer,.mdrawer.open,.mdrawer-scrim,.mdrawer-scrim.open{transition-duration:.01s!important}}

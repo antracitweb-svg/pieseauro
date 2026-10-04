@@ -206,6 +206,10 @@ function renderHeader(){
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
   renderHeader();
+  /* pe telefon pornește cu o singură secțiune deschisă */
+  if(window.matchMedia('(max-width:800px)').matches){
+    $$('#page-account .account-sections details[open]').forEach((d,i)=>{ if(i>0) d.removeAttribute('open'); });
+  }
 }
 
 function renderAccountTool(view, withId, refId){
@@ -1451,6 +1455,14 @@ async function openSellerProfile(id){
     <div class="contact-row"><button type="button" class="btn ghost small" data-seller="${s.id}" data-sname="${nm}">Vezi anunțurile</button>${own?'':`<button type="button" class="btn primary small" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`}</div>`;
   }catch(e){ box.innerHTML=`<p>${esc(e.message||'Profilul nu a putut fi încărcat.')}</p>`; }
 }
+/* Contul meu: pe telefon (<=800px) se deschide o singură secțiune o dată; pe desktop rămân independente */
+document.addEventListener('click', e=>{
+  const sum = e.target.closest && e.target.closest('.account-sections summary');
+  if(!sum || !window.matchMedia('(max-width:800px)').matches) return;
+  const cur = sum.parentElement;
+  if(cur.hasAttribute('open')) return;
+  $$('.account-sections details[open]').forEach(d=>{ if(d!==cur) d.removeAttribute('open'); });
+});
 document.addEventListener('click', e=>{
   const t = e.target;
   if(t.classList && t.classList.contains('modal')){ closeModal(t); return; }
