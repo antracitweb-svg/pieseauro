@@ -659,3 +659,33 @@ h1,h2,h3,.home-center h1,.page-head h2,.narrow h2,.detail-price,.ad-price-m,.lis
 .site-footer{background:#0e0f12;color:#a89c86;border-top:1px solid #b8935a}
 .site-footer h4,.site-footer b{color:#e9d3a8}.site-footer button{color:#a89c86}.site-footer button:hover{color:#d4b483}
 .toast{background:#14110c;color:#e9d3a8;border:1px solid #b8935a}
+
+/* ===== Anunțurile mele: aranjare în pagină (poză mare, titlu pe 3 rânduri, butoane pe un rând, rând de jos aerisit) ===== */
+.mine-row{grid-template-columns:28px 128px minmax(0,1fr);grid-template-areas:"chk thumb name" "chk thumb badge" "acts acts acts" "meta meta meta";gap:10px 12px;padding:18px 2px 16px;align-items:start}
+.mine-row>.mine-check{grid-area:chk;padding-top:4px}
+.mine-body{display:contents}
+.mine-thumb{grid-area:thumb;width:128px;height:128px;border:0;border-radius:8px;background:#f1f5f9}
+.mine-thumb img{width:100%;height:100%;object-fit:cover}
+.mine-name{grid-area:name;align-self:start;font-weight:500;font-size:17px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.mine-body>.badge{grid-area:badge;justify-self:start;align-self:start}
+.mine-acts{grid-area:acts;display:flex;flex-wrap:nowrap;justify-content:space-between;gap:8px;width:100%;margin:6px 0 0;padding-left:40px}
+.mine-act{flex:1 1 0;min-width:0;width:auto;height:42px;border-radius:9px;font-size:17px}
+.mine-meta{grid-area:meta;display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;padding:10px 6px 0 40px;font-size:16px}
+.mine-meta span:nth-child(2){text-align:center}
+.mine-meta b{text-align:right;font-size:18px}
+.mine-head b{font-size:18px}
+.mine-list{gap:0}
+@media(max-width:420px){
+  .mine-row{grid-template-columns:26px 112px minmax(0,1fr)}
+  .mine-thumb{width:112px;height:112px}
+  .mine-name{font-size:16px}
+  .mine-acts,.mine-meta{padding-left:38px}
+}
+@media(min-width:700px){
+  .mine-row{grid-template-columns:30px 170px minmax(0,1fr)}
+  .mine-thumb{width:170px;height:170px}
+  .mine-name{font-size:19px}
+  .mine-acts{max-width:460px;justify-content:flex-start}
+  .mine-acts,.mine-meta{padding-left:0;margin-left:42px;width:auto}
+  .mine-meta{max-width:520px}
+}
