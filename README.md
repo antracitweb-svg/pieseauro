@@ -107,3 +107,9 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Fiecare mesaj arată expeditorul, data, textul și, dacă a pornit dintr-un anunț, linia `Ref: <titlu anunț>` (link către anunț). Apăsarea pe mesaj deschide conversația.
 - Butonul „Trimite mesaj” din anunț atașează anunțul ca referință.
 - Endpointuri noi: `GET /api/messages/box?box=inbox|sent|archived`, `POST /api/messages/archive`, `POST /api/messages/read`; `POST /api/messages` acceptă `listing_id` și `to_nick`. Coloane noi în `messages` (`listing_id`, `ref_title`, `arch_r`, `arch_s`), create automat la pornire.
+
+## Legal (ciorne — de validat juridic înainte de lansare)
+- Pagini: `#/terms`, `#/privacy`, `#/cookies`, `#/rules` (Regulament de publicare), `#/contact` (contact + raportare conținut). Linkuri în subsol.
+- Completează în `index.html` toate câmpurile `[DENUMIRE FIRMĂ SRL]`, `[CUI]`, `[J../…/….]`, `[ADRESĂ]`, `[EMAIL CONTACT]`, `[TELEFON]`, `[DATA]` (caută „[” în fișier).
+- Înregistrare: checkbox obligatoriu „18+ și accept Termenii/Confidențialitatea”; serverul refuză fără `accept_terms:true` și salvează momentul în `users.terms_accepted_at` (coloană creată automat).
+- Subsol: date firmă + atribuire VehiclesDB (CC-BY 4.0).

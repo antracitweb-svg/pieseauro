@@ -158,6 +158,7 @@ async function dbReady(){
   "UPDATE listings SET category='Diverse' WHERE category='Altele'",
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS show_phone BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ',
   'CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_unique_idx ON users(nickname) WHERE nickname IS NOT NULL',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS ship_county TEXT',
@@ -619,7 +620,8 @@ app.delete('/api/account/phones/:id',requireDb,auth,async(req,res)=>{
 
 app.post('/api/auth/register',requireDb,async(req,res)=>{
  try{
-  const {name,nickname,email,phone,password,remember=true}=req.body||{};
+  const {name,nickname,email,phone,password,remember=true,accept_terms}=req.body||{};
+  if(accept_terms!==true)return res.status(400).json({error:'TERMENI_NEACCEPTATI'});
   if(typeof name!=='string'||typeof nickname!=='string'||typeof email!=='string'||typeof password!=='string'||!name.trim()||!nickname.trim()||password.length<8||password.length>72||name.length>100||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())||(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim())))return res.status(400).json({error:'DATE_INVALIDE'});
   const em=email.trim().toLowerCase(), nick=nickname.trim();
   if(!NICK_RE.test(nick))return res.status(400).json({error:'NICKNAME_INVALID'});
@@ -628,7 +630,7 @@ app.post('/api/auth/register',requireDb,async(req,res)=>{
   const exists=await pool.query('SELECT id,email,nickname FROM users WHERE LOWER(email)=$1 OR LOWER(nickname)=LOWER($2)',[em,nick]);
   if(exists.rowCount)return res.status(409).json({error:String(exists.rows[0].email).toLowerCase()===em?'EMAIL_EXISTS':'NICKNAME_EXISTS'});
   const hash=await bcrypt.hash(password,12);
-  const r=await pool.query('INSERT INTO users(name,nickname,email,phone,password_hash) VALUES($1,$2,$3,$4,$5) RETURNING id,name,nickname,email,phone,show_phone,role,status',[name.trim(),nick,em,phone?String(phone).trim():null,hash]);
+  const r=await pool.query('INSERT INTO users(name,nickname,email,phone,password_hash,terms_accepted_at) VALUES($1,$2,$3,$4,$5,NOW()) RETURNING id,name,nickname,email,phone,show_phone,role,status',[name.trim(),nick,em,phone?String(phone).trim():null,hash]);
   if(r.rows[0].phone){try{await pool.query('INSERT INTO user_phones(user_id,phone) VALUES($1,$2) ON CONFLICT DO NOTHING',[r.rows[0].id,r.rows[0].phone]);}catch(e){console.error(e);}}
   const session=await createSession(r.rows[0],req,remember!==false);
   res.cookie('session',session.token,safeCookieOptions(session.maxAge));

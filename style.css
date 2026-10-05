@@ -1275,3 +1275,8 @@ html.menu-open,html.menu-open body{overflow:hidden}
 /* utilizatori sensibili la transparență: panou opac */
 @media (prefers-reduced-transparency:reduce){.mdrawer{background:linear-gradient(165deg,#2b2822,#1a1814);-webkit-backdrop-filter:none;backdrop-filter:none}}
 @media (prefers-reduced-motion:reduce){.mdrawer,.mdrawer.open,.mdrawer-scrim,.mdrawer-scrim.open{transition-duration:.01s!important}}
+
+/* subsol: date firmă și atribuire */
+.footer-brand small{display:block;margin-top:6px;font-size:12px;line-height:1.5;color:var(--muted,#77746c)}
+.legal-page h3{margin:22px 0 6px}.legal-page p{line-height:1.6}
+.clean-form label.check span a{color:var(--gold-ink,#7a5a28);text-decoration:underline}
