@@ -1204,25 +1204,35 @@ img,video{max-width:100%}
 }
 
 /* ========== MENIU LATERAL — panou suprapus „liquid glass” (intră din dreapta, lasă un spațiu în stânga) ========== */
+/* Paletă calmă pentru ochi: fundal cărbune cald (nu negru), text crem (nu alb), un singur accent auriu, fără culori saturate. Se schimbă din variabilele de mai jos. */
 .mdrawer-scrim{position:fixed;inset:0;z-index:90;background:rgba(8,8,10,.42);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s ease,visibility 0s linear .45s}
 .mdrawer-scrim.open{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .45s ease,visibility 0s}
 html.menu-open,html.menu-open body{overflow:hidden}
 
 .mdrawer{
+  --gl-text:#f1ebdd;
+  --gl-muted:rgba(241,235,221,.74);
+  --gl-accent:#cdb48a;
+  --gl-accent-soft:#e9d3a8;
+  --gl-line:rgba(255,255,255,.10);
+  --gl-chip-bg:rgba(205,180,138,.16);
+  --gl-chip-bd:rgba(233,211,168,.32);
+  --gl-hover:rgba(255,255,255,.07);
+  --gl-press:rgba(205,180,138,.20);
   position:fixed;top:0;right:0;bottom:0;z-index:95;
   width:min(357px,71vw);
   display:flex;flex-direction:column;
   padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);
-  color:#f6efe0;
+  color:var(--gl-text);
   background:
-    radial-gradient(120% 60% at 100% 0%,rgba(212,180,131,.30),transparent 60%),
-    radial-gradient(90% 50% at 0% 100%,rgba(143,109,56,.22),transparent 65%),
-    linear-gradient(165deg,rgba(52,46,36,.40),rgba(14,15,18,.56));
-  -webkit-backdrop-filter:blur(3px) saturate(1.6) brightness(.68);
-  backdrop-filter:blur(3px) saturate(1.6) brightness(.68);
-  border-left:1px solid rgba(233,211,168,.38);
+    radial-gradient(110% 45% at 100% 14%,rgba(205,180,138,.16),transparent 62%),
+    radial-gradient(90% 50% at 0% 100%,rgba(143,109,56,.16),transparent 65%),
+    linear-gradient(165deg,rgba(40,36,30,.42),rgba(26,24,20,.58));
+  -webkit-backdrop-filter:blur(16px) saturate(1.3) brightness(.7);
+  backdrop-filter:blur(16px) saturate(1.3) brightness(.7);
+  border-left:1px solid rgba(233,211,168,.32);
   border-radius:26px 0 0 26px;
-  box-shadow:-30px 0 70px rgba(0,0,0,.48),inset 1.5px 0 0 rgba(255,255,255,.22),inset 0 1.5px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.06);
+  box-shadow:-30px 0 70px rgba(0,0,0,.42),inset 1.5px 0 0 rgba(255,255,255,.18),inset 0 1.5px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(255,255,255,.05);
   transform:translateX(104%);visibility:hidden;
   transition:transform .55s cubic-bezier(.22,1,.36,1),visibility 0s linear .55s;
   overflow:hidden;
@@ -1231,30 +1241,37 @@ html.menu-open,html.menu-open body{overflow:hidden}
 .mdrawer.open{transform:translateX(0);visibility:visible;transition:transform .55s cubic-bezier(.22,1,.36,1),visibility 0s}
 /* reflexie de sticlă pe muchia din stânga */
 .mdrawer::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
-  background:linear-gradient(100deg,rgba(255,255,255,.20) 0,rgba(255,255,255,.05) 14%,transparent 34%),linear-gradient(180deg,rgba(255,255,255,.09),transparent 22%)}
+  background:linear-gradient(100deg,rgba(255,255,255,.14) 0,rgba(255,255,255,.04) 14%,transparent 34%),linear-gradient(180deg,rgba(255,255,255,.06),transparent 22%)}
 
 .mdrawer-head{position:relative;display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px 24px}
-.mdrawer-title{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:24px;font-weight:600;letter-spacing:-.3px;color:#f6efe0}
-.mdrawer .close-menu{width:40px;height:40px;border-radius:50%;border:1px solid rgba(233,211,168,.4);background:rgba(255,255,255,.10);color:#f6efe0;font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;transition:background-color .15s ease,transform .12s ease}
-.mdrawer .close-menu:hover{background:rgba(255,255,255,.18)}
+.mdrawer-title{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:24px;font-weight:600;letter-spacing:-.3px;color:var(--gl-text)}
+.mdrawer .close-menu{width:40px;height:40px;border-radius:50%;border:1px solid var(--gl-chip-bd);background:rgba(255,255,255,.08);color:var(--gl-text);font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;transition:background-color .15s ease,transform .12s ease}
+.mdrawer .close-menu:hover{background:rgba(255,255,255,.16)}
 .mdrawer .close-menu:active{transform:scale(.92)}
 
 .mdrawer-body{position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain;padding:4px 16px 28px;-webkit-overflow-scrolling:touch}
-.mdrawer .menu-card{display:block;margin:0 0 12px;background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.16)!important;border-radius:16px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;overflow:hidden}
-.mdrawer .menu-card>button{width:100%;min-height:58px;padding:14px 16px;border:0;border-bottom:1px solid rgba(255,255,255,.09);background:transparent!important;color:#f6efe0;display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:12px;align-items:center;text-align:left;cursor:pointer}
+.mdrawer .menu-card{display:block;margin:0 0 12px;background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:16px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)!important;overflow:hidden}
+.mdrawer .menu-card>button{width:100%;min-height:58px;padding:14px 16px;border:0;border-bottom:1px solid var(--gl-line);background:transparent!important;color:var(--gl-text);display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:12px;align-items:center;text-align:left;cursor:pointer}
 .mdrawer .menu-card>button:has(.mi){grid-template-columns:40px minmax(0,1fr) 20px}
 .mdrawer .menu-card>button:last-child{border-bottom:0}
-.mdrawer .menu-card>button:hover{background:rgba(255,255,255,.09)!important}
-.mdrawer .menu-card>button:active{background:rgba(212,180,131,.22)!important}
-.mdrawer .menu-card>button:focus-visible,.mdrawer .close-menu:focus-visible{outline:2px solid #d4b483;outline-offset:-2px}
-.mdrawer .menu-card button b{font-size:15px;font-weight:650;color:#f6efe0;line-height:1.3}
-.mdrawer .menu-card button small{font-size:12px;color:rgba(246,239,224,.64)}
-.mdrawer .menu-card button i{color:rgba(233,211,168,.75);font-style:normal;font-size:22px}
-.mdrawer .mi{box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 4px 12px rgba(0,0,0,.25)}
-.mdrawer .mi-user{background:rgba(255,255,255,.16);color:#e9d3a8}
+.mdrawer .menu-card>button:hover{background:var(--gl-hover)!important}
+.mdrawer .menu-card>button:active{background:var(--gl-press)!important}
+.mdrawer .menu-card>button:focus-visible,.mdrawer .close-menu:focus-visible{outline:2px solid var(--gl-accent);outline-offset:-2px}
+.mdrawer .menu-card button b{font-size:15px;font-weight:650;color:var(--gl-text);line-height:1.3}
+.mdrawer .menu-card button small{font-size:12.5px;color:var(--gl-muted)}
+.mdrawer .menu-card button i{color:var(--gl-accent);font-style:normal;font-size:22px}
+
+/* pictograme: același chip translucid pentru toate; doar nuanța iconiței diferă, dezaturat */
+.mdrawer .mi{background:var(--gl-chip-bg);border:1px solid var(--gl-chip-bd);color:var(--gl-accent-soft);box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
+.mdrawer .mi-user{background:var(--gl-chip-bg);color:var(--gl-accent-soft)}
+.mdrawer .mi-orange{background:var(--gl-chip-bg);color:#d89a74}
+.mdrawer .mi-blue{background:var(--gl-chip-bg);color:#9fb3cc}
+.mdrawer .mi-green{background:var(--gl-chip-bg);color:#9dbfa8}
 
 @media (min-width:801px){.mdrawer{width:420px}}
 @media (max-width:360px){.mdrawer{width:73vw}.mdrawer-title{font-size:22px}}
 /* dacă browserul nu știe blur-ul de fundal, panoul rămâne opac ca scrisul din spate să nu se vadă */
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.mdrawer{background:linear-gradient(165deg,#2b2822,#0e0f12)}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.mdrawer{background:linear-gradient(165deg,#2b2822,#1a1814)}}
+/* utilizatori sensibili la transparență: panou opac */
+@media (prefers-reduced-transparency:reduce){.mdrawer{background:linear-gradient(165deg,#2b2822,#1a1814);-webkit-backdrop-filter:none;backdrop-filter:none}}
 @media (prefers-reduced-motion:reduce){.mdrawer,.mdrawer.open,.mdrawer-scrim,.mdrawer-scrim.open{transition-duration:.01s!important}}
