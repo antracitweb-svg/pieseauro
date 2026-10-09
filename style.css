@@ -1280,3 +1280,126 @@ html.menu-open,html.menu-open body{overflow:hidden}
 .footer-brand small{display:block;margin-top:6px;font-size:12px;line-height:1.5;color:var(--muted,#77746c)}
 .legal-page h3{margin:22px 0 6px}.legal-page p{line-height:1.6}
 .clean-form label.check span a{color:var(--gold-ink,#7a5a28);text-decoration:underline}
+
+/* =====================================================================
+   LUXE 2026 — strat de design peste PRESTIGE (încărcat ultimul)
+   Obsidian + șampanie + fildeș. Un singur accent (auriul), serif pentru titluri,
+   linii fine în loc de umbre groase, mișcare doar la deschiderea paginii principale.
+   Nu schimbă logica: doar aspectul.
+   ===================================================================== */
+:root{
+  --ob:#0b0a09; --ob-2:#14120f; --ob-3:#1d1a15;
+  --champ:#c6a468; --champ-hi:#ecd9aa; --champ-lo:#8d6f3a;
+  --ivory:#f4efe6; --paper:#fcfaf5; --ink:#171512; --muted:#6b655a; --line:#e4dccb;
+  --hair:rgba(198,164,104,.28); --hair-strong:rgba(198,164,104,.6);
+  --font-serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+}
+body{background:var(--ivory);color:var(--ink)}
+h1,h2,h3{font-family:var(--font-serif)}
+
+/* ---------- antet ---------- */
+.header{background:linear-gradient(180deg,#14120f,#0b0a09)!important;border-bottom:1px solid var(--hair-strong)!important;box-shadow:0 1px 0 rgba(0,0,0,.4),0 10px 30px rgba(11,10,9,.25)!important}
+.brand-copy strong{font-family:var(--font-serif);font-weight:600;letter-spacing:.06em;color:var(--champ-hi)}
+.brand-copy strong span{color:var(--champ)}
+.brand-copy small{color:rgba(236,217,170,.62);letter-spacing:.14em}
+.menu-btn{background:transparent!important;border:1px solid var(--hair-strong)!important}
+.menu-btn:hover{background:rgba(198,164,104,.14)!important}
+.garage-btn{border-color:var(--hair-strong);background:transparent;color:var(--champ-hi)}
+.garage-btn:hover{background:rgba(198,164,104,.14)}
+.icon-btn{color:var(--champ-hi)}
+.icon-btn span{background:var(--champ);color:#14110c}
+
+/* ---------- pagina principală: showroom întunecat ---------- */
+#page-home{
+  background:
+    radial-gradient(60% 46% at 50% -6%,rgba(236,217,170,.22),transparent 72%),
+    radial-gradient(34% 28% at 88% 38%,rgba(198,164,104,.07),transparent 70%),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.016) 0 1px,transparent 1px 7px),
+    linear-gradient(180deg,#14120f 0%,#0b0a09 100%);
+  color:var(--champ-hi);
+}
+#page-home .home-wrap{justify-content:flex-start;padding:clamp(44px,9vh,104px) 0 0}
+.home-center{position:relative;animation:luxeIn .9s var(--ease) both}
+.home-center::before{content:"";display:block;width:64px;height:1px;margin:0 auto 26px;background:linear-gradient(90deg,transparent,var(--champ),transparent)}
+.home-center .eyebrow{display:none}
+.home-center h1{font-family:var(--font-serif);font-weight:500;font-size:clamp(38px,6.2vw,74px);line-height:1.04;letter-spacing:-.025em;color:#f7efdc}
+.home-center p{color:rgba(244,239,230,.72);max-width:540px;line-height:1.55}
+.home-search-form{background:var(--paper);border:1px solid var(--hair-strong);box-shadow:0 0 0 6px rgba(198,164,104,.07),0 24px 60px rgba(0,0,0,.45)}
+.home-search-form:focus-within{border-color:var(--champ-hi);box-shadow:0 0 0 6px rgba(198,164,104,.2),0 24px 60px rgba(0,0,0,.45)}
+.home-search-form input{color:var(--ink)}
+.home-search-go{background:linear-gradient(180deg,var(--champ-hi),var(--champ))!important;color:#14110c!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
+.home-search-go:hover{background:linear-gradient(180deg,#fff2cf,var(--champ-hi))!important}
+.home-links button{background:transparent;border:1px solid var(--hair-strong);color:var(--champ-hi)}
+.home-links button:hover{background:rgba(198,164,104,.16);border-color:var(--champ-hi)}
+@keyframes luxeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* categorii + pași */
+.home-lux{order:1;width:min(1080px,100%);margin:clamp(48px,8vh,88px) auto 0}
+.lux-head{text-align:center;margin-bottom:26px}
+.lux-head h2{margin:0 0 6px;font-weight:500;font-size:clamp(24px,3vw,34px);letter-spacing:-.01em;color:#f7efdc}
+.lux-head p{margin:0;color:rgba(244,239,230,.6);font-size:15px}
+.lux-cats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.lux-tile{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:68px;padding:14px 18px;text-align:left;font:inherit;font-family:var(--font-serif);font-size:17px;color:#f1e6cb;background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--hair);border-radius:var(--r);cursor:pointer;overflow:hidden;transition:border-color .2s,background-color .2s,transform .15s var(--ease)}
+.lux-tile::after{content:"";position:absolute;left:18px;bottom:0;width:0;height:2px;background:var(--champ);transition:width .3s var(--ease)}
+.lux-tile i{font-style:normal;font-size:24px;line-height:1;color:var(--champ);transition:transform .2s var(--ease)}
+.lux-tile:hover{border-color:var(--hair-strong);background:rgba(198,164,104,.1)}
+.lux-tile:hover::after{width:calc(100% - 36px)}
+.lux-tile:hover i{transform:translateX(4px)}
+.lux-tile:active{transform:scale(.98);background:rgba(198,164,104,.2)}
+.lux-tile:focus-visible{outline:2px solid var(--champ-hi);outline-offset:2px}
+.lux-steps{list-style:none;margin:54px 0 0;padding:34px 0 0;border-top:1px solid var(--hair);display:grid;grid-template-columns:repeat(3,1fr);gap:34px;counter-reset:lux}
+.lux-steps li{counter-increment:lux;display:flex;flex-direction:column;gap:8px}
+.lux-steps li::before{content:counter(lux);font-family:var(--font-serif);font-size:38px;line-height:1;color:var(--champ);font-weight:400}
+.lux-steps b{font-family:var(--font-serif);font-size:20px;font-weight:600;color:#f7efdc}
+.lux-steps span{color:rgba(244,239,230,.66);line-height:1.55;font-size:15px;max-width:34ch}
+.home-bottom{order:2;margin-top:64px!important;border-top:1px solid var(--hair);color:rgba(244,239,230,.7)}
+.home-bottom b{color:#f7efdc;font-family:var(--font-serif);font-size:17px;font-weight:600}
+.trust span{background:transparent!important;border:1px solid var(--hair)!important;color:var(--champ-hi)}
+
+/* ---------- pagini interioare (fildeș) ---------- */
+.page-head h2,.narrow h2{font-family:var(--font-serif);font-weight:500;letter-spacing:-.02em}
+.eyebrow{color:var(--champ-lo)}
+.result-search{background:var(--paper);border:1px solid var(--line);border-radius:var(--r)}
+.result-search button{background:var(--ob);color:var(--champ-hi)}
+.filters{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:none}
+.filter-head b{font-family:var(--font-serif);font-size:19px;font-weight:600}
+.save-search,.results-actions select,.filter-toggle{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);color:var(--ink)}
+
+/* carduri: linii fine, preț în serif, fără emoji */
+.listing{background:var(--paper);border:1px solid var(--line);box-shadow:none}
+.listing:hover{border-color:var(--champ);box-shadow:0 18px 44px rgba(23,21,18,.12)}
+.listing-top h3{font-family:var(--font-serif)!important;font-weight:600;font-size:18px!important}
+.listing-price{color:var(--ink);font-family:var(--font-serif)}
+.listing-bottom{border-top:1px solid var(--line)}
+.listing-image:has(.listing-placeholder){background:radial-gradient(70% 70% at 50% 40%,#2a251c,#0f0d0a)}
+.listing-placeholder{font-size:0!important;filter:none!important;opacity:1!important;display:grid;place-items:center;width:100%;height:100%}
+.listing-placeholder::before{content:"AP";display:grid;place-items:center;width:64px;height:64px;border-radius:50%;border:1px solid var(--hair-strong);font-family:var(--font-serif);font-size:22px;letter-spacing:.08em;color:var(--champ-hi)}
+.badge{border-radius:999px}
+
+/* butoane și câmpuri */
+.btn.primary{border-color:var(--ob);background:linear-gradient(180deg,#26221b,var(--ob))}
+.btn.primary:hover{background:linear-gradient(180deg,var(--champ-hi),var(--champ));color:#14110c;border-color:var(--champ)}
+.clean-form,.set-card,.mine-card,.cp-card{background:var(--paper);border-color:var(--line)}
+
+/* subsol */
+.site-footer{background:var(--ob)!important;border-top:1px solid var(--hair-strong)}
+.site-footer b,.site-footer h4{color:var(--champ-hi);font-family:var(--font-serif)}
+
+/* ---------- telefon ---------- */
+@media (max-width:900px){.lux-cats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){
+  .lux-cats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .lux-tile{min-height:60px;padding:12px 14px;font-size:15px}
+  .lux-steps{grid-template-columns:1fr;gap:26px;margin-top:40px}
+  .lux-steps li{flex-direction:row;flex-wrap:wrap;column-gap:14px;align-items:baseline}
+  .lux-steps li::before{font-size:30px}
+  .lux-steps span{flex-basis:100%;max-width:none}
+  .home-center h1{letter-spacing:-.02em}
+}
+@media (prefers-reduced-motion:reduce){.home-center{animation:none}.lux-tile,.lux-tile::after,.lux-tile i{transition:none}}
+
+/* ---------- retușuri ---------- */
+.site-footer{margin-top:0!important}
+body:has(#page-home.active) .site-footer{margin-top:0!important}
+/* emoji din antet: nuanță aurie în loc de culorile standard */
+.g-ico,#cartBtn,.icon-btn[aria-label*="oș" i],.icon-btn[aria-label*="art" i]{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(2deg) brightness(1.15)}
