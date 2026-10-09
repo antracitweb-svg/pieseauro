@@ -429,27 +429,51 @@ app.get('/api/me',async(req,res)=>{
  }catch{res.json({user:null});}
 });
 async function sendMail(to,subject,text,html){
- const apiKey=process.env.RESEND_API_KEY;
+ const apiKey=String(process.env.RESEND_API_KEY||'').trim();
  const from=String(process.env.RESEND_FROM||'').trim();
  if(!apiKey) throw new Error('EMAIL_NOT_CONFIGURED');
  if(!from) throw new Error('EMAIL_SENDER_NOT_CONFIGURED');
  if(!from.includes('@')) throw new Error('EMAIL_SENDER_INVALID');
- const resp=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
+ let resp;
+ try{
+  resp=await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(15000),headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
+ }catch(netErr){
+  console.error('Resend network error',netErr&&netErr.message);
+  throw new Error('EMAIL_SEND_FAILED');
+ }
  let data={}; try{data=await resp.json();}catch{}
  if(!resp.ok){
    console.error('Resend error',resp.status,JSON.stringify(data));
    const msg=String(data?.message||data?.error||'').toLowerCase();
+   // Expeditor de test (onboarding@resend.dev) sau domeniu neverificat: Resend trimite doar către emailul contului Resend.
+   if(/(testing emails|own email|your own)/.test(msg)) throw new Error('EMAIL_SANDBOX_ONLY');
+   if(resp.status===401 || /api key/.test(msg)) throw new Error('EMAIL_PROVIDER_FORBIDDEN');
    if(resp.status===403 && /(domain|sender|from|verified|verify)/.test(msg)) throw new Error('EMAIL_SENDER_NOT_VERIFIED');
    if(resp.status===403) throw new Error('EMAIL_PROVIDER_FORBIDDEN');
+   if(resp.status===422 && /(from|sender)/.test(msg)) throw new Error('EMAIL_SENDER_INVALID');
    if(resp.status===429) throw new Error('EMAIL_RATE_LIMIT');
    throw new Error('EMAIL_SEND_FAILED');
  }
  return data;
 }
+const MAIL_ERRORS=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_SANDBOX_ONLY','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SEND_FAILED'];
+function mailConfigError(){
+ const from=String(process.env.RESEND_FROM||'').trim();
+ if(!String(process.env.RESEND_API_KEY||'').trim())return 'EMAIL_NOT_CONFIGURED';
+ if(!from)return 'EMAIL_SENDER_NOT_CONFIGURED';
+ if(!from.includes('@'))return 'EMAIL_SENDER_INVALID';
+ return null;
+}
+function mailButton(link,label){
+ return `<p><a href="${link}" style="display:inline-block;background:#1f6feb;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${label}</a></p><p style="color:#666;font-size:13px">Dacă butonul nu funcționează, copiază acest link în browser:<br>${link}</p>`;
+}
 function appBaseUrl(req){
  // Linkurile din emailuri (resetare parolă etc.) nu trebuie să depindă de antetul Host trimis de client.
- const fixed=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;
- if(fixed)return fixed.replace(/\/$/,'');
+ let fixed=String(process.env.APP_URL||process.env.RENDER_EXTERNAL_URL||'').trim();
+ if(fixed){
+  if(!/^https?:\/\//i.test(fixed))fixed='https://'+fixed; // APP_URL scris fără https:// ar rupe linkurile din email
+  return fixed.replace(/\/+$/,'');
+ }
  const host=String(req.get('host')||'');
  const safe=/^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(host)?host:'localhost';
  return `${req.protocol}://${safe}`;
@@ -461,6 +485,8 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   if(!em||em.length>254)return res.status(400).json({error:'EMAIL_REQUIRED'});
   const key=`${clientIp(req)}:${em}`;
   if(!throttle(recoveryAttempts,key,3,15*60*1000))return res.status(429).json({error:'RECOVERY_RATE_LIMIT'});
+  // Configurarea emailului se verifică înainte de căutarea contului: răspunsul nu mai trădează dacă adresa există.
+  const cfgErr=mailConfigError(); if(cfgErr)return res.status(503).json({error:cfgErr});
   const r=await pool.query('SELECT id,email,name FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1',[em]);
   // Always use the same success response for unknown addresses.
   if(!r.rowCount)return res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
@@ -471,7 +497,7 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[userId,hashToken(raw)]);
   const link=`${appBaseUrl(req)}/#/reset-password?token=${encodeURIComponent(raw)}`;
   try{
-   await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href=\"${link}\">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+   await sendMail(r.rows[0].email,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton (valabil 30 de minute):</p>${mailButton(link,'Resetează parola')}<p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
   }catch(mailErr){
    // Never leave a valid reset token behind when delivery failed.
    await pool.query('DELETE FROM password_resets WHERE user_id=$1',[userId]);
@@ -480,7 +506,7 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
  }catch(e){
   console.error('Password recovery error:',e);
-  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT'];
+  const known=MAIL_ERRORS;
   if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});
   if(e.message==='RECOVERY_RATE_LIMIT')return res.status(429).json({error:e.message});
   res.status(500).json({error:'SERVER_ERROR'});
@@ -555,15 +581,16 @@ app.post('/api/account/email-change',requireDb,auth,async(req,res)=>{
   if(!me||!curPass||!(await bcrypt.compare(curPass.slice(0,72),me.password_hash)))return res.status(401).json({error:'PAROLA_GRESITA'});
   const exists=await pool.query('SELECT id FROM users WHERE LOWER(email)=$1 AND id<>$2',[em,req.user.id]);
   if(exists.rowCount)return res.status(409).json({error:'EMAIL_EXISTS'});
+  const cfgErr=mailConfigError(); if(cfgErr)return res.status(503).json({error:cfgErr});
   const raw=crypto.randomBytes(32).toString('base64url');
   await pool.query('DELETE FROM email_change_requests WHERE user_id=$1 OR expires_at<NOW()',[req.user.id]);
   await pool.query("INSERT INTO email_change_requests(user_id,new_email,token_hash,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '30 minutes')",[req.user.id,em,hashToken(raw)]);
   const link=`${appBaseUrl(req)}/#/verify-email-change?token=${encodeURIComponent(raw)}`;
   try{ await sendMail(em,'AutoPiese – confirmă noua adresă de email',`Ai cerut schimbarea adresei de email pentru contul AutoPiese. Confirmă în 30 de minute: ${link}`,
-   `<p>Ai cerut schimbarea adresei de email pentru contul AutoPiese.</p><p><a href="${link}">Confirmă noua adresă de email</a></p><p>Linkul este valabil 30 de minute.</p>`);
+   `<p>Ai cerut schimbarea adresei de email pentru contul AutoPiese (valabil 30 de minute).</p>${mailButton(link,'Confirmă noua adresă de email')}`);
   }catch(mailErr){ await pool.query('DELETE FROM email_change_requests WHERE user_id=$1',[req.user.id]); throw mailErr; }
   res.json({ok:true,message:'Ți-am trimis un link de confirmare pe noua adresă de email.'});
- }catch(e){console.error(e);const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SEND_FAILED'];if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});res.status(500).json({error:'SERVER_ERROR'});}
+ }catch(e){console.error(e);const known=MAIL_ERRORS;if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});res.status(500).json({error:'SERVER_ERROR'});}
 });
 app.post('/api/account/email-change/confirm',requireDb,async(req,res)=>{
  try{

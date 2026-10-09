@@ -10,7 +10,7 @@ const ERR = {
   EMAIL_NOT_CONFIGURED:'Trimiterea emailurilor nu este configurată încă pe server.',EMAIL_SENDER_NOT_CONFIGURED:'Lipsește expeditorul email (RESEND_FROM).',
   EMAIL_SENDER_INVALID:'Adresa configurată pentru RESEND_FROM nu este validă.',EMAIL_SENDER_NOT_VERIFIED:'Expeditorul email nu este verificat în Resend.',
   EMAIL_PROVIDER_FORBIDDEN:'Serviciul de email a refuzat trimiterea. Verifică cheia API și expeditorul.',EMAIL_RATE_LIMIT:'Prea multe cereri către serviciul de email. Încearcă peste câteva minute.',
-  EMAIL_SEND_FAILED:'Emailul nu a putut fi trimis. Încearcă din nou.',RECOVERY_RATE_LIMIT:'Ai cerut prea multe resetări. Încearcă peste 15 minute.',
+  EMAIL_SEND_FAILED:'Emailul nu a putut fi trimis. Încearcă din nou.',EMAIL_SANDBOX_ONLY:'Resend este în mod de test: poate trimite doar către emailul contului Resend. Verifică un domeniu în Resend și folosește-l în RESEND_FROM.',RECOVERY_RATE_LIMIT:'Ai cerut prea multe resetări. Încearcă peste 15 minute.',
   LOGIN_RATE_LIMIT:'Prea multe încercări. Încearcă din nou mai târziu.',RESET_EXPIRED:'Linkul a expirat sau a fost deja folosit.',
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
@@ -1243,9 +1243,12 @@ async function togglePrivacy(){
     setMsg(msg, r.show_phone ? 'Telefonul va fi vizibil în anunțurile tale.' : 'Telefonul nu mai este afișat public.','ok');
   }catch(err){ $('#showPhoneToggle').checked = !want; setMsg(msg,err.message,'error'); }
 }
+let emailConfirmDone = null;
 async function confirmEmailChange(params){
   const token = params.get('token'), el = $('#verifyEmailChangeMsg');
   if(!token){ el.textContent='Link invalid.'; return; }
+  if(emailConfirmDone===token) return; emailConfirmDone = token;
+  el.textContent='Se verifică linkul…';
   try{ const r = await api('/api/account/email-change/confirm',{method:'POST',body:JSON.stringify({token})}); currentUser=null; renderHeader(); el.textContent=r.message; }
   catch(e){ el.textContent=e.message; }
 }

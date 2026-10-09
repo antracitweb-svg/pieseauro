@@ -113,3 +113,10 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Completează în `index.html` toate câmpurile `[DENUMIRE FIRMĂ SRL]`, `[CUI]`, `[J../…/….]`, `[ADRESĂ]`, `[EMAIL CONTACT]`, `[TELEFON]`, `[DATA]` (caută „[” în fișier).
 - Înregistrare: checkbox obligatoriu „18+ și accept Termenii/Confidențialitatea”; serverul refuză fără `accept_terms:true` și salvează momentul în `users.terms_accepted_at` (coloană creată automat).
 - Subsol: date firmă + atribuire VehiclesDB (CC-BY 4.0).
+
+## Recuperare parolă / emailuri (Resend) — ghid rapid
+1. În Resend: **Domains → Add Domain**, adaugă recordurile DNS cerute și așteaptă „Verified”. Fără domeniu verificat, Resend trimite doar către emailul contului tău Resend (mesaj în site: „Resend este în mod de test”).
+2. În Render → Environment: `RESEND_API_KEY` (cheia `re_...`), `RESEND_FROM` (ex. `AutoPiese <no-reply@domeniul-tau.ro>`, pe domeniul verificat), `APP_URL` (ex. `https://pieseauto.onrender.com`).
+3. Salvează și așteaptă redeploy-ul, apoi testează „Ai uitat parola?”. Dacă nu ajunge, uită-te la Render → Logs după `Resend error`.
+
+Corecturi: eroarea generică „A apărut o eroare pe server” la trimitere eșuată are acum mesaje clare; `APP_URL` fără `https://` este completat automat; timeout de 15 s la trimitere; verificarea configurării se face înaintea căutării contului (nu mai arată dacă un email există); emailurile au buton + link de rezervă; confirmarea schimbării de email nu mai poate afișa „link expirat” la un apel dublu.
