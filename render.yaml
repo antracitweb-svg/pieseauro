@@ -22,5 +22,7 @@ services:
         sync: false
       - key: RESEND_FROM
         sync: false
+      - key: REQUIRE_VERIFIED_EMAIL
+        value: "false"
       - key: VEHICLE_CATALOG_URL
         value: https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@latest/dist/vehicles.json

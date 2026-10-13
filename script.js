@@ -10,9 +10,9 @@ const ERR = {
   EMAIL_NOT_CONFIGURED:'Trimiterea emailurilor nu este configurată încă pe server.',EMAIL_SENDER_NOT_CONFIGURED:'Lipsește expeditorul email (RESEND_FROM).',
   EMAIL_SENDER_INVALID:'Adresa configurată pentru RESEND_FROM nu este validă.',EMAIL_SENDER_NOT_VERIFIED:'Expeditorul email nu este verificat în Resend.',
   EMAIL_PROVIDER_FORBIDDEN:'Serviciul de email a refuzat trimiterea. Verifică cheia API și expeditorul.',EMAIL_RATE_LIMIT:'Prea multe cereri către serviciul de email. Încearcă peste câteva minute.',
-  EMAIL_SEND_FAILED:'Emailul nu a putut fi trimis. Încearcă din nou.',EMAIL_SANDBOX_ONLY:'Resend este în mod de test: poate trimite doar către emailul contului Resend. Verifică un domeniu în Resend și folosește-l în RESEND_FROM.',RECOVERY_RATE_LIMIT:'Ai cerut prea multe resetări. Încearcă peste 15 minute.',
+  EMAIL_SEND_FAILED:'Emailul nu a putut fi trimis. Încearcă din nou.',RECOVERY_RATE_LIMIT:'Ai cerut prea multe resetări. Încearcă peste 15 minute.',
   LOGIN_RATE_LIMIT:'Prea multe încercări. Încearcă din nou mai târziu.',RESET_EXPIRED:'Linkul a expirat sau a fost deja folosit.',
-  EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
+  EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',EMAIL_NOT_VERIFIED:'Confirmă adresa de email (verifică mesajul primit) ca să poți continua.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
   PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
   CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',TERMENI_NEACCEPTATI:'Trebuie să accepți Termenii și Politica de confidențialitate.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',DESTINATAR_NEGASIT:'Nu am găsit niciun utilizator cu acest nickname.'
@@ -43,7 +43,7 @@ const CATEGORIES = CATEGORY_TREE.map(c=>[c[0],c[1]]);
 const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],sold:['Vândut','pending'],rejected:['Respins','bad'],blocked:['Blocat','bad'],deleted:['Șters','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
-const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',mesagerie:'page-messages',privacy:'page-privacy',rules:'page-rules',contact:'page-contact',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change'};
+const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',mesagerie:'page-messages',privacy:'page-privacy',rules:'page-rules',contact:'page-contact',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change','verify-email':'page-verify-email'};
 const AUTH_ROUTES = new Set(['cont','cerere','cerere-noua','vinde','settings','admin','anunturile-mele','mesagerie']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',maxPrice:'maxPrice',filterSeller:'seller_type',sortListings:'sort'};
 
@@ -166,6 +166,7 @@ function route(){
   else if(name==='cont') renderAccount();
   else if(name==='settings') safe(loadSettings)();
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
+  else if(name==='verify-email') safe(confirmEmail)(params);
   else if(name==='admin') safe(loadAdmin)();
   else if(name==='mesagerie') safe(enterMessages)(params.get('box'));
   else if(name==='account-tool'){
@@ -202,6 +203,7 @@ function renderHeader(){
   $('#adminMenu').classList.toggle('hidden', !isAdmin);
   const ad = $('#accountAdmin'); if(ad) ad.classList.toggle('hidden', !isAdmin);
   $('#favCount').textContent = favorites.length;
+  renderVerifyBanner();
 }
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
@@ -328,7 +330,7 @@ function card(x, o={}){
   const st = o.mine ? (STATUS_LABEL[x.status]||['',''] ) : null;
   const firstImage = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
   const img = firstImage
-    ? `<button type="button" class="listing-image-button" data-lightbox-src="${esc(firstImage)}" data-lightbox-alt="${esc(x.title)}" aria-label="Vezi poza mai mare"><img src="${esc(firstImage)}" alt="${esc(x.title)}" loading="lazy"><span class="image-zoom-hint">⌕</span></button>`
+    ? `<button type="button" class="listing-image-button" data-lightbox-src="${esc(firstImage)}" data-lightbox-alt="${esc(x.title)}" aria-label="Vezi poza mai mare"><img src="${esc(firstImage)}" alt="${esc(x.title)}" loading="lazy" decoding="async"><span class="image-zoom-hint">⌕</span></button>`
     : `<div class="listing-placeholder">${x.type==='dezmembrari'?'🚗':'⚙️'}</div>`;
   return `<article class="listing" data-open="${x.id}" tabindex="0">
     <div class="listing-image">${img}</div>
@@ -579,7 +581,7 @@ function detailHtml(x, phones, canContact){
   const phone1 = (phones||[]).slice(0,1);
   const callbar = (canContact && phone1.length) ? `<div class="ad-callbar"><a class="btn primary" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(phone1[0].phone))}</a>${phone1[0].is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(phone1[0].phone))}">WhatsApp</a>`:''}</div>` : '';
   const galleryImages = Array.isArray(x.images) ? x.images.filter(Boolean) : [];
-  const gallery = galleryImages.length ? `<div class="detail-gallery">${galleryImages.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(x.title)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(x.title)} - poza ${i+1}" loading="lazy"></button>`).join('')}</div>` : '';
+  const gallery = galleryImages.length ? `<div class="detail-gallery">${galleryImages.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(x.title)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(x.title)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>` : '';
   const seller = esc(x.seller_name || 'Vânzător');
   return `<div class="ad">
   <div class="ad-main">
@@ -976,7 +978,8 @@ function showInfoPop(btn){
 function renderSellImages(){
   const box=$('#sellImagePreview'), count=$('#sellImageCount');
   if(!box||!count)return;
-  box.innerHTML=state.sellImages.map((src,i)=>`<div class="sell-image-item"><img src="${src}" alt="Poza ${i+1}"><button type="button" class="sell-image-remove" data-remove-sell-image="${i}" aria-label="Șterge poza">×</button></div>`).join('');
+  const last=state.sellImages.length-1;
+  box.innerHTML=state.sellImages.map((src,i)=>`<div class="sell-image-item"><img src="${src}" alt="Poza ${i+1}">${i===0?'<span class="sell-image-cover">Principală</span>':''}<button type="button" class="sell-image-remove" data-remove-sell-image="${i}" aria-label="Șterge poza">×</button><div class="sell-image-move"><button type="button" data-move-sell-image="${i}" data-dir="-1" aria-label="Mută poza ${i+1} mai devreme"${i===0?' disabled':''}>‹</button><button type="button" data-move-sell-image="${i}" data-dir="1" aria-label="Mută poza ${i+1} mai târziu"${i===last?' disabled':''}>›</button></div></div>`).join('');
   count.textContent=state.sellImages.length?`${state.sellImages.length}/8 poze selectate`:'';
 }
 function fileToDataUrl(file){
@@ -1243,12 +1246,27 @@ async function togglePrivacy(){
     setMsg(msg, r.show_phone ? 'Telefonul va fi vizibil în anunțurile tale.' : 'Telefonul nu mai este afișat public.','ok');
   }catch(err){ $('#showPhoneToggle').checked = !want; setMsg(msg,err.message,'error'); }
 }
-let emailConfirmDone = null;
+async function confirmEmail(params){
+  const token = params.get('token'), el = $('#verifyEmailMsg');
+  if(!token){ el.textContent='Link invalid.'; return; }
+  try{ const r = await api('/api/auth/verify-email',{method:'POST',body:JSON.stringify({token})}); if(currentUser) currentUser.email_verified = true; renderHeader(); el.textContent = r.message; }
+  catch(e){ el.textContent = e.message; }
+}
+function renderVerifyBanner(){
+  const b = $('#verifyBanner'); if(!b) return;
+  const v = window.__verif;
+  b.classList.toggle('hidden', !(currentUser && currentUser.email_verified===false && v && v.enabled));
+}
+document.addEventListener('click', async e=>{
+  const b = e.target.closest('#resendVerifyBtn'); if(!b) return;
+  b.disabled = true;
+  try{ const r = await api('/api/auth/resend-verification',{method:'POST',body:'{}'}); toast(r.message||'Email trimis.'); }
+  catch(err){ toast(err.message); }
+  finally{ setTimeout(()=>{ b.disabled = false; },4000); }
+});
 async function confirmEmailChange(params){
   const token = params.get('token'), el = $('#verifyEmailChangeMsg');
   if(!token){ el.textContent='Link invalid.'; return; }
-  if(emailConfirmDone===token) return; emailConfirmDone = token;
-  el.textContent='Se verifică linkul…';
   try{ const r = await api('/api/account/email-change/confirm',{method:'POST',body:JSON.stringify({token})}); currentUser=null; renderHeader(); el.textContent=r.message; }
   catch(e){ el.textContent=e.message; }
 }
@@ -1530,7 +1548,8 @@ document.addEventListener('click', e=>{
   }
   if((el=t.closest('[data-open]'))){ openDetail(Number(el.dataset.open)); return; }
 });
-document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); } });
+document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); return; }
+  const m=e.target.closest('[data-move-sell-image]'); if(m){ const i=Number(m.dataset.moveSellImage), k=i+Number(m.dataset.dir), a=state.sellImages; if(k>=0&&k<a.length){ [a[i],a[k]]=[a[k],a[i]]; renderSellImages(); } } });
 document.addEventListener('submit', e=>{ const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault(); safe(async()=>{ await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(f.dataset.to),body:$('#msgBody').value,listing_id:f.dataset.ref?Number(f.dataset.ref):undefined})}); renderAccountTool('messages',f.dataset.to,f.dataset.ref); })(); });
 document.addEventListener('keydown', e=>{
   if(!$('#imageLightbox')?.classList.contains('hidden')){
@@ -1707,7 +1726,7 @@ function mineRow(x){
     : `<button type="button" class="mine-act" data-m-promo="${x.id}" title="Promovează" aria-label="Promovează">📢</button><button type="button" class="mine-act" data-m-bump="${x.id}" title="Reactualizează" aria-label="Reactualizează">↑</button>${locked?'':`<button type="button" class="mine-act" data-m-edit="${x.id}" title="Editează" aria-label="Editează">✎</button>`}${x.status==='approved'||x.status==='sold'?`<button type="button" class="mine-act" data-m-sold="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}" aria-label="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}">${x.status==='sold'?'⟲':'✓'}</button>`:''}<button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge" aria-label="Șterge">🗑</button>`;
   return `<article class="mine-row">
     <label class="mine-check"><input type="checkbox" data-m-check="${x.id}" ${mine.sel.has(x.id)?'checked':''} aria-label="Selectează anunțul"></label>
-    <button type="button" class="mine-thumb" data-m-open="${x.id}" aria-label="Deschide anunțul">${img?`<img src="${esc(img)}" alt="" loading="lazy">`:'<span>📷</span>'}</button>
+    <button type="button" class="mine-thumb" data-m-open="${x.id}" aria-label="Deschide anunțul">${img?`<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`:'<span>📷</span>'}</button>
     <div class="mine-body">
       <button type="button" class="mine-name" data-m-open="${x.id}">${esc(x.title)}</button>
       ${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:''}
@@ -1888,7 +1907,7 @@ document.addEventListener('submit', e=>{
   initFormValidation();
   fillStaticSelects();
   wire();
-  try{ const r = await api('/api/me'); currentUser = r.user || null; }catch{ currentUser = null; }
+  try{ const r = await api('/api/me'); currentUser = r.user || null; window.__verif = r.verification || null; }catch{ currentUser = null; }
   renderHeader();
   syncFavorites();
   route();

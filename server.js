@@ -6,8 +6,11 @@ const helmet = require('helmet');
 const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
+let compression=null;try{compression=require('compression');}catch{}
 
 const app = express();
+// Erorile din handlere async ajung la handlerul global (răspuns 500) în loc să lase cererea agățată.
+for(const m of ['get','post','put','patch','delete']){const orig=app[m].bind(app);app[m]=(p,...hs)=>orig(p,...hs.map(h=>typeof h==='function'&&h.length<4&&h.constructor&&h.constructor.name==='AsyncFunction'?(req,res,next)=>h(req,res,next).catch(next):h));}
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV==='production' || !!process.env.RENDER;
 const PUBLIC_FILES = ['index.html','style.css','script.js'];
@@ -71,8 +74,12 @@ app.use(helmet({
   imgSrc:["'self'","data:"],connectSrc:["'self'"],fontSrc:["'self'","data:"],objectSrc:["'none'"],
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
+if(compression)app.use(compression());
 app.use(express.json({limit:'6mb'}));
 app.use(cookieParser());
+// Cache scurt (10 s) pentru căutările publice; se golește la orice modificare de anunțuri/conturi.
+const LIST_CACHE=new Map(),LIST_CACHE_TTL=10000,LIST_CACHE_MAX=300;
+app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listings|admin\/users|account)/.test(req.path))res.on('finish',()=>LIST_CACHE.clear());next();});
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,f));});
 app.use('/assets',express.static(ASSETS_DIR,{index:false,dotfiles:'ignore',maxAge:'7d'}));
@@ -231,7 +238,7 @@ async function auth(req,res,next){
  try{
   const token=req.cookies.session;
   if(!token)return res.status(401).json({error:'AUTH_REQUIRED'});
-  const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(token)]);
+  const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status,u.email_verified FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(token)]);
   if(!r.rowCount)return res.status(401).json({error:'AUTH_REQUIRED'});
   const u=r.rows[0];
   if(u.status!=='active')return res.status(403).json({error:'ACCOUNT_BLOCKED'});
@@ -241,6 +248,7 @@ async function auth(req,res,next){
  }catch(e){console.error(e);return res.status(401).json({error:'AUTH_REQUIRED'});}
 }
 function admin(req,res,next){if(req.user.role!=='admin')return res.status(403).json({error:'ADMIN_ONLY'});next();}
+function needVerified(req,res,next){if(REQUIRE_VERIFIED&&!req.user.email_verified&&req.user.role!=='admin')return res.status(403).json({error:'EMAIL_NOT_VERIFIED'});next();}
 function requireDb(req,res,next){if(!pool)return res.status(503).json({error:'DATABASE_NOT_CONFIGURED',message:'Configurează DATABASE_URL în Render.'});next();}
 const ah=fn=>(req,res)=>Promise.resolve(fn(req,res)).catch(e=>{console.error(e);if(!res.headersSent)res.status(500).json({error:'EROARE_SERVER'});});
 const clip=(v,n)=>v==null||v===''?null:String(v).trim().slice(0,n);
@@ -419,64 +427,56 @@ app.post('/api/admin/vehicles/sync',auth,admin,requireDb,async(req,res)=>{
 app.get('/api/me',async(req,res)=>{
  if(!pool)return res.json({user:null,mode:'prototype'});
  try{
-  const t=req.cookies.session; if(!t)return res.json({user:null});
-  const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(t)]);
-  if(!r.rowCount)return res.json({user:null});
+  const t=req.cookies.session; if(!t)return res.json({user:null,verification:VERIF});
+  const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status,u.email_verified FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(t)]);
+  if(!r.rowCount)return res.json({user:null,verification:VERIF});
   const u=r.rows[0];
-  if(u.status!=='active')return res.json({user:null});
+  if(u.status!=='active')return res.json({user:null,verification:VERIF});
   await pool.query('UPDATE sessions SET last_seen_at=NOW() WHERE id=$1',[u.session_id]);
-  res.json({user:u});
- }catch{res.json({user:null});}
+  res.json({user:u,verification:VERIF});
+ }catch{res.json({user:null,verification:VERIF});}
 });
 async function sendMail(to,subject,text,html){
- const apiKey=String(process.env.RESEND_API_KEY||'').trim();
+ const apiKey=process.env.RESEND_API_KEY;
  const from=String(process.env.RESEND_FROM||'').trim();
  if(!apiKey) throw new Error('EMAIL_NOT_CONFIGURED');
  if(!from) throw new Error('EMAIL_SENDER_NOT_CONFIGURED');
  if(!from.includes('@')) throw new Error('EMAIL_SENDER_INVALID');
- let resp;
- try{
-  resp=await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(15000),headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
- }catch(netErr){
-  console.error('Resend network error',netErr&&netErr.message);
-  throw new Error('EMAIL_SEND_FAILED');
- }
+ const resp=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
  let data={}; try{data=await resp.json();}catch{}
  if(!resp.ok){
    console.error('Resend error',resp.status,JSON.stringify(data));
    const msg=String(data?.message||data?.error||'').toLowerCase();
-   // Expeditor de test (onboarding@resend.dev) sau domeniu neverificat: Resend trimite doar către emailul contului Resend.
-   if(/(testing emails|own email|your own)/.test(msg)) throw new Error('EMAIL_SANDBOX_ONLY');
-   if(resp.status===401 || /api key/.test(msg)) throw new Error('EMAIL_PROVIDER_FORBIDDEN');
    if(resp.status===403 && /(domain|sender|from|verified|verify)/.test(msg)) throw new Error('EMAIL_SENDER_NOT_VERIFIED');
    if(resp.status===403) throw new Error('EMAIL_PROVIDER_FORBIDDEN');
-   if(resp.status===422 && /(from|sender)/.test(msg)) throw new Error('EMAIL_SENDER_INVALID');
    if(resp.status===429) throw new Error('EMAIL_RATE_LIMIT');
    throw new Error('EMAIL_SEND_FAILED');
  }
  return data;
 }
-const MAIL_ERRORS=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_SANDBOX_ONLY','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SEND_FAILED'];
-function mailConfigError(){
- const from=String(process.env.RESEND_FROM||'').trim();
- if(!String(process.env.RESEND_API_KEY||'').trim())return 'EMAIL_NOT_CONFIGURED';
- if(!from)return 'EMAIL_SENDER_NOT_CONFIGURED';
- if(!from.includes('@'))return 'EMAIL_SENDER_INVALID';
- return null;
-}
-function mailButton(link,label){
- return `<p><a href="${link}" style="display:inline-block;background:#1f6feb;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${label}</a></p><p style="color:#666;font-size:13px">Dacă butonul nu funcționează, copiază acest link în browser:<br>${link}</p>`;
-}
 function appBaseUrl(req){
  // Linkurile din emailuri (resetare parolă etc.) nu trebuie să depindă de antetul Host trimis de client.
- let fixed=String(process.env.APP_URL||process.env.RENDER_EXTERNAL_URL||'').trim();
- if(fixed){
-  if(!/^https?:\/\//i.test(fixed))fixed='https://'+fixed; // APP_URL scris fără https:// ar rupe linkurile din email
-  return fixed.replace(/\/+$/,'');
- }
+ const fixed=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;
+ if(fixed)return fixed.replace(/\/$/,'');
  const host=String(req.get('host')||'');
  const safe=/^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(host)?host:'localhost';
  return `${req.protocol}://${safe}`;
+}
+
+// ---- Confirmare email la înregistrare ----
+// Se trimite doar dacă Resend e configurat. Obligativitatea se activează cu REQUIRE_VERIFIED_EMAIL=true (și doar dacă emailurile funcționează).
+const MAIL_READY=!!(process.env.RESEND_API_KEY&&String(process.env.RESEND_FROM||'').includes('@'));
+const REQUIRE_VERIFIED=process.env.REQUIRE_VERIFIED_EMAIL==='true'&&MAIL_READY;
+if(process.env.REQUIRE_VERIFIED_EMAIL==='true'&&!MAIL_READY)console.warn('REQUIRE_VERIFIED_EMAIL=true este ignorat: RESEND_API_KEY/RESEND_FROM nu sunt configurate.');
+const VERIF={enabled:MAIL_READY,required:REQUIRE_VERIFIED};
+async function sendVerificationEmail(req,user){
+ const raw=crypto.randomBytes(32).toString('base64url');
+ await pool.query('DELETE FROM email_verifications WHERE user_id=$1 OR expires_at<NOW()',[user.id]);
+ await pool.query("INSERT INTO email_verifications(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '24 hours')",[user.id,hashToken(raw)]);
+ const link=`${appBaseUrl(req)}/#/verify-email?token=${encodeURIComponent(raw)}`;
+ try{
+  await sendMail(user.email,'AutoPiese – confirmă adresa de email',`Salut, ${user.name||''}\n\nConfirmă adresa de email deschizând linkul (valabil 24 de ore):\n${link}\n\nDacă nu ți-ai creat cont pe AutoPiese, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(user.name||'')}!</p><p>Confirmă adresa de email apăsând pe link:</p><p><a href="${link}">Confirmă emailul</a></p><p>Linkul este valabil 24 de ore.</p><p>Dacă nu ți-ai creat cont pe AutoPiese, ignoră acest mesaj.</p>`);
+ }catch(e){await pool.query('DELETE FROM email_verifications WHERE user_id=$1',[user.id]).catch(()=>{});throw e;}
 }
 
 app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
@@ -485,8 +485,6 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   if(!em||em.length>254)return res.status(400).json({error:'EMAIL_REQUIRED'});
   const key=`${clientIp(req)}:${em}`;
   if(!throttle(recoveryAttempts,key,3,15*60*1000))return res.status(429).json({error:'RECOVERY_RATE_LIMIT'});
-  // Configurarea emailului se verifică înainte de căutarea contului: răspunsul nu mai trădează dacă adresa există.
-  const cfgErr=mailConfigError(); if(cfgErr)return res.status(503).json({error:cfgErr});
   const r=await pool.query('SELECT id,email,name FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1',[em]);
   // Always use the same success response for unknown addresses.
   if(!r.rowCount)return res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
@@ -497,7 +495,7 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[userId,hashToken(raw)]);
   const link=`${appBaseUrl(req)}/#/reset-password?token=${encodeURIComponent(raw)}`;
   try{
-   await sendMail(r.rows[0].email,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton (valabil 30 de minute):</p>${mailButton(link,'Resetează parola')}<p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+   await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href=\"${link}\">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
   }catch(mailErr){
    // Never leave a valid reset token behind when delivery failed.
    await pool.query('DELETE FROM password_resets WHERE user_id=$1',[userId]);
@@ -506,9 +504,34 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
  }catch(e){
   console.error('Password recovery error:',e);
-  const known=MAIL_ERRORS;
+  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT'];
   if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});
   if(e.message==='RECOVERY_RATE_LIMIT')return res.status(429).json({error:e.message});
+  res.status(500).json({error:'SERVER_ERROR'});
+ }
+});
+
+app.post('/api/auth/verify-email',requireDb,async(req,res)=>{
+ try{
+  const token=String((req.body||{}).token||'');
+  if(!token||token.length>200)return res.status(400).json({error:'RESET_EXPIRED'});
+  const r=await pool.query('SELECT id,user_id FROM email_verifications WHERE token_hash=$1 AND expires_at>NOW() AND verified_at IS NULL LIMIT 1',[hashToken(token)]);
+  if(!r.rowCount)return res.status(400).json({error:'RESET_EXPIRED'});
+  await pool.query('UPDATE users SET email_verified=TRUE WHERE id=$1',[r.rows[0].user_id]);
+  await pool.query('UPDATE email_verifications SET verified_at=NOW() WHERE id=$1',[r.rows[0].id]);
+  res.json({ok:true,message:'Adresa de email a fost confirmată. Mulțumim!'});
+ }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
+});
+app.post('/api/auth/resend-verification',auth,requireDb,async(req,res)=>{
+ try{
+  if(req.user.email_verified)return res.json({ok:true,message:'Adresa ta de email este deja confirmată.'});
+  if(!throttle(recoveryAttempts,'verify:'+req.user.id,3,15*60*1000))return res.status(429).json({error:'RECOVERY_RATE_LIMIT'});
+  await sendVerificationEmail(req,req.user);
+  res.json({ok:true,message:'Ți-am trimis un email de confirmare. Verifică și folderul Spam.'});
+ }catch(e){
+  console.error('Verification mail error:',e.message);
+  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT'];
+  if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});
   res.status(500).json({error:'SERVER_ERROR'});
  }
 });
@@ -581,16 +604,15 @@ app.post('/api/account/email-change',requireDb,auth,async(req,res)=>{
   if(!me||!curPass||!(await bcrypt.compare(curPass.slice(0,72),me.password_hash)))return res.status(401).json({error:'PAROLA_GRESITA'});
   const exists=await pool.query('SELECT id FROM users WHERE LOWER(email)=$1 AND id<>$2',[em,req.user.id]);
   if(exists.rowCount)return res.status(409).json({error:'EMAIL_EXISTS'});
-  const cfgErr=mailConfigError(); if(cfgErr)return res.status(503).json({error:cfgErr});
   const raw=crypto.randomBytes(32).toString('base64url');
   await pool.query('DELETE FROM email_change_requests WHERE user_id=$1 OR expires_at<NOW()',[req.user.id]);
   await pool.query("INSERT INTO email_change_requests(user_id,new_email,token_hash,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '30 minutes')",[req.user.id,em,hashToken(raw)]);
   const link=`${appBaseUrl(req)}/#/verify-email-change?token=${encodeURIComponent(raw)}`;
   try{ await sendMail(em,'AutoPiese – confirmă noua adresă de email',`Ai cerut schimbarea adresei de email pentru contul AutoPiese. Confirmă în 30 de minute: ${link}`,
-   `<p>Ai cerut schimbarea adresei de email pentru contul AutoPiese (valabil 30 de minute).</p>${mailButton(link,'Confirmă noua adresă de email')}`);
+   `<p>Ai cerut schimbarea adresei de email pentru contul AutoPiese.</p><p><a href="${link}">Confirmă noua adresă de email</a></p><p>Linkul este valabil 30 de minute.</p>`);
   }catch(mailErr){ await pool.query('DELETE FROM email_change_requests WHERE user_id=$1',[req.user.id]); throw mailErr; }
   res.json({ok:true,message:'Ți-am trimis un link de confirmare pe noua adresă de email.'});
- }catch(e){console.error(e);const known=MAIL_ERRORS;if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});res.status(500).json({error:'SERVER_ERROR'});}
+ }catch(e){console.error(e);const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SEND_FAILED'];if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});res.status(500).json({error:'SERVER_ERROR'});}
 });
 app.post('/api/account/email-change/confirm',requireDb,async(req,res)=>{
  try{
@@ -657,8 +679,9 @@ app.post('/api/auth/register',requireDb,async(req,res)=>{
   const exists=await pool.query('SELECT id,email,nickname FROM users WHERE LOWER(email)=$1 OR LOWER(nickname)=LOWER($2)',[em,nick]);
   if(exists.rowCount)return res.status(409).json({error:String(exists.rows[0].email).toLowerCase()===em?'EMAIL_EXISTS':'NICKNAME_EXISTS'});
   const hash=await bcrypt.hash(password,12);
-  const r=await pool.query('INSERT INTO users(name,nickname,email,phone,password_hash,terms_accepted_at) VALUES($1,$2,$3,$4,$5,NOW()) RETURNING id,name,nickname,email,phone,show_phone,role,status',[name.trim(),nick,em,phone?String(phone).trim():null,hash]);
+  const r=await pool.query('INSERT INTO users(name,nickname,email,phone,password_hash,terms_accepted_at) VALUES($1,$2,$3,$4,$5,NOW()) RETURNING id,name,nickname,email,phone,show_phone,role,status,email_verified',[name.trim(),nick,em,phone?String(phone).trim():null,hash]);
   if(r.rows[0].phone){try{await pool.query('INSERT INTO user_phones(user_id,phone) VALUES($1,$2) ON CONFLICT DO NOTHING',[r.rows[0].id,r.rows[0].phone]);}catch(e){console.error(e);}}
+  if(MAIL_READY)sendVerificationEmail(req,r.rows[0]).catch(e=>console.error('verify mail',e.message));
   const session=await createSession(r.rows[0],req,remember!==false);
   res.cookie('session',session.token,safeCookieOptions(session.maxAge));
   res.status(201).json({user:r.rows[0]});
@@ -680,7 +703,7 @@ app.post('/api/auth/login',requireDb,async(req,res)=>{
   pool.query('DELETE FROM login_attempts WHERE key=$1',['ip:'+key]).catch(()=>{});
   const u=r.rows[0]; const session=await createSession(u,req,remember!==false);
   res.cookie('session',session.token,safeCookieOptions(session.maxAge));
-  res.json({user:{id:u.id,name:u.name,nickname:u.nickname,email:u.email,phone:u.phone,show_phone:u.show_phone,role:u.role,status:u.status}});
+  res.json({user:{id:u.id,name:u.name,nickname:u.nickname,email:u.email,phone:u.phone,show_phone:u.show_phone,role:u.role,status:u.status,email_verified:u.email_verified}});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
 });
 app.post('/api/auth/logout',async(req,res)=>{try{const token=req.cookies.session;if(pool&&token)await pool.query('DELETE FROM sessions WHERE token_hash=$1',[hashToken(token)]);}catch{}res.clearCookie('session',{httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/'});res.json({ok:true});});
@@ -727,6 +750,8 @@ app.delete('/api/favorites/:id',auth,requireDb,async(req,res)=>{
  res.json({ok:true});
 });
 app.get('/api/listings',requireDb,async(req,res)=>{
+ const ckey=req.originalUrl,hit=LIST_CACHE.get(ckey);
+ if(hit&&Date.now()-hit.at<LIST_CACHE_TTL)return res.json(hit.body);
  // Public: doar anunțuri aprobate. Statusul NU este controlat din query string.
  const {q,delivery}=req.query; const where=["l.status='approved'","l.type <> 'masina'"],vals=[];let i=1;
  if(q){
@@ -753,9 +778,11 @@ app.get('/api/listings',requireDb,async(req,res)=>{
  // Anunțurile fără preț (0) apar la final și la sortare crescătoare.
  const order={price_asc:'(COALESCE(l.price,0)=0) ASC, l.price ASC, l.id DESC',price_desc:'l.price DESC NULLS LAST, l.id DESC'}[req.query.sort]||'l.created_at DESC, l.id DESC';
  const limit=Math.min(60,Math.max(1,Math.floor(Number(req.query.limit))||30)), offset=Math.min(100000,Math.max(0,Math.floor(Number(req.query.offset))||0));
- const total=(await pool.query(`SELECT COUNT(*)::int n FROM listings l WHERE ${where.join(' AND ')}`,vals)).rows[0].n;
- const r=await pool.query(`${LISTING_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`,vals);
- res.json({listings:r.rows,total,limit,offset});
+ const [cnt,r]=await Promise.all([pool.query(`SELECT COUNT(*)::int n FROM listings l WHERE ${where.join(' AND ')}`,vals),pool.query(`${LISTING_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`,vals)]);
+ const body={listings:r.rows,total:cnt.rows[0].n,limit,offset};
+ if(LIST_CACHE.size>=LIST_CACHE_MAX)LIST_CACHE.clear();
+ LIST_CACHE.set(ckey,{at:Date.now(),body});
+ res.json(body);
 });
 app.get('/api/listings/:id',requireDb,async(req,res)=>{
  const r=await pool.query("SELECT l.*,COALESCE(u.nickname,u.name) seller_name,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[req.params.id]);
@@ -837,7 +864,7 @@ async function imageQuotaExceeded(userId,images,excludeId=0){
  const used=(await pool.query("SELECT COALESCE(SUM(length(array_to_string(images,''))),0)::bigint n FROM listings WHERE user_id=$1 AND id<>$2",[userId,excludeId])).rows[0].n;
  return Number(used)+imgBytes(images)>60*1024*1024;
 }
-app.post('/api/listings',auth,requireDb,async(req,res)=>{
+app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
  if(!throttle(authAttempts,'lst:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});
  const p=parseListing(req.body||{}); if(p.error)return res.status(p.status).json({error:p.error});
  const v=p.v;
@@ -856,7 +883,7 @@ app.get('/api/listings/mine/:id',auth,requireDb,async(req,res)=>{
 });
 // Editare anunț. Prețul, livrarea, județul etc. se schimbă direct; textul, pozele și datele piesei/mașinii
 // trimit anunțul din nou la moderare (ca să nu se poată schimba conținutul după aprobare).
-app.patch('/api/listings/:id',auth,requireDb,async(req,res)=>{
+app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
  const cur=(await pool.query('SELECT * FROM listings WHERE id=$1 AND user_id=$2',[req.params.id,req.user.id])).rows[0];
  if(!cur)return res.status(404).json({error:'NOT_FOUND'});
  if(cur.status==='blocked')return res.status(403).json({error:'INTERZIS'});
@@ -864,7 +891,7 @@ app.patch('/api/listings/:id',auth,requireDb,async(req,res)=>{
  const v=p.v;
  if(await imageQuotaExceeded(req.user.id,v.images,cur.id))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});
  const norm2=a=>String(a==null?'':a).trim();
- const contentChanged=['type','title','description','category','subcategory','make','model','oem','year'].some(k=>norm2(cur[k])!==norm2(v[k]))||JSON.stringify(cur.images||[])!==JSON.stringify(v.images);
+ const contentChanged=['type','title','description','category','subcategory','make','model','oem','year'].some(k=>norm2(cur[k])!==norm2(v[k]))||JSON.stringify([...(cur.images||[])].sort())!==JSON.stringify([...(v.images||[])].sort());
  let status=cur.status;
  if(contentChanged&&['approved','sold','rejected'].includes(cur.status)){
   // Aprobare automată: anunțurile publicate/vândute rămân în starea lor după editare; cele respinse de admin revin la moderare.
@@ -899,7 +926,7 @@ app.delete('/api/requests/:id',auth,requireDb,async(req,res)=>{
  if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  res.json({ok:true});
 });
-app.post('/api/requests',auth,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title))]);res.status(201).json({request:r.rows[0]});});
+app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title))]);res.status(201).json({request:r.rows[0]});});
 
 app.get('/api/admin/overview',auth,admin,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.get('/api/admin/listings',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
@@ -920,7 +947,7 @@ app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempt
 
 /* ---------- oferte, comenzi, notificări ---------- */
 const notify=(uid,text)=>uid?pool.query('INSERT INTO notifications(user_id,text) VALUES($1,$2)',[uid,String(text).slice(0,300)]).catch(()=>{}):null;
-app.post('/api/requests/:id/offers',auth,requireDb,ah(async(req,res)=>{
+app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
  if(!throttle(authAttempts,'offer:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_OFERTE'});
  const price=Number(req.body&&req.body.price),message=String((req.body&&req.body.message)||'').trim().slice(0,2000);
@@ -960,7 +987,7 @@ app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
 }));
 
-app.post('/api/messages',auth,requireDb,ah(async(req,res)=>{
+app.post('/api/messages',auth,needVerified,requireDb,ah(async(req,res)=>{
  const b=req.body||{}, body=String(b.body||'').trim();
  let to=Number(b.to);
  // „Trimite un mesaj”: destinatarul poate fi ales după nickname.

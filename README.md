@@ -19,6 +19,7 @@ Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și con
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | da (prima pornire) | creează contul de administrator |
 | `APP_URL` | recomandat | adresa publică, folosită în linkurile din emailuri |
 | `RESEND_API_KEY`, `RESEND_FROM` | pentru emailuri | recuperare parolă, schimbare email (sender verificat în Resend) |
+| `REQUIRE_VERIFIED_EMAIL` | nu | `true` = doar conturile cu email confirmat pot publica anunțuri, cereri, oferte și mesaje (merge doar dacă `RESEND_*` e configurat, altfel e ignorat) |
 | `VEHICLE_CATALOG_URL` | nu | sursa catalogului de vehicule (setată deja în `render.yaml`) |
 
 Fără `RESEND_*`, „Ai uitat parola?” răspunde că emailul nu este configurat.
@@ -88,7 +89,7 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Poze: maximum 60 MB de poze per utilizator, în total.
 - Baza de date: `DATABASE_SSL_STRICT=true` activează verificarea certificatului SSL (implicit oprit, cum cere de obicei Render).
 - La pornire, serverul avertizează în log dacă `ADMIN_PASSWORD` este slabă (sub 12 caractere).
-- Verificarea emailului la înregistrare NU este activă (decizie pentru perioada de test).
+- Confirmarea emailului: la înregistrare se trimite un link (24 h) dacă `RESEND_*` e configurat; contul poate retrimite linkul din Contul meu. Rămâne opțională până setezi `REQUIRE_VERIFIED_EMAIL=true`. Conturile existente nu sunt marcate ca confirmate: administratorii sunt scutiți, ceilalți își confirmă emailul din Contul meu.
 
 ## Corecturi „Vinde o piesă” / postare anunțuri
 - Formular: „Tip anunț” (Piesă / Mașină la dezmembrat) și „Vând ca” (Persoană fizică / Firmă / Parc dezmembrări) sunt acum alegeri vizibile; înainte erau câmpuri ascunse, deci nu se putea posta niciun anunț de dezmembrări și nu se putea alege tipul de vânzător.
@@ -114,9 +115,8 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Înregistrare: checkbox obligatoriu „18+ și accept Termenii/Confidențialitatea”; serverul refuză fără `accept_terms:true` și salvează momentul în `users.terms_accepted_at` (coloană creată automat).
 - Subsol: date firmă + atribuire VehiclesDB (CC-BY 4.0).
 
-## Recuperare parolă / emailuri (Resend) — ghid rapid
-1. În Resend: **Domains → Add Domain**, adaugă recordurile DNS cerute și așteaptă „Verified”. Fără domeniu verificat, Resend trimite doar către emailul contului tău Resend (mesaj în site: „Resend este în mod de test”).
-2. În Render → Environment: `RESEND_API_KEY` (cheia `re_...`), `RESEND_FROM` (ex. `AutoPiese <no-reply@domeniul-tau.ro>`, pe domeniul verificat), `APP_URL` (ex. `https://pieseauto.onrender.com`).
-3. Salvează și așteaptă redeploy-ul, apoi testează „Ai uitat parola?”. Dacă nu ajunge, uită-te la Render → Logs după `Resend error`.
-
-Corecturi: eroarea generică „A apărut o eroare pe server” la trimitere eșuată are acum mesaje clare; `APP_URL` fără `https://` este completat automat; timeout de 15 s la trimitere; verificarea configurării se face înaintea căutării contului (nu mai arată dacă un email există); emailurile au buton + link de rezervă; confirmarea schimbării de email nu mai poate afișa „link expirat” la un apel dublu.
+## Viteză și stabilitate (final V26)
+- Răspunsurile sunt comprimate (pachetul `compression`; dacă lipsește, serverul pornește oricum).
+- Căutările publice (`GET /api/listings`) au cache de 10 secunde în memorie, golit automat la orice modificare de anunțuri; numărătoarea și lista rulează în paralel.
+- Pozele din liste se decodează asincron, fără să blocheze afișarea.
+- Erorile din handlerele async ajung la handlerul global (răspuns 500) în loc să lase cererea agățată.
