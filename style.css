@@ -1405,3 +1405,52 @@ html.menu-open,html.menu-open body{overflow:hidden}
   .home-center p{font-size:13.5px!important;max-width:300px;margin-bottom:18px}
   .home-links{margin-top:6px!important}
 }
+
+
+/* ---------- poze la cereri și oferte ---------- */
+.photo-box{display:flex;flex-direction:column;gap:8px;margin:16px 0}
+.photo-box .sf-label{display:block;font-size:15px;font-weight:800;color:var(--ink)}
+.photo-box label.pick-btn{display:inline-flex;flex-direction:row;margin:0;gap:10px;font-size:16px;font-weight:600}
+.req-card-thumb{display:block;width:100%;height:140px;object-fit:cover;border-radius:10px;margin:0 0 10px;background:#f4f7fa}
+.req-gallery{grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin:8px 0 12px}
+.req-gallery .detail-gallery-item,.req-gallery .detail-gallery-item:first-child{grid-column:auto;height:90px}
+
+
+/* ---------- Statistici anunțuri ---------- */
+.stats-card{display:grid;gap:14px;padding:16px}
+.stats-top{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.stats-pick{display:grid;gap:6px;font-weight:800;font-size:14px;color:var(--ink);flex:1 1 260px;min-width:0}
+.stats-pick select{min-height:46px;padding:0 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font:inherit;font-weight:700;color:var(--ink);width:100%}
+.stats-range{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.stats-range-btn{min-height:46px;padding:0 16px;border:0;background:#fff;font:inherit;font-weight:800;color:#185b91;cursor:pointer}
+.stats-range-btn+.stats-range-btn{border-left:1px solid var(--line)}
+.stats-range-btn.on{background:var(--blue);color:#fff}
+.stats-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.stats-kpis .stat{position:relative;gap:2px;padding:14px}
+.stats-kpis .stat h3{font-size:30px;line-height:1.1}
+.stats-kpis .stat-ico{position:absolute;top:12px;right:14px;font-size:20px;opacity:.55}
+.stats-kpis .stat-name{font-weight:800;color:var(--ink);padding-right:28px}
+.stats-legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;font-weight:700;color:var(--muted)}
+.stats-legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{display:inline-block;width:12px;height:12px;border-radius:3px}
+.lg.v{background:#0d6efd}.lg.p{background:#f59e0b}
+.stats-chart{border:1px solid var(--line);border-radius:14px;padding:10px 8px 4px;background:#fff;overflow:hidden}
+.stats-chart svg{display:block;max-width:100%;height:auto}
+.stats-days{border:1px solid var(--line);border-radius:12px;padding:0 12px;background:#fbfdff}
+.stats-days summary{cursor:pointer;padding:12px 0;font-weight:800;color:#185b91}
+.stats-days[open] summary{border-bottom:1px solid var(--line);margin-bottom:8px}
+.stats-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:4px 0 10px}
+.stats-table{width:100%;border-collapse:collapse;font-size:14px;min-width:340px}
+.stats-table th,.stats-table td{padding:10px 10px;text-align:right;border-bottom:1px solid #edf1f6;white-space:nowrap}
+.stats-table th:first-child,.stats-table td:first-child{text-align:left}
+.stats-table thead th{background:var(--pale);color:var(--muted);font-size:12.5px;font-weight:800;position:sticky;top:0}
+.stats-listings{min-width:640px}
+.stats-listings tbody tr{cursor:pointer}
+.stats-listings tbody tr:hover{background:#f5f9ff}
+.stats-listings tr.sel{background:#eaf3ff}
+.stats-listings tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
+.st-title{white-space:normal!important;min-width:200px;max-width:340px;font-weight:700;color:var(--ink)}
+.st-bar{display:block;height:5px;margin-top:6px;border-radius:99px;background:#e8eef6;overflow:hidden}
+.st-bar i{display:block;height:100%;background:linear-gradient(90deg,#0d6efd,#19b7ff);border-radius:99px}
+.stats-note{font-size:12.5px;line-height:1.5}
+@media(max-width:560px){.stats-range{width:100%}.stats-range-btn{flex:1}.stats-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-kpis .stat h3{font-size:26px}}

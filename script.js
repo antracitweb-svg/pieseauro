@@ -110,7 +110,7 @@ let currentUser = null;
 let favorites = readJSON('autopiese_fav', []).map(Number).filter(Number.isFinite);
 const modelCache = new Map();
 let catalogMakes = [];
-const state = { mode:'search', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{}, sellImages:[] };
+const state = { mode:'search', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{}, sellImages:[], reqImages:[], offerImages:[] };
 
 async function api(url, opt={}){
   let r;
@@ -291,14 +291,15 @@ async function loadToolData(view, box, withId, refId){
 let statsData=null, statsPick='all', currentToolView='', offersMine=[], requestsCache=new Map(), currentRequestModal=null;
 const sumLast=(a,n)=>a.slice(Math.max(0,a.length-n)).reduce((t,v)=>t+(Number(v)||0),0);
 const dmy=d=>d.slice(8,10)+'.'+d.slice(5,7)+'.'+d.slice(0,4), dm=d=>d.slice(8,10)+'.'+d.slice(5,7);
+let statsRange=0; // 0 = toate zilele păstrate, altfel numărul de zile afișate
 function statsScope(){
-  const L=statsData.listings, n=statsData.days.length;
-  if(statsPick!=='all'){ const x=L.find(l=>String(l.id)===String(statsPick)); if(x) return {title:x.title,v:x.v,p:x.p,tv:x.total_views,tp:x.total_phone}; statsPick='all'; }
-  return {title:'Toate anunțurile',v:statsData.days.map((_,i)=>L.reduce((t,l)=>t+l.v[i],0)),p:statsData.days.map((_,i)=>L.reduce((t,l)=>t+l.p[i],0)),tv:L.reduce((t,l)=>t+l.total_views,0),tp:L.reduce((t,l)=>t+l.total_phone,0)};
+  const L=statsData.listings;
+  if(statsPick!=='all'){ const x=L.find(l=>String(l.id)===String(statsPick)); if(x) return {title:x.title,v:x.v,p:x.p,tv:x.total_views,tp:x.total_phone,fav:x.fav||0,ms:x.msgs||0}; statsPick='all'; }
+  return {title:'Toate anunțurile',v:statsData.days.map((_,i)=>L.reduce((t,l)=>t+l.v[i],0)),p:statsData.days.map((_,i)=>L.reduce((t,l)=>t+l.p[i],0)),tv:L.reduce((t,l)=>t+l.total_views,0),tp:L.reduce((t,l)=>t+l.total_phone,0),fav:L.reduce((t,l)=>t+(l.fav||0),0),ms:L.reduce((t,l)=>t+(l.msgs||0),0)};
 }
 function statsChartSvg(days,v,p){
   const W=640,H=240,pl=36,pr=8,pt=14,pb=36,iw=W-pl-pr,ih=H-pt-pb,n=days.length;
-  const max=Math.max(4,...v,...p), top=Math.ceil(max/4)*4, gw=iw/n, bw=Math.max(2,Math.min(14,gw*.38));
+  const max=Math.max(4,...v,...p), top=Math.ceil(max/4)*4, gw=iw/n, bw=Math.max(2,Math.min(22,gw*.38));
   let g='';
   for(let i=0;i<=4;i++){ const y=pt+ih-ih*i/4, val=Math.round(top*i/4); g+=`<line x1="${pl}" y1="${y}" x2="${W-pr}" y2="${y}" stroke="#e3e9f1" stroke-width="1"/><text x="${pl-6}" y="${y+3}" font-size="10" fill="#6c7f97" text-anchor="end">${val}</text>`; }
   const every=Math.ceil(n/15);
@@ -312,23 +313,38 @@ function statsChartSvg(days,v,p){
 }
 function drawStats(){
   const box=$('#statsBox'); if(!box||!statsData) return;
-  const D=statsData, n=D.days.length, sc=statsScope();
+  const D=statsData, N=D.days.length, sc=statsScope();
   if(!D.listings.length){ box.innerHTML='<div class="info-card"><p class="muted">Nu ai încă anunțuri. Statisticile apar după ce publici primul anunț.</p></div>'; return; }
-  const cards=[['Azi',sc.v[n-1],sc.p[n-1]],['Ultimele 7 zile',sumLast(sc.v,7),sumLast(sc.p,7)],['Ultimele '+n+' zile',sumLast(sc.v,n),sumLast(sc.p,n)],['Total de la publicare',sc.tv,sc.tp]];
+  const n=(statsRange>0&&statsRange<N)?statsRange:N, from=N-n;
+  const days=D.days.slice(from), sv=sc.v.slice(from), sp=sc.p.slice(from);
+  const sumV=sv.reduce((t,x)=>t+x,0), sumP=sp.reduce((t,x)=>t+x,0);
+  const rate=sumV?Math.round(sumP/sumV*1000)/10:0;
+  const label=n===N?`ultimele ${N} zile`:`ultimele ${n} zile`;
+  const cards=[
+    ['👁','Vizualizări',sumV,label],
+    ['📞','Apăsări pe telefon / WhatsApp',sumP,`${rate}% din vizualizări`],
+    ['♥','În favorite',sc.fav,'total, la zi'],
+    ['✉','Mesaje primite',sc.ms,'total, din anunț'],
+    ['Σ','Total de la publicare',sc.tv,`${sc.tp} apăsări pe telefon`]
+  ];
   const opts=['<option value="all">Toate anunțurile</option>'].concat(D.listings.map(l=>`<option value="${l.id}"${String(l.id)===String(statsPick)?' selected':''}>${esc(l.title.slice(0,70))}</option>`)).join('');
-  const rows=D.listings.map(l=>`<tr data-stats-pick="${l.id}"${String(l.id)===String(statsPick)?' class="sel"':''}><td class="st-title">${esc(l.title)}${l.status!=='approved'?` <small class="muted">(${l.status==='sold'?'vândut':esc(l.status)})</small>`:''}</td><td>${l.v[n-1]}</td><td>${l.p[n-1]}</td><td>${sumLast(l.v,7)}</td><td>${sumLast(l.p,7)}</td><td>${sumLast(l.v,n)}</td><td>${sumLast(l.p,n)}</td><td>${l.total_views}</td><td>${l.total_phone}</td></tr>`).join('');
-  const dayRows=D.days.map((d,i)=>[d,sc.v[i],sc.p[i]]).reverse().map(([d,a,b],i)=>`<tr><td>${dmy(d)}${i===0?' <small class="muted">(azi)</small>':''}</td><td>${a}</td><td>${b}</td></tr>`).join('');
+  const rangeBtn=(v,t)=>`<button type="button" class="stats-range-btn${(statsRange===v||(v===0&&(statsRange<=0||statsRange>=N)))?' on':''}" data-stats-range="${v}">${t}</button>`;
+  const ranges=[rangeBtn(7,'7 zile')].concat(N>7?[rangeBtn(0,`Toate (${N} zile)`)]:[]).join('');
+  const per=D.listings.map(l=>({l,v:sumLast(l.v,n),p:sumLast(l.p,n)})).sort((a,b)=>b.v-a.v||b.p-a.p);
+  const maxV=Math.max(1,...per.map(x=>x.v));
+  const rows=per.map(({l,v,p})=>`<tr data-stats-pick="${l.id}"${String(l.id)===String(statsPick)?' class="sel"':''}><td class="st-title">${esc(l.title)}${l.status!=='approved'?` <small class="muted">(${l.status==='sold'?'vândut':esc(l.status)})</small>`:''}<span class="st-bar"><i style="width:${Math.round(v/maxV*100)}%"></i></span></td><td>${v}</td><td>${p}</td><td>${l.fav||0}</td><td>${l.msgs||0}</td><td>${v?Math.round(p/v*1000)/10:0}%</td><td>${l.total_views}</td></tr>`).join('');
+  const dayRows=days.map((d,i)=>[d,sv[i],sp[i]]).reverse().map(([d,a,b],i)=>`<tr><td>${dmy(d)}${i===0?' <small class="muted">(azi)</small>':''}</td><td>${a}</td><td>${b}</td></tr>`).join('');
   box.innerHTML=`<div class="info-card stats-card">
-    <label class="stats-pick">Afișează statistici pentru<select id="statsSelect">${opts}</select></label>
-    <div class="stat-grid">${cards.map(c=>`<div class="stat"><b>${esc(c[0])}</b><h3>👁 ${c[1]}</h3><small>📞 ${c[2]} apăsări pe telefon</small></div>`).join('')}</div>
-    <h3 class="ad-h">Pe zile · ${esc(sc.title.slice(0,60))}</h3>
+    <div class="stats-top"><label class="stats-pick">Statistici pentru<select id="statsSelect">${opts}</select></label><div class="stats-range" role="group" aria-label="Perioadă">${ranges}</div></div>
+    <div class="stat-grid stats-kpis">${cards.map(c=>`<div class="stat"><span class="stat-ico" aria-hidden="true">${c[0]}</span><small class="stat-name">${esc(c[1])}</small><h3>${c[2]}</h3><small>${esc(c[3])}</small></div>`).join('')}</div>
+    <h3 class="ad-h">Evoluție pe zile · ${esc(sc.title.slice(0,60))}</h3>
     <div class="stats-legend"><span><i class="lg v"></i>Vizualizări</span><span><i class="lg p"></i>Apăsări pe telefon / WhatsApp</span></div>
-    ${statsChartSvg(D.days,sc.v,sc.p)}
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Zi</th><th>👁 Vizualizări</th><th>📞 Apăsări tel.</th></tr></thead><tbody>${dayRows}</tbody></table></div>
-    <h3 class="ad-h">Pe anunț</h3>
-    <p class="muted">Apasă pe un anunț ca să-i vezi graficul.</p>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th rowspan="2">Anunț</th><th colspan="2">Azi</th><th colspan="2">7 zile</th><th colspan="2">${n} zile</th><th colspan="2">Total</th></tr><tr><th>👁</th><th>📞</th><th>👁</th><th>📞</th><th>👁</th><th>📞</th><th>👁</th><th>📞</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="muted stats-note">Statisticile zilnice se păstrează ${D.retention_days} zile, apoi se resetează automat (zilele mai vechi dispar). Totalurile „de la publicare” rămân. Vizitele tale pe propriile anunțuri nu se numără, iar apăsările repetate de la același vizitator sunt limitate.</p></div>`;
+    <div class="stats-chart">${statsChartSvg(days,sv,sp)}</div>
+    <details class="stats-days"><summary>Tabel pe zile</summary><div class="stats-scroll"><table class="stats-table"><thead><tr><th>Zi</th><th>👁 Vizualizări</th><th>📞 Apăsări tel.</th></tr></thead><tbody>${dayRows}</tbody></table></div></details>
+    <h3 class="ad-h">Pe fiecare anunț · ${label}</h3>
+    <p class="muted">Apasă pe un anunț ca să-i vezi graficul. Sunt ordonate după vizualizări.</p>
+    <div class="stats-scroll"><table class="stats-table stats-listings"><thead><tr><th>Anunț</th><th>👁 Vizualizări</th><th>📞 Telefon</th><th>♥ Favorite</th><th>✉ Mesaje</th><th>Rată contact</th><th>Total 👁</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted stats-note">Zilele se păstrează ${D.retention_days} zile, apoi dispar din grafic. Totalurile „de la publicare”, favoritele și mesajele rămân. „Rată contact” = apăsări pe telefon împărțite la vizualizări. Vizitele tale pe propriile anunțuri nu se numără, iar apăsările repetate de la același vizitator sunt limitate.</p></div>`;
 }
 
 /* ---------- cereri: fereastră cu detalii + oferte ---------- */
@@ -339,7 +355,8 @@ function reqDetailsHtml(x){
   extra=Array.isArray(extra)?extra.filter(p=>p&&p.title):[];
   return `${rows.length?`<dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>`:''}
     ${x.description?`<h3 class="ad-h">Descriere</h3><p class="detail-desc">${esc(x.description)}</p>`:''}
-    ${extra.length?`<h3 class="ad-h">Piese căutate în plus (${extra.length})</h3><ul class="req-extra">${extra.map(p=>`<li><b>${esc(p.title)}</b>${p.details?`<br><span class="muted">${esc(p.details)}</span>`:''}</li>`).join('')}</ul>`:''}`;
+    ${extra.length?`<h3 class="ad-h">Piese căutate în plus (${extra.length})</h3><ul class="req-extra">${extra.map(p=>`<li><b>${esc(p.title)}</b>${p.details?`<br><span class="muted">${esc(p.details)}</span>`:''}</li>`).join('')}</ul>`:''}
+    ${(x.images&&x.images.length)?`<h3 class="ad-h">Poze</h3>${imgGalleryHtml(x.images,x.title||'Cerere')}`:''}`;
 }
 function myRequestHtml(x, offers){
   const open=x.status==='open', mn=v=>new Intl.NumberFormat('ro-RO').format(Number(v))+' lei';
@@ -348,6 +365,7 @@ function myRequestHtml(x, offers){
     return `<article class="info-card req-offer"><div class="req-offer-head"><div><b>${esc(o.seller_name||'Vânzător')}</b>${o.company?' <span class="badge">Firmă</span>':''}${o.company&&o.seller_nick?`<small class="muted"> · cont: ${esc(o.seller_nick)}</small>`:''}</div><div class="req-offer-price">${mn(o.price)}</div></div>
       <p class="muted"><span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(OFFER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}${o.updated_at?' · modificată '+fmtDate(o.updated_at):''}</p>
       ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:''}
+      ${imgGalleryHtml(o.images,'Poză ofertă')}
       ${o.status!=='rejected'?`<div class="req-offer-phones">${contactHtml(o.phones,'Ofertantul')}</div>`:''}
       <div class="row">${pend&&open?`<button type="button" class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button><button type="button" class="btn danger small" data-offer-reject="${o.id}">Refuză</button>`:''}${o.seller_id?`<button type="button" class="btn ghost small" data-seller-msg="${o.seller_id}">✉️ Scrie mesaj</button>`:''}</div></article>`;
   }).join('');
@@ -361,10 +379,11 @@ function myOfferHtml(o){
   const open=o.request_status==='open', pend=o.status==='pending', mn=v=>new Intl.NumberFormat('ro-RO').format(Number(v))+' lei';
   return `<div class="eyebrow">OFERTA MEA</div><h2>${esc(o.request_title)}</h2>
     <p class="muted">Cerere de la ${esc(o.buyer_name||'cumpărător')}</p>
-    <h3 class="ad-h">Ce caută cumpărătorul</h3>${reqDetailsHtml({...o,created_at:undefined})}
+    <h3 class="ad-h">Ce caută cumpărătorul</h3>${reqDetailsHtml({...o,images:o.req_images,created_at:undefined})}
     <h3 class="ad-h">Oferta mea</h3>
     <div class="info-card req-offer"><div class="req-offer-head"><div><span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(pend&&!open?'Cererea s-a închis':(OFFER_ST[o.status]||o.status))}</span> <small class="muted">${fmtDate(o.created_at)}${o.updated_at?' · modificată '+fmtDate(o.updated_at):''}</small></div><div class="req-offer-price">${mn(o.price)}</div></div>
       ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:'<p class="muted">Fără mesaj.</p>'}
+      ${imgGalleryHtml(o.images,'Poza ofertei mele')}
       <div class="row">${pend&&open?`<button type="button" class="btn primary small" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small" data-seller-msg="${o.buyer_id}">✉️ Scrie mesaj</button></div></div>
     ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b>${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}`;
 }
@@ -378,8 +397,8 @@ async function openRequestModal(id, mode){
   box.innerHTML='<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden'); currentRequestModal={id,mode};
   try{
     if(mode==='mine'){ const r=await api('/api/requests/mine/'+id); box.innerHTML=myRequestHtml(r.request,r.offers); }
-    else if(mode==='offer'){ offersMine=(await api('/api/offers/mine')).offers; const o=offersMine.find(x=>x.id===id); box.innerHTML=o?myOfferHtml(o):'<p>Oferta nu mai există.</p>'; }
-    else { const x=requestsCache.get(id); box.innerHTML=x?publicRequestHtml(x):'<p>Cererea nu mai este disponibilă.</p>'; }
+    else if(mode==='offer'){ offersMine=(await api('/api/offers/mine?id='+id)).offers; const o=offersMine.find(x=>x.id===id); box.innerHTML=o?myOfferHtml(o):'<p>Oferta nu mai există.</p>'; }
+    else { let x=requestsCache.get(id); try{ const f=await api('/api/requests/'+id); x={...(x||{}),...f.request}; }catch{} box.innerHTML=x?publicRequestHtml(x):'<p>Cererea nu mai este disponibilă.</p>'; }
   }catch(e){ box.innerHTML=`<p>${esc(e.message)}</p>`; }
 }
 function refreshAfterOfferChange(){
@@ -787,6 +806,7 @@ async function loadRequests(mine){
     grid.innerHTML = r.requests.map(x=>{
       const mode=mine?'mine':'public', n=Number(x.offers_count)||0, np=Number(x.offers_pending)||0;
       return `<article class="info-card req-card" data-request="${x.id}" data-open-request="${x.id}" data-mode="${mode}">
+      ${(x.images&&x.images[0])?`<img class="req-card-thumb" src="${esc(x.images[0])}" alt="" loading="lazy" decoding="async">`:''}
       <b>${esc([x.make,x.model,x.year].filter(Boolean).join(' · ')||'Orice mașină')}</b><h3>${esc(x.title)}</h3>
       ${x.description?`<p>${esc(x.description.slice(0,160))}${x.description.length>160?'…':''}</p>`:''}
       ${extraPartsHtml(x)}
@@ -1129,6 +1149,29 @@ async function handleSellImages(e){
 }
 
 
+/* ---------- poze la cereri și oferte ---------- */
+const IMG_BOXES={reqImages:{prev:'#reqImagePreview',count:'#reqImageCount',max:6},offerImages:{prev:'#offerImagePreview',count:'#offerImageCount',max:6}};
+function renderImgBox(key){
+  const c=IMG_BOXES[key], box=$(c.prev), count=$(c.count); if(!box||!count) return;
+  const arr=state[key], last=arr.length-1;
+  box.innerHTML=arr.map((src,i)=>`<div class="sell-image-item"><img src="${src}" alt="Poza ${i+1}">${i===0?'<span class="sell-image-cover">Principală</span>':''}<button type="button" class="sell-image-remove" data-remove-img="${key}:${i}" aria-label="Șterge poza">×</button><div class="sell-image-move"><button type="button" data-move-img="${key}:${i}" data-dir="-1" aria-label="Mută poza ${i+1} mai devreme"${i===0?' disabled':''}>‹</button><button type="button" data-move-img="${key}:${i}" data-dir="1" aria-label="Mută poza ${i+1} mai târziu"${i===last?' disabled':''}>›</button></div></div>`).join('');
+  count.textContent=arr.length?`${arr.length}/${c.max} poze selectate`:'';
+}
+async function handleImgBox(e){
+  const key=e.target.dataset.imgKey, c=IMG_BOXES[key]; if(!c) return;
+  let files=[...e.target.files]; e.target.value='';
+  const room=c.max-state[key].length;
+  if(files.length>room){ toast(room>0?`Poți adăuga încă ${room} poze (maximum ${c.max}). Le-am luat pe primele.`:`Ai deja ${c.max} poze.`); files=files.slice(0,Math.max(0,room)); }
+  if(!files.length) return;
+  state[key+'Busy']=true; $(c.count).textContent='Se procesează pozele…';
+  try{ for(const file of files){ try{ state[key].push(await fileToDataUrl(file)); }catch(err){ toast(err.message); } } }
+  finally{ state[key+'Busy']=false; renderImgBox(key); }
+}
+function imgGalleryHtml(images, alt){
+  const list=(Array.isArray(images)?images:[]).filter(Boolean); if(!list.length) return '';
+  return `<div class="detail-gallery req-gallery">${list.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(alt)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(alt)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>`;
+}
+
 /* ---------- preselecție mașină pentru cereri ---------- */
 // Mașinile salvate sunt cele din cererile anterioare ale utilizatorului (fără duplicate).
 let savedCars = [];
@@ -1156,7 +1199,7 @@ function ensureOption(el, val){
   el.value = val || '';
 }
 async function enterRequestForm(fromId){
-  const form = $('#requestForm'); form.reset(); $('#reqExtra').innerHTML = ''; setMsg($('#requestMessage'),'');
+  const form = $('#requestForm'); form.reset(); $('#reqExtra').innerHTML = ''; setMsg($('#requestMessage'),''); state.reqImages=[]; renderImgBox('reqImages');
   await loadModels('','reqModel');
   if(!fromId){
     const g = garageActive();
@@ -1187,10 +1230,11 @@ async function submitRequest(e){
   if(year && !/^\d{4}$/.test(year)){ setMsg(msg,'Anul trebuie să aibă 4 cifre.','error'); return; }
   if(!$('#reqKind').value){ setMsg(msg,'Alege ce oferte vrei (noi, second-hand sau ambele).','error'); return; }
   if(!$('#reqCounty').value){ setMsg(msg,'Alege județul de livrare.','error'); return; }
+  if(state.reqImagesBusy){ setMsg(msg,'Așteaptă să se proceseze pozele.','error'); return; }
   const extra=[...document.querySelectorAll('#reqExtra .req-part')].map(p=>({title:p.querySelector('.rp-title').value.trim(),details:p.querySelector('.rp-details').value.trim()})).filter(x=>x.title);
   try{
-    await api('/api/requests',{method:'POST',body:JSON.stringify({title:$('#reqTitle').value.trim(),make:$('#reqMake').value,model:$('#reqModel').value,year,description:$('#reqDescription').value,variant:$('#reqVariant').value.trim(),engine:$('#reqEngine').value.trim(),vin:$('#reqVin').value.trim(),kind:$('#reqKind').value,county:$('#reqCounty').value,city:$('#reqCity').value.trim(),extra_parts:extra})});
-    e.target.reset(); $('#reqExtra').innerHTML=''; await loadModels('','reqModel');
+    await api('/api/requests',{method:'POST',body:JSON.stringify({title:$('#reqTitle').value.trim(),make:$('#reqMake').value,model:$('#reqModel').value,year,description:$('#reqDescription').value,variant:$('#reqVariant').value.trim(),engine:$('#reqEngine').value.trim(),vin:$('#reqVin').value.trim(),kind:$('#reqKind').value,county:$('#reqCounty').value,city:$('#reqCity').value.trim(),extra_parts:extra,images:state.reqImages})});
+    e.target.reset(); $('#reqExtra').innerHTML=''; state.reqImages=[]; renderImgBox('reqImages'); await loadModels('','reqModel');
     setMsg(msg,'Cererea a fost trimisă. O găsești în Cererile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
@@ -1613,11 +1657,12 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
-  if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerEditId').value=''; $('#offerTitle').textContent='Trimite o ofertă'; $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
+  if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerEditId').value=''; $('#offerTitle').textContent='Trimite o ofertă'; $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
   if((el=t.closest('[data-offer-accept]'))){ if(confirm('Accepți această ofertă? Celelalte oferte vor fi respinse.')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerAccept+'/accept',{method:'POST'}); toast('Ofertă acceptată. Comanda a fost creată.'); refreshAfterOfferChange(); })(); return; }
   if((el=t.closest('[data-offer-reject]'))){ if(confirm('Refuzi această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerReject+'/reject',{method:'POST'}); toast('Oferta a fost refuzată.'); refreshAfterOfferChange(); })(); return; }
-  if((el=t.closest('[data-offer-edit]'))){ const o=offersMine.find(x=>x.id===Number(el.dataset.offerEdit)); if(!o) return; $('#offerRequestId').value=o.request_id; $('#offerEditId').value=o.id; $('#offerTitle').textContent='Modifică oferta'; $('#offerPrice').value=o.price; $('#offerMessage').value=o.message||''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
+  if((el=t.closest('[data-offer-edit]'))){ const o=offersMine.find(x=>x.id===Number(el.dataset.offerEdit)); if(!o) return; $('#offerRequestId').value=o.request_id; $('#offerEditId').value=o.id; $('#offerTitle').textContent='Modifică oferta'; $('#offerPrice').value=o.price; $('#offerMessage').value=o.message||''; setMsg($('#offerMessageStatus'),''); state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); $('#offerModal').classList.remove('hidden'); api('/api/offers/mine?id='+o.id).then(r=>{ const f=(r.offers||[])[0]; state.offerImages=((f&&f.images)||[]).filter(Boolean); state.offerImagesLoaded=true; renderImgBox('offerImages'); }).catch(()=>{}); return; }
   if((el=t.closest('[data-offer-del]'))){ if(confirm('Retragi această ofertă? Cumpărătorul nu o va mai vedea.')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerDel,{method:'DELETE'}); toast('Oferta a fost retrasă.'); $('#requestModal').classList.add('hidden'); refreshAfterOfferChange(); })(); return; }
+  if((el=t.closest('[data-stats-range]'))){ statsRange=Number(el.dataset.statsRange)||0; drawStats(); return; }
   if((el=t.closest('[data-stats-pick]'))){ statsPick=el.dataset.statsPick; drawStats(); const sb=$('#statsBox'); if(sb) sb.scrollIntoView({block:'start',behavior:'smooth'}); return; }
   if((el=t.closest('[data-open-request],[data-offer-open]'))){
     const inner=t.closest('button,a');
@@ -1799,10 +1844,17 @@ function wire(){
   $('#reqAddPart').addEventListener('click', addReqPart);
   $('#reqExtra').addEventListener('click', e=>{ const b=e.target.closest('.rp-del'); if(b) b.closest('.req-part').remove(); });
   $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
-  $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const editId=$('#offerEditId').value, body=JSON.stringify({price:$('#offerPrice').value,message:$('#offerMessage').value}); if(editId) await api('/api/offers/'+editId,{method:'PATCH',body}); else await api('/api/requests/'+$('#offerRequestId').value+'/offers',{method:'POST',body}); $('#offerModal').classList.add('hidden'); toast(editId?'Oferta a fost modificată.':'Oferta a fost trimisă.'); refreshAfterOfferChange(); })(); });
+  $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const editId=$('#offerEditId').value; if(state.offerImagesBusy){ toast('Așteaptă să se proceseze pozele.'); return; } const payload={price:$('#offerPrice').value,message:$('#offerMessage').value}; if(!editId||state.offerImagesLoaded) payload.images=state.offerImages; const body=JSON.stringify(payload); if(editId) await api('/api/offers/'+editId,{method:'PATCH',body}); else await api('/api/requests/'+$('#offerRequestId').value+'/offers',{method:'POST',body}); $('#offerModal').classList.add('hidden'); state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); toast(editId?'Oferta a fost modificată.':'Oferta a fost trimisă.'); refreshAfterOfferChange(); })(); });
   document.addEventListener('change', e=>{ if(e.target&&e.target.id==='statsSelect'){ statsPick=e.target.value; drawStats(); } });
   $('#sellForm').addEventListener('submit', submitSell);
   $('#sellImages').addEventListener('change', handleSellImages);
+  ['reqImages','offerImages'].forEach(id=>{ const el=$('#'+id); if(el) el.addEventListener('change', handleImgBox); });
+  document.addEventListener('click', e=>{
+    const b=e.target.closest('[data-remove-img]');
+    if(b){ const [k,i]=b.dataset.removeImg.split(':'); state[k].splice(Number(i),1); renderImgBox(k); return; }
+    const m=e.target.closest('[data-move-img]');
+    if(m){ const [k,i]=m.dataset.moveImg.split(':'), a=state[k], from=Number(i), to=from+Number(m.dataset.dir); if(to>=0&&to<a.length){ [a[from],a[to]]=[a[to],a[from]]; renderImgBox(k); } }
+  });
   $('#profileSettingsForm').addEventListener('submit', saveProfile);
   $('#emailChangeForm').addEventListener('submit', requestEmailChange);
   $('#phoneAddForm').addEventListener('submit', addPhone);

@@ -120,3 +120,16 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Căutările publice (`GET /api/listings`) au cache de 10 secunde în memorie, golit automat la orice modificare de anunțuri; numărătoarea și lista rulează în paralel.
 - Pozele din liste se decodează asincron, fără să blocheze afișarea.
 - Erorile din handlerele async ajung la handlerul global (răspuns 500) în loc să lase cererea agățată.
+
+## Poze la cereri și oferte
+- Formularele „Cerere de piese” și „Trimite o ofertă” au acum „Adaugă poze” (opțional, maximum 6 poze JPG/PNG/WebP, comprimate în browser ca la anunțuri).
+- Pozele se salvează în coloanele noi `part_requests.images` și `offers.images` (create automat la pornire).
+- Cota de 60 MB de poze per utilizator numără acum anunțurile, cererile și ofertele la un loc.
+- Listele (cereri publice, cererile mele, ofertele mele) trimit doar prima poză; galeria completă se încarcă la deschiderea detaliilor (`GET /api/requests/:id`, `GET /api/offers/mine?id=`).
+- Cumpărătorul vede pozele din ofertele primite; vânzătorul vede pozele din cerere. Ofertele se pot edita cu poze (`PATCH /api/offers/:id` păstrează pozele dacă nu trimiți `images`).
+- Atenție: cererile și ofertele nu trec prin moderare, deci pozele lor apar imediat.
+
+## Statistici anunțuri (Contul meu → Utile)
+- Panou cu stilizare completă (înainte lipsea CSS pentru tabel și grafic): carduri pentru vizualizări, apăsări pe telefon/WhatsApp, favorite, mesaje și total de la publicare.
+- Filtru de perioadă (7 zile / toate zilele păstrate), grafic pe zile, tabel pe zile (pliabil) și tabel pe fiecare anunț, ordonat după vizualizări, cu rată de contact (apăsări ÷ vizualizări). Apăsarea pe un anunț îi arată graficul.
+- `GET /api/stats/mine` întoarce acum și `fav` (favorite) și `msgs` (mesaje primite din anunț) pentru fiecare anunț.
