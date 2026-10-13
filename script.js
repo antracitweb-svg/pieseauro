@@ -225,15 +225,17 @@ function renderAccountTool(view, withId, refId){
     notifications:{title:'Notificări',text:'Notificările contului vor apărea aici când există activitate nouă.',action:null,label:null},
     credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
     transactions:{title:'Tranzacții',text:'Comenzile tale, ca cumpărător și ca vânzător.',action:null,label:null},
-    invoices:{title:'Facturi',text:'Facturile emise pentru contul tău.',action:null,label:null}
+    invoices:{title:'Facturi',text:'Facturile emise pentru contul tău.',action:null,label:null},
+    stats:{title:'Statistici anunțuri',text:'Vizualizări și apăsări pe telefon, pe anunț și pe zi.',action:null,label:null}
   };
+  currentToolView=view;
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
   $('#accountToolTitle').textContent=d.title;
   $('#accountToolSub').textContent=d.text;
   const content=$('#accountToolContent');
   if(content){
     content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
-    if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
+    if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices','stats'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
   }
 }
 
@@ -253,9 +255,19 @@ async function loadToolData(view, box, withId, refId){
     items=r.orders.map(o=>`<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}</b><p>${o.role==='buyer'?'Cumpărare':'Vânzare'} · ${money(o.price)} · ${esc(ORDER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p></div>`);
   }else if(view==='invoices'){
     items=['<div class="info-card tool-item"><p>Nu există facturi emise. Completează datele de facturare în Setări cont ca să fie gata când vei avea nevoie.</p><div class="row"><button class="btn ghost small" data-go="settings">Deschide Setări cont</button></div></div>'];
-  }else if(view==='offers'||view==='offers-received'){
-    const r=await api(view==='offers'?'/api/offers/mine':'/api/offers/received');
-    items=r.offers.map(o=>`<div class="info-card tool-item"><b>${esc(o.request_title)}</b><p>${money(o.price)}${view==='offers-received'&&o.seller_name?' · '+esc(o.seller_name):''} · ${esc(OFFER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row">${view==='offers-received'&&o.status==='pending'?`<button class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button>`:''}<button class="btn ghost small" data-go="account-tool?view=messages&with=${view==='offers'?o.buyer_id:o.seller_id}">Scrie mesaj</button></div></div>`);
+  }else if(view==='stats'){
+    statsData=await api('/api/stats/mine'); statsPick='all';
+    box.insertAdjacentHTML('beforeend','<div id="statsBox"></div>'); drawStats(); return;
+  }else if(view==='offers'){
+    const r=await api('/api/offers/mine'); offersMine=r.offers;
+    items=r.offers.map(o=>{
+      const open=o.request_status==='open', pend=o.status==='pending';
+      const st=pend&&!open?'Cererea s-a închis':(OFFER_ST[o.status]||o.status);
+      return `<div class="info-card tool-item offer-card" data-offer-open="${o.id}"><b>${esc(o.request_title)}</b><p class="muted">${esc([o.make,o.model,o.year].filter(Boolean).join(' · ')||'Orice mașină')}${o.buyer_name?' · cumpărător: '+esc(o.buyer_name):''}</p><p>Oferta mea: <b>${money(o.price)}</b> · <span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(st)}</span> · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row"><button type="button" class="btn primary small" data-offer-open="${o.id}">Vezi cererea</button>${pend&&open?`<button type="button" class="btn ghost small" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small" data-go="account-tool?view=messages&with=${o.buyer_id}">Scrie mesaj</button></div></div>`;
+    });
+  }else if(view==='offers-received'){
+    const r=await api('/api/offers/received');
+    items=r.offers.map(o=>`<div class="info-card tool-item"><b>${esc(o.request_title)}</b><p>${money(o.price)}${o.seller_name?' · '+esc(o.seller_name):''} · ${esc(OFFER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row"><button type="button" class="btn ghost small" data-open-request="${o.request_id}" data-mode="mine">Cererea și ofertanții</button>${o.status==='pending'?`<button class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button>`:''}<button class="btn ghost small" data-go="account-tool?view=messages&with=${o.seller_id}">Scrie mesaj</button></div></div>`);
   }else if(view==='orders'||view==='orders-seller'){
     const r=await api('/api/orders'), role=view==='orders'?'buyer':'seller';
     items=r.orders.filter(o=>o.role===role).map(o=>`<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}</b><p>${money(o.price)} · ${esc(ORDER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p></div>`);
@@ -273,6 +285,106 @@ async function loadToolData(view, box, withId, refId){
     api('/api/notifications/read',{method:'POST'}).catch(()=>{});
   }
   box.insertAdjacentHTML('beforeend',`<div class="tool-list">${items.join('')||'<p class="muted">Nu există nimic de afișat încă.</p>'}</div>`);
+}
+
+/* ---------- statistici anunțuri (Utile) ---------- */
+let statsData=null, statsPick='all', currentToolView='', offersMine=[], requestsCache=new Map(), currentRequestModal=null;
+const sumLast=(a,n)=>a.slice(Math.max(0,a.length-n)).reduce((t,v)=>t+(Number(v)||0),0);
+const dmy=d=>d.slice(8,10)+'.'+d.slice(5,7)+'.'+d.slice(0,4), dm=d=>d.slice(8,10)+'.'+d.slice(5,7);
+function statsScope(){
+  const L=statsData.listings, n=statsData.days.length;
+  if(statsPick!=='all'){ const x=L.find(l=>String(l.id)===String(statsPick)); if(x) return {title:x.title,v:x.v,p:x.p,tv:x.total_views,tp:x.total_phone}; statsPick='all'; }
+  return {title:'Toate anunțurile',v:statsData.days.map((_,i)=>L.reduce((t,l)=>t+l.v[i],0)),p:statsData.days.map((_,i)=>L.reduce((t,l)=>t+l.p[i],0)),tv:L.reduce((t,l)=>t+l.total_views,0),tp:L.reduce((t,l)=>t+l.total_phone,0)};
+}
+function statsChartSvg(days,v,p){
+  const W=640,H=240,pl=36,pr=8,pt=14,pb=36,iw=W-pl-pr,ih=H-pt-pb,n=days.length;
+  const max=Math.max(4,...v,...p), top=Math.ceil(max/4)*4, gw=iw/n, bw=Math.max(2,Math.min(14,gw*.38));
+  let g='';
+  for(let i=0;i<=4;i++){ const y=pt+ih-ih*i/4, val=Math.round(top*i/4); g+=`<line x1="${pl}" y1="${y}" x2="${W-pr}" y2="${y}" stroke="#e3e9f1" stroke-width="1"/><text x="${pl-6}" y="${y+3}" font-size="10" fill="#6c7f97" text-anchor="end">${val}</text>`; }
+  const every=Math.ceil(n/15);
+  days.forEach((d,i)=>{
+    const x0=pl+i*gw+(gw-2*bw-2)/2, hv=v[i]/top*ih, hp=p[i]/top*ih;
+    g+=`<rect x="${x0.toFixed(1)}" y="${(pt+ih-hv).toFixed(1)}" width="${bw.toFixed(1)}" height="${hv.toFixed(1)}" rx="2" fill="#0d6efd"><title>${dmy(d)}: ${v[i]} vizualizări</title></rect>`;
+    g+=`<rect x="${(x0+bw+2).toFixed(1)}" y="${(pt+ih-hp).toFixed(1)}" width="${bw.toFixed(1)}" height="${hp.toFixed(1)}" rx="2" fill="#f59e0b"><title>${dmy(d)}: ${p[i]} apăsări pe telefon</title></rect>`;
+    if(i%every===0||i===n-1) g+=`<text x="${(pl+i*gw+gw/2).toFixed(1)}" y="${H-pb+16}" font-size="10" fill="#6c7f97" text-anchor="middle">${dm(d)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Grafic vizualizări și apăsări pe telefon pe zile" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
+}
+function drawStats(){
+  const box=$('#statsBox'); if(!box||!statsData) return;
+  const D=statsData, n=D.days.length, sc=statsScope();
+  if(!D.listings.length){ box.innerHTML='<div class="info-card"><p class="muted">Nu ai încă anunțuri. Statisticile apar după ce publici primul anunț.</p></div>'; return; }
+  const cards=[['Azi',sc.v[n-1],sc.p[n-1]],['Ultimele 7 zile',sumLast(sc.v,7),sumLast(sc.p,7)],['Ultimele '+n+' zile',sumLast(sc.v,n),sumLast(sc.p,n)],['Total de la publicare',sc.tv,sc.tp]];
+  const opts=['<option value="all">Toate anunțurile</option>'].concat(D.listings.map(l=>`<option value="${l.id}"${String(l.id)===String(statsPick)?' selected':''}>${esc(l.title.slice(0,70))}</option>`)).join('');
+  const rows=D.listings.map(l=>`<tr data-stats-pick="${l.id}"${String(l.id)===String(statsPick)?' class="sel"':''}><td class="st-title">${esc(l.title)}${l.status!=='approved'?` <small class="muted">(${l.status==='sold'?'vândut':esc(l.status)})</small>`:''}</td><td>${l.v[n-1]}</td><td>${l.p[n-1]}</td><td>${sumLast(l.v,7)}</td><td>${sumLast(l.p,7)}</td><td>${sumLast(l.v,n)}</td><td>${sumLast(l.p,n)}</td><td>${l.total_views}</td><td>${l.total_phone}</td></tr>`).join('');
+  const dayRows=D.days.map((d,i)=>[d,sc.v[i],sc.p[i]]).reverse().map(([d,a,b],i)=>`<tr><td>${dmy(d)}${i===0?' <small class="muted">(azi)</small>':''}</td><td>${a}</td><td>${b}</td></tr>`).join('');
+  box.innerHTML=`<div class="info-card stats-card">
+    <label class="stats-pick">Afișează statistici pentru<select id="statsSelect">${opts}</select></label>
+    <div class="stat-grid">${cards.map(c=>`<div class="stat"><b>${esc(c[0])}</b><h3>👁 ${c[1]}</h3><small>📞 ${c[2]} apăsări pe telefon</small></div>`).join('')}</div>
+    <h3 class="ad-h">Pe zile · ${esc(sc.title.slice(0,60))}</h3>
+    <div class="stats-legend"><span><i class="lg v"></i>Vizualizări</span><span><i class="lg p"></i>Apăsări pe telefon / WhatsApp</span></div>
+    ${statsChartSvg(D.days,sc.v,sc.p)}
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Zi</th><th>👁 Vizualizări</th><th>📞 Apăsări tel.</th></tr></thead><tbody>${dayRows}</tbody></table></div>
+    <h3 class="ad-h">Pe anunț</h3>
+    <p class="muted">Apasă pe un anunț ca să-i vezi graficul.</p>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th rowspan="2">Anunț</th><th colspan="2">Azi</th><th colspan="2">7 zile</th><th colspan="2">${n} zile</th><th colspan="2">Total</th></tr><tr><th>👁</th><th>📞</th><th>👁</th><th>📞</th><th>👁</th><th>📞</th><th>👁</th><th>📞</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted stats-note">Statisticile zilnice se păstrează ${D.retention_days} zile, apoi se resetează automat (zilele mai vechi dispar). Totalurile „de la publicare” rămân. Vizitele tale pe propriile anunțuri nu se numără, iar apăsările repetate de la același vizitator sunt limitate.</p></div>`;
+}
+
+/* ---------- cereri: fereastră cu detalii + oferte ---------- */
+const REQ_ST={open:'Deschisă',matched:'Ofertă acceptată',closed:'Închisă'}, REQ_KIND={noi:'Piese noi','second-hand':'Piese second-hand',ambele:'Noi sau second-hand'};
+function reqDetailsHtml(x){
+  const rows=[['Marcă',x.make],['Model',x.model],['An',x.year],['Variantă',x.variant],['Motor',x.engine],['Serie șasiu (VIN)',x.vin],['Caut',REQ_KIND[x.kind]],['Locație',[x.city,x.county].filter(Boolean).join(', ')],['Publicată',x.created_at?fmtDate(x.created_at):'']].filter(r=>r[1]);
+  let extra=[]; try{ extra=typeof x.extra_parts==='string'?JSON.parse(x.extra_parts||'[]'):(x.extra_parts||[]); }catch{}
+  extra=Array.isArray(extra)?extra.filter(p=>p&&p.title):[];
+  return `${rows.length?`<dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>`:''}
+    ${x.description?`<h3 class="ad-h">Descriere</h3><p class="detail-desc">${esc(x.description)}</p>`:''}
+    ${extra.length?`<h3 class="ad-h">Piese căutate în plus (${extra.length})</h3><ul class="req-extra">${extra.map(p=>`<li><b>${esc(p.title)}</b>${p.details?`<br><span class="muted">${esc(p.details)}</span>`:''}</li>`).join('')}</ul>`:''}`;
+}
+function myRequestHtml(x, offers){
+  const open=x.status==='open', mn=v=>new Intl.NumberFormat('ro-RO').format(Number(v))+' lei';
+  const list=offers.map(o=>{
+    const pend=o.status==='pending';
+    return `<article class="info-card req-offer"><div class="req-offer-head"><div><b>${esc(o.seller_name||'Vânzător')}</b>${o.company?' <span class="badge">Firmă</span>':''}${o.company&&o.seller_nick?`<small class="muted"> · cont: ${esc(o.seller_nick)}</small>`:''}</div><div class="req-offer-price">${mn(o.price)}</div></div>
+      <p class="muted"><span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(OFFER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}${o.updated_at?' · modificată '+fmtDate(o.updated_at):''}</p>
+      ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:''}
+      ${o.status!=='rejected'?`<div class="req-offer-phones">${contactHtml(o.phones,'Ofertantul')}</div>`:''}
+      <div class="row">${pend&&open?`<button type="button" class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button><button type="button" class="btn danger small" data-offer-reject="${o.id}">Refuză</button>`:''}${o.seller_id?`<button type="button" class="btn ghost small" data-seller-msg="${o.seller_id}">✉️ Scrie mesaj</button>`:''}</div></article>`;
+  }).join('');
+  return `<div class="eyebrow">CEREREA MEA</div><h2>${esc(x.title)}</h2>
+    <p><span class="badge ${open?'pending':'new'}">${esc(REQ_ST[x.status]||x.status)}</span></p>
+    ${reqDetailsHtml(x)}
+    <h3 class="ad-h">Oferte primite (${offers.length})</h3>
+    ${list||'<p class="muted">Nu ai primit încă nicio ofertă. Vânzătorii vor apărea aici cu nume, preț și telefon.</p>'}`;
+}
+function myOfferHtml(o){
+  const open=o.request_status==='open', pend=o.status==='pending', mn=v=>new Intl.NumberFormat('ro-RO').format(Number(v))+' lei';
+  return `<div class="eyebrow">OFERTA MEA</div><h2>${esc(o.request_title)}</h2>
+    <p class="muted">Cerere de la ${esc(o.buyer_name||'cumpărător')}</p>
+    <h3 class="ad-h">Ce caută cumpărătorul</h3>${reqDetailsHtml({...o,created_at:undefined})}
+    <h3 class="ad-h">Oferta mea</h3>
+    <div class="info-card req-offer"><div class="req-offer-head"><div><span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(pend&&!open?'Cererea s-a închis':(OFFER_ST[o.status]||o.status))}</span> <small class="muted">${fmtDate(o.created_at)}${o.updated_at?' · modificată '+fmtDate(o.updated_at):''}</small></div><div class="req-offer-price">${mn(o.price)}</div></div>
+      ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:'<p class="muted">Fără mesaj.</p>'}
+      <div class="row">${pend&&open?`<button type="button" class="btn primary small" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small" data-seller-msg="${o.buyer_id}">✉️ Scrie mesaj</button></div></div>
+    ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b>${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}`;
+}
+function publicRequestHtml(x){
+  return `<div class="eyebrow">CERERE DE PIESE</div><h2>${esc(x.title)}</h2><p class="muted">${esc(x.user_name||'Cumpărător')} · ${fmtDate(x.created_at)}</p>
+    ${reqDetailsHtml(x)}
+    <div class="contact-slot req-actions"><button type="button" class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button type="button" class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button></div>`;
+}
+async function openRequestModal(id, mode){
+  const modal=$('#requestModal'), box=$('#requestContent');
+  box.innerHTML='<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden'); currentRequestModal={id,mode};
+  try{
+    if(mode==='mine'){ const r=await api('/api/requests/mine/'+id); box.innerHTML=myRequestHtml(r.request,r.offers); }
+    else if(mode==='offer'){ offersMine=(await api('/api/offers/mine')).offers; const o=offersMine.find(x=>x.id===id); box.innerHTML=o?myOfferHtml(o):'<p>Oferta nu mai există.</p>'; }
+    else { const x=requestsCache.get(id); box.innerHTML=x?publicRequestHtml(x):'<p>Cererea nu mai este disponibilă.</p>'; }
+  }catch(e){ box.innerHTML=`<p>${esc(e.message)}</p>`; }
+}
+function refreshAfterOfferChange(){
+  if(!$('#requestModal').classList.contains('hidden') && currentRequestModal && currentRequestModal.mode!=='public') openRequestModal(currentRequestModal.id,currentRequestModal.mode);
+  if(currentToolView==='offers'||currentToolView==='offers-received') renderAccountTool(currentToolView);
 }
 
 /* ---------- selecturi / catalog ---------- */
@@ -570,8 +682,8 @@ function contactHtml(phones, who, sellerId, own, listingId){
   const msgBtn = '';
   if(!phones || !phones.length) return `<p class="phone-none">📵 ${who} nu a afișat un număr de telefon.</p>${msgBtn}`;
   return phones.map(p=>{
-    const tel=String(p.phone).replace(/[^\d+]/g,'');
-    return `<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(tel)}">Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}">WhatsApp</a>`:''}</div></div>`;
+    const tel=String(p.phone).replace(/[^\d+]/g,''), tr=listingId?` data-track-phone="${Number(listingId)}"`:'';
+    return `<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(tel)}"${tr}>Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}"${tr}>WhatsApp</a>`:''}</div></div>`;
   }).join('')+msgBtn;
 }
 function detailHtml(x, phones, canContact){
@@ -579,7 +691,7 @@ function detailHtml(x, phones, canContact){
   const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
   const spec = [['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
   const phone1 = (phones||[]).slice(0,1);
-  const callbar = (canContact && phone1.length) ? `<div class="ad-callbar"><a class="btn primary" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(phone1[0].phone))}</a>${phone1[0].is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(phone1[0].phone))}">WhatsApp</a>`:''}</div>` : '';
+  const callbar = (canContact && phone1.length) ? `<div class="ad-callbar"><a class="btn primary" data-track-phone="${Number(x.id)}" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(phone1[0].phone))}</a>${phone1[0].is_whatsapp?`<a class="btn wa" data-track-phone="${Number(x.id)}" target="_blank" rel="noopener noreferrer" href="${esc(waLink(phone1[0].phone))}">WhatsApp</a>`:''}</div>` : '';
   const galleryImages = Array.isArray(x.images) ? x.images.filter(Boolean) : [];
   const gallery = galleryImages.length ? `<div class="detail-gallery">${galleryImages.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(x.title)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(x.title)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>` : '';
   const seller = esc(x.seller_name || 'Vânzător');
@@ -671,12 +783,16 @@ async function loadRequests(mine){
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
     const r = await api(mine ? '/api/requests/mine' : '/api/requests');
-    grid.innerHTML = r.requests.map(x=>`<article class="info-card" data-request="${x.id}">
+    requestsCache=new Map(r.requests.map(x=>[x.id,x]));
+    grid.innerHTML = r.requests.map(x=>{
+      const mode=mine?'mine':'public', n=Number(x.offers_count)||0, np=Number(x.offers_pending)||0;
+      return `<article class="info-card req-card" data-request="${x.id}" data-open-request="${x.id}" data-mode="${mode}">
       <b>${esc([x.make,x.model,x.year].filter(Boolean).join(' · ')||'Orice mașină')}</b><h3>${esc(x.title)}</h3>
       ${x.description?`<p>${esc(x.description.slice(0,160))}${x.description.length>160?'…':''}</p>`:''}
       ${extraPartsHtml(x)}
-      <p class="muted">${esc(mine ? (x.status==='open'?'Deschisă':x.status) : (x.user_name||'Cumpărător'))} · ${fmtDate(x.created_at)}</p>
-      <div class="contact-slot">${mine?`<button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:`<button class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button>`}</div></article>`).join('');
+      <p class="muted">${esc(mine ? (REQ_ST[x.status]||x.status) : (x.user_name||'Cumpărător'))} · ${fmtDate(x.created_at)}${mine?` · <b>${n} ${n===1?'ofertă':'oferte'}</b>${np?` (${np} noi)`:''}`:''}</p>
+      <div class="contact-slot">${mine?`<button type="button" class="btn primary small" data-open-request="${x.id}" data-mode="mine">Vezi cererea și ofertele</button> <button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:`<button type="button" class="btn ghost small" data-open-request="${x.id}" data-mode="public">Detalii</button> <button class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button>`}</div></article>`;
+    }).join('');
     $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -1447,7 +1563,7 @@ function accountAction(a){
   else if(a==='requests') navigate('requests?t=mine');
   else if(a==='saved') navigate('saved');
   else if(a==='messages') navigate('mesagerie');
-  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
+  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices','stats'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
 }
 
 
@@ -1496,8 +1612,21 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); loadRequests(true); })(); return; }
-  if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
-  if((el=t.closest('[data-offer-accept]'))){ if(confirm('Accepți această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerAccept+'/accept',{method:'POST'}); toast('Ofertă acceptată. Comanda a fost creată.'); renderAccountTool('offers-received'); })(); return; }
+  if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
+  if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerEditId').value=''; $('#offerTitle').textContent='Trimite o ofertă'; $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
+  if((el=t.closest('[data-offer-accept]'))){ if(confirm('Accepți această ofertă? Celelalte oferte vor fi respinse.')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerAccept+'/accept',{method:'POST'}); toast('Ofertă acceptată. Comanda a fost creată.'); refreshAfterOfferChange(); })(); return; }
+  if((el=t.closest('[data-offer-reject]'))){ if(confirm('Refuzi această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerReject+'/reject',{method:'POST'}); toast('Oferta a fost refuzată.'); refreshAfterOfferChange(); })(); return; }
+  if((el=t.closest('[data-offer-edit]'))){ const o=offersMine.find(x=>x.id===Number(el.dataset.offerEdit)); if(!o) return; $('#offerRequestId').value=o.request_id; $('#offerEditId').value=o.id; $('#offerTitle').textContent='Modifică oferta'; $('#offerPrice').value=o.price; $('#offerMessage').value=o.message||''; setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
+  if((el=t.closest('[data-offer-del]'))){ if(confirm('Retragi această ofertă? Cumpărătorul nu o va mai vedea.')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerDel,{method:'DELETE'}); toast('Oferta a fost retrasă.'); $('#requestModal').classList.add('hidden'); refreshAfterOfferChange(); })(); return; }
+  if((el=t.closest('[data-stats-pick]'))){ statsPick=el.dataset.statsPick; drawStats(); const sb=$('#statsBox'); if(sb) sb.scrollIntoView({block:'start',behavior:'smooth'}); return; }
+  if((el=t.closest('[data-open-request],[data-offer-open]'))){
+    const inner=t.closest('button,a');
+    if(!(inner && inner!==el && el.contains(inner))){
+      if(el.dataset.offerOpen) openRequestModal(Number(el.dataset.offerOpen),'offer');
+      else openRequestModal(Number(el.dataset.openRequest), el.dataset.mode||'public');
+      return;
+    }
+  }
   if((el=t.closest('[data-req-contact]'))){ safe(requestContact)(el.dataset.reqContact, el); return; }
   if((el=t.closest('[data-msg-open]'))){
     if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
@@ -1670,7 +1799,8 @@ function wire(){
   $('#reqAddPart').addEventListener('click', addReqPart);
   $('#reqExtra').addEventListener('click', e=>{ const b=e.target.closest('.rp-del'); if(b) b.closest('.req-part').remove(); });
   $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
-  $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const id=$('#offerRequestId').value; await api('/api/requests/'+id+'/offers',{method:'POST',body:JSON.stringify({price:$('#offerPrice').value,message:$('#offerMessage').value})}); $('#offerModal').classList.add('hidden'); toast('Oferta a fost trimisă.'); })(); });
+  $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const editId=$('#offerEditId').value, body=JSON.stringify({price:$('#offerPrice').value,message:$('#offerMessage').value}); if(editId) await api('/api/offers/'+editId,{method:'PATCH',body}); else await api('/api/requests/'+$('#offerRequestId').value+'/offers',{method:'POST',body}); $('#offerModal').classList.add('hidden'); toast(editId?'Oferta a fost modificată.':'Oferta a fost trimisă.'); refreshAfterOfferChange(); })(); });
+  document.addEventListener('change', e=>{ if(e.target&&e.target.id==='statsSelect'){ statsPick=e.target.value; drawStats(); } });
   $('#sellForm').addEventListener('submit', submitSell);
   $('#sellImages').addEventListener('change', handleSellImages);
   $('#profileSettingsForm').addEventListener('submit', saveProfile);

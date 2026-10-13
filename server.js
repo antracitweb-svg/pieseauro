@@ -206,6 +206,11 @@ async function dbReady(){
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS ref_title TEXT',
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS phone_clicks INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ',
+  'CREATE TABLE IF NOT EXISTS listing_stats (listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE, day DATE NOT NULL, views INTEGER NOT NULL DEFAULT 0, phone_clicks INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(listing_id,day))',
+  'CREATE INDEX IF NOT EXISTS offers_request_idx ON offers(request_id)',
+  'CREATE INDEX IF NOT EXISTS offers_seller_idx ON offers(seller_id,created_at DESC)',
   'CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,created_at DESC)',
   'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)'
  );
@@ -252,6 +257,23 @@ function needVerified(req,res,next){if(REQUIRE_VERIFIED&&!req.user.email_verifie
 function requireDb(req,res,next){if(!pool)return res.status(503).json({error:'DATABASE_NOT_CONFIGURED',message:'Configurează DATABASE_URL în Render.'});next();}
 const ah=fn=>(req,res)=>Promise.resolve(fn(req,res)).catch(e=>{console.error(e);if(!res.headersSent)res.status(500).json({error:'EROARE_SERVER'});});
 const clip=(v,n)=>v==null||v===''?null:String(v).trim().slice(0,n);
+/* ---------- statistici anunțuri (vizualizări / apăsări pe telefon) ----------
+   Contoarele zilnice se păstrează STATS_RETENTION_DAYS zile (implicit 15), apoi se șterg.
+   Totalurile pe viață rămân în listings.views și listings.phone_clicks. */
+const STATS_DAYS=Math.min(90,Math.max(1,Math.floor(Number(process.env.STATS_RETENTION_DAYS))||15));
+const TODAY_SQL="(NOW() AT TIME ZONE 'Europe/Bucharest')::date";
+function bumpStat(listingId,col){
+ if(!pool||!['views','phone_clicks'].includes(col))return;
+ pool.query(`INSERT INTO listing_stats(listing_id,day,${col}) VALUES($1,${TODAY_SQL},1) ON CONFLICT(listing_id,day) DO UPDATE SET ${col}=listing_stats.${col}+1`,[listingId]).catch(e=>console.error('stats',e.message));
+}
+function purgeStats(){return pool?pool.query(`DELETE FROM listing_stats WHERE day<=${TODAY_SQL}-$1::int`,[STATS_DAYS]).catch(e=>console.error('stats purge',e.message)):null;}
+async function optUserId(req){
+ try{
+  const t=req.cookies&&req.cookies.session; if(!t)return null;
+  const r=await pool.query('SELECT s.user_id FROM sessions s WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(t)]);
+  return r.rowCount?r.rows[0].user_id:null;
+ }catch{return null;}
+}
 function norm(s=''){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 function slugify(s=''){return norm(s).replace(/\s+/g,'-').slice(0,120);}
 function escapeHtml(s=''){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
@@ -788,11 +810,33 @@ app.get('/api/listings/:id',requireDb,async(req,res)=>{
  const r=await pool.query("SELECT l.*,COALESCE(u.nickname,u.name) seller_name,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const x=r.rows[0]; let phones=[];
- if(req.query.noview!=='1'){pool.query('UPDATE listings SET views=views+1 WHERE id=$1',[x.id]).catch(()=>{});x.views=(Number(x.views)||0)+1;}
+ if(req.query.noview!=='1'){const me=await optUserId(req);if(!me||me!==x.user_id){pool.query('UPDATE listings SET views=views+1 WHERE id=$1',[x.id]).catch(()=>{});bumpStat(x.id,'views');x.views=(Number(x.views)||0)+1;}}
  if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id LIMIT 1',[x.user_id])).rows;
  delete x.seller_show_phone;
  res.json({listing:x,phones});
 });
+app.post('/api/listings/:id/phone-click',requireDb,ah(async(req,res)=>{
+ // Apăsare pe „Sună” / WhatsApp. Maximum 5 pe oră per vizitator și anunț (fără umflarea cifrelor); proprietarul nu se numără.
+ if(!throttle(authAttempts,'pc:'+clientIp(req)+':'+req.params.id,5,10*60*1000))return res.json({ok:true,counted:false});
+ const r=await pool.query("SELECT id,user_id FROM listings WHERE id=$1 AND status='approved'",[req.params.id]);
+ if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ const me=await optUserId(req);
+ if(me&&me===r.rows[0].user_id)return res.json({ok:true,counted:false});
+ await pool.query('UPDATE listings SET phone_clicks=phone_clicks+1 WHERE id=$1',[r.rows[0].id]);
+ bumpStat(r.rows[0].id,'phone_clicks');
+ res.json({ok:true,counted:true});
+}));
+app.get('/api/stats/mine',auth,requireDb,ah(async(req,res)=>{
+ const [dd,ls,st]=await Promise.all([
+  pool.query(`SELECT to_char(d,'YYYY-MM-DD') day FROM generate_series(${TODAY_SQL}-($1::int-1),${TODAY_SQL},'1 day') d ORDER BY d`,[STATS_DAYS]),
+  pool.query("SELECT id,title,status,views,phone_clicks FROM listings WHERE user_id=$1 AND status<>'deleted' ORDER BY created_at DESC LIMIT 200",[req.user.id]),
+  pool.query(`SELECT s.listing_id,to_char(s.day,'YYYY-MM-DD') day,s.views,s.phone_clicks FROM listing_stats s JOIN listings l ON l.id=s.listing_id WHERE l.user_id=$1 AND s.day>${TODAY_SQL}-$2::int`,[req.user.id,STATS_DAYS])
+ ]);
+ const days=dd.rows.map(x=>x.day), idx=new Map(days.map((d,i)=>[d,i]));
+ const by=new Map(ls.rows.map(l=>[l.id,{id:l.id,title:l.title,status:l.status,total_views:Number(l.views)||0,total_phone:Number(l.phone_clicks)||0,v:days.map(()=>0),p:days.map(()=>0)}]));
+ for(const r of st.rows){const e=by.get(r.listing_id),i=idx.get(r.day);if(e&&i!==undefined){e.v[i]=r.views;e.p[i]=r.phone_clicks;}}
+ res.json({retention_days:STATS_DAYS,days,listings:[...by.values()]});
+}));
 app.patch('/api/listings/:id/status',auth,requireDb,async(req,res)=>{
  const to=String((req.body||{}).status||'');
  if(!['sold','approved'].includes(to))return res.status(400).json({error:'STATUS_INVALIDE'});
@@ -911,9 +955,22 @@ app.get('/api/requests',requireDb,async(req,res)=>{
  res.json({requests:r.rows});
 });
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query('SELECT id,title,make,model,year,variant,engine,vin,description,extra_parts,status,created_at FROM part_requests WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.id]);
+ const r=await pool.query('SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.description,r.extra_parts,r.status,r.created_at,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id AND o.status='pending') offers_pending FROM part_requests r WHERE r.user_id=$1 ORDER BY r.created_at DESC LIMIT 200',[req.user.id]);
  res.json({requests:r.rows});
 });
+app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
+ const q=await pool.query('SELECT id,title,make,model,year,variant,engine,vin,kind,county,city,description,extra_parts,status,created_at FROM part_requests WHERE id=$1 AND user_id=$2',[req.params.id,req.user.id]);
+ if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ const o=await pool.query("SELECT o.id,o.price,o.message,o.status,o.created_at,o.updated_at,o.seller_id,COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,u.phone user_phone FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
+ const ids=[...new Set(o.rows.filter(x=>x.status!=='rejected'&&x.seller_id).map(x=>x.seller_id))];
+ const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
+ const offers=o.rows.map(x=>{
+  let phones=x.status==='rejected'?[]:ph.filter(p=>p.user_id===x.seller_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp}));
+  if(!phones.length&&x.status!=='rejected'&&x.user_phone)phones=[{phone:x.user_phone,is_whatsapp:false}];
+  const {user_phone,...rest}=x; return {...rest,phones};
+ });
+ res.json({request:q.rows[0],offers});
+}));
 app.get('/api/requests/:id/contact',auth,requireDb,async(req,res)=>{
  const q=await pool.query("SELECT user_id FROM part_requests WHERE id=$1 AND status='open'",[req.params.id]);
  if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});
@@ -961,11 +1018,34 @@ app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res
  res.json({ok:true,id:o.rows[0].id});
 }));
 app.get('/api/offers/mine',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,q.title request_title,q.user_id buyer_id FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
- res.json({offers:r.rows});
+ const r=await pool.query("SELECT o.id,o.price,o.message,o.status,o.created_at,o.updated_at,q.id request_id,q.title request_title,q.user_id buyer_id,q.status request_status,q.make,q.model,q.year,q.variant,q.engine,q.kind,q.county,q.city,q.description,q.extra_parts,CASE WHEN o.status='accepted' THEN q.vin END vin,COALESCE(u.nickname,u.name) buyer_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=q.user_id WHERE o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
+ const ids=[...new Set(r.rows.filter(x=>x.status==='accepted').map(x=>x.buyer_id))];
+ const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
+ res.json({offers:r.rows.map(x=>({...x,phones:x.status==='accepted'?ph.filter(p=>p.user_id===x.buyer_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp})):[]}))});
+}));
+app.patch('/api/offers/:id',auth,needVerified,requireDb,ah(async(req,res)=>{
+ if(!throttle(authAttempts,'offer:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_OFERTE'});
+ const price=Number(req.body&&req.body.price),message=String((req.body&&req.body.message)||'').trim().slice(0,2000);
+ if(!isFinite(price)||price<0||price>10000000)return res.status(400).json({error:'PRET_INVALID'});
+ const r=await pool.query("UPDATE offers o SET price=$1,message=$2,updated_at=NOW() FROM part_requests q WHERE o.id=$3 AND o.seller_id=$4 AND o.status='pending' AND q.id=o.request_id AND q.status='open' RETURNING o.id,q.user_id buyer_id,q.title",[price,message,req.params.id,req.user.id]);
+ if(!r.rowCount)return res.status(409).json({error:'OFERTA_NU_MAI_E_DISPONIBILA'});
+ await notify(r.rows[0].buyer_id,'Oferta la cererea „'+r.rows[0].title+'” a fost modificată: '+price+' lei');
+ res.json({ok:true});
+}));
+app.delete('/api/offers/:id',auth,requireDb,ah(async(req,res)=>{
+ const r=await pool.query("DELETE FROM offers o USING part_requests q WHERE o.id=$1 AND o.seller_id=$2 AND o.status='pending' AND q.id=o.request_id RETURNING q.user_id buyer_id,q.title",[req.params.id,req.user.id]);
+ if(!r.rowCount)return res.status(409).json({error:'OFERTA_NU_MAI_E_DISPONIBILA'});
+ await notify(r.rows[0].buyer_id,'O ofertă la cererea „'+r.rows[0].title+'” a fost retrasă.');
+ res.json({ok:true});
+}));
+app.post('/api/offers/:id/reject',auth,requireDb,ah(async(req,res)=>{
+ const r=await pool.query("UPDATE offers o SET status='rejected' FROM part_requests q WHERE o.id=$1 AND q.id=o.request_id AND q.user_id=$2 AND o.status='pending' RETURNING o.seller_id,q.title",[req.params.id,req.user.id]);
+ if(!r.rowCount)return res.status(409).json({error:'OFERTA_NU_MAI_E_DISPONIBILA'});
+ await notify(r.rows[0].seller_id,'Oferta ta pentru „'+r.rows[0].title+'” a fost refuzată.');
+ res.json({ok:true});
 }));
 app.get('/api/offers/received',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,o.seller_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
+ const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,o.seller_id,q.id request_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
  res.json({offers:r.rows});
 }));
 app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
@@ -1101,6 +1181,7 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
     setInterval(ping,10*60*1000).unref(); setTimeout(ping,60*1000).unref();
   }
   if(pool)setInterval(()=>pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'").catch(()=>{}),30*60*1000).unref();
+  if(pool){purgeStats();setInterval(purgeStats,60*60*1000).unref();}
   if(pool)setInterval(()=>pool.query('DELETE FROM sessions WHERE expires_at < NOW()').catch(e=>console.error('session cleanup',e.message)),60*60*1000).unref();
   const stop=()=>{server.close(()=>{(pool?pool.end():Promise.resolve()).finally(()=>process.exit(0));});setTimeout(()=>process.exit(0),8000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
