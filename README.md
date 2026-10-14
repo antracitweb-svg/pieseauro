@@ -133,3 +133,8 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Panou cu stilizare completă (înainte lipsea CSS pentru tabel și grafic): carduri pentru vizualizări, apăsări pe telefon/WhatsApp, favorite, mesaje și total de la publicare.
 - Filtru de perioadă (7 zile / toate zilele păstrate), grafic pe zile, tabel pe zile (pliabil) și tabel pe fiecare anunț, ordonat după vizualizări, cu rată de contact (apăsări ÷ vizualizări). Apăsarea pe un anunț îi arată graficul.
 - `GET /api/stats/mine` întoarce acum și `fav` (favorite) și `msgs` (mesaje primite din anunț) pentru fiecare anunț.
+
+## Statistici cont (Contul meu → Utile)
+- Pagina Statistici are acum un selector sus: **Statistici cont** (tabel cu tab-uri 14 zile / 6 luni / 12 luni, rânduri cu bife și buton „Afișează grafic”) și **Statistici anunțuri** (panoul detaliat de mai înainte).
+- Endpoint nou: `GET /api/stats/account?range=14d|6m|12m`. Date reale: anunțuri adăugate, vizualizări, afișări telefon, oferte, oferte câștigătoare/necâștigătoare/inactive, valoare comenzi din oferte. Rândurile pentru credite, calificative, comenzi din anunțuri și statistici la oferte afișează 0 până există backend pentru ele.
+- Contoarele zilnice se păstrează acum `STATS_KEEP_DAYS` zile (implicit 400) ca să existe istoric pe 12 luni; `STATS_RETENTION_DAYS` rămâne fereastra graficului din „Statistici anunțuri” (15 zile). Istoricul de dinainte de această versiune nu poate fi recuperat (era șters după 15 zile).

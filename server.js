@@ -216,7 +216,9 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,created_at DESC)',
   'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)'
  );
- for(const q of migrations) await pool.query(q);
+ for(const q of migrations){ try{ await pool.query(q); }catch(e){ console.error('MIGRARE EȘUATĂ:',String(q).slice(0,160),'->',e.message); } }
+ /* coloanele din messages sunt necesare pentru Primite/Trimise/Arhivate: le asigurăm separat, indiferent de alte migrări */
+ for(const q of ['ALTER TABLE messages ADD COLUMN IF NOT EXISTS listing_id INTEGER','ALTER TABLE messages ADD COLUMN IF NOT EXISTS ref_title TEXT','ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT']){ try{ await pool.query(q); }catch(e){ console.error('MIGRARE messages EȘUATĂ:',q,'->',e.message); } }
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
  await pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
  await pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'");
@@ -260,15 +262,17 @@ function requireDb(req,res,next){if(!pool)return res.status(503).json({error:'DA
 const ah=fn=>(req,res)=>Promise.resolve(fn(req,res)).catch(e=>{console.error(e);if(!res.headersSent)res.status(500).json({error:'EROARE_SERVER'});});
 const clip=(v,n)=>v==null||v===''?null:String(v).trim().slice(0,n);
 /* ---------- statistici anunțuri (vizualizări / apăsări pe telefon) ----------
-   Contoarele zilnice se păstrează STATS_RETENTION_DAYS zile (implicit 15), apoi se șterg.
+   STATS_RETENTION_DAYS (implicit 15) = câte zile apar în „Statistici anunțuri” (grafic pe zile).
+   Contoarele zilnice se păstrează STATS_KEEP_DAYS zile (implicit 400), pentru tabelul „Statistici cont” pe 14 zile / 6 luni / 12 luni.
    Totalurile pe viață rămân în listings.views și listings.phone_clicks. */
 const STATS_DAYS=Math.min(90,Math.max(1,Math.floor(Number(process.env.STATS_RETENTION_DAYS))||15));
+const STATS_KEEP_DAYS=Math.min(800,Math.max(STATS_DAYS,Math.floor(Number(process.env.STATS_KEEP_DAYS))||400));
 const TODAY_SQL="(NOW() AT TIME ZONE 'Europe/Bucharest')::date";
 function bumpStat(listingId,col){
  if(!pool||!['views','phone_clicks'].includes(col))return;
  pool.query(`INSERT INTO listing_stats(listing_id,day,${col}) VALUES($1,${TODAY_SQL},1) ON CONFLICT(listing_id,day) DO UPDATE SET ${col}=listing_stats.${col}+1`,[listingId]).catch(e=>console.error('stats',e.message));
 }
-function purgeStats(){return pool?pool.query(`DELETE FROM listing_stats WHERE day<=${TODAY_SQL}-$1::int`,[STATS_DAYS]).catch(e=>console.error('stats purge',e.message)):null;}
+function purgeStats(){return pool?pool.query(`DELETE FROM listing_stats WHERE day<=${TODAY_SQL}-$1::int`,[STATS_KEEP_DAYS]).catch(e=>console.error('stats purge',e.message)):null;}
 async function optUserId(req){
  try{
   const t=req.cookies&&req.cookies.session; if(!t)return null;
@@ -842,6 +846,32 @@ app.get('/api/stats/mine',auth,requireDb,ah(async(req,res)=>{
  for(const r of ms.rows){const e=by.get(r.listing_id);if(e)e.msgs=r.n;}
  for(const r of st.rows){const e=by.get(r.listing_id),i=idx.get(r.day);if(e&&i!==undefined){e.v[i]=r.views;e.p[i]=r.phone_clicks;}}
  res.json({retention_days:STATS_DAYS,days,listings:[...by.values()]});
+}));
+app.get('/api/stats/account',auth,requireDb,ah(async(req,res)=>{
+ const range=['14d','6m','12m'].includes(req.query.range)?req.query.range:'12m';
+ const unit=range==='14d'?'day':'month', n=range==='14d'?14:(range==='6m'?6:12);
+ const t=(await pool.query(`SELECT to_char(${TODAY_SQL},'YYYY-MM-DD') d`)).rows[0].d;
+ const y=Number(t.slice(0,4)), m=Number(t.slice(5,7)), dd=Number(t.slice(8,10));
+ const cols=[];
+ for(let i=n-1;i>=0;i--){const x=unit==='day'?new Date(Date.UTC(y,m-1,dd-i)):new Date(Date.UTC(y,m-1-i,1));cols.push(x.toISOString().slice(0,10));}
+ const idx=new Map(cols.map((c,i)=>[c,i])), P=[req.user.id,unit,cols[0]];
+ const tz=c=>`(${c} AT TIME ZONE 'Europe/Bucharest')`;
+ const bk=c=>`to_char(date_trunc($2::text,${tz(c)})::date,'YYYY-MM-DD')`;
+ const bkd=`to_char(date_trunc($2::text,s.day::timestamp)::date,'YYYY-MM-DD')`;
+ const [ad,vw,of,od,fs]=await Promise.all([
+  pool.query(`SELECT ${bk('created_at')} b,COUNT(*)::int n FROM listings WHERE user_id=$1 AND ${tz('created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  pool.query(`SELECT ${bkd} b,COALESCE(SUM(s.views),0)::int v,COALESCE(SUM(s.phone_clicks),0)::int p FROM listing_stats s JOIN listings l ON l.id=s.listing_id WHERE l.user_id=$1 AND s.day>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  pool.query(`SELECT ${bk('o.created_at')} b,COUNT(*)::int n,COUNT(*) FILTER (WHERE o.status='accepted')::int won,COUNT(*) FILTER (WHERE o.status='rejected')::int lost,COUNT(*) FILTER (WHERE o.status='pending' AND pr.status<>'open')::int idle FROM offers o JOIN part_requests pr ON pr.id=o.request_id WHERE o.seller_id=$1 AND ${tz('o.created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  pool.query(`SELECT ${bk('created_at')} b,COALESCE(SUM(price),0)::float val FROM orders WHERE seller_id=$1 AND ${tz('created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  pool.query(`SELECT to_char(MIN(s.day),'YYYY-MM-DD') d FROM listing_stats s JOIN listings l ON l.id=s.listing_id WHERE l.user_id=$1`,[req.user.id])
+ ]);
+ const z=()=>cols.map(()=>0), rows={added:z(),offers:z(),won:z(),lost:z(),inactive:z(),ord_o_v:z(),views:z(),phone:z()};
+ const put=(rs,fn)=>{for(const r of rs){const i=idx.get(r.b);if(i!==undefined)fn(r,i);}};
+ put(ad.rows,(r,i)=>{rows.added[i]=r.n;});
+ put(vw.rows,(r,i)=>{rows.views[i]=r.v;rows.phone[i]=r.p;});
+ put(of.rows,(r,i)=>{rows.offers[i]=r.n;rows.won[i]=r.won;rows.lost[i]=r.lost;rows.inactive[i]=r.idle;});
+ put(od.rows,(r,i)=>{rows.ord_o_v[i]=Math.round(r.val);});
+ res.json({range,unit,cols,rows,views_since:(fs.rows[0]||{}).d||null});
 }));
 app.patch('/api/listings/:id/status',auth,requireDb,async(req,res)=>{
  const to=String((req.body||{}).status||'');

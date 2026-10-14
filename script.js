@@ -226,7 +226,7 @@ function renderAccountTool(view, withId, refId){
     credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
     transactions:{title:'Tranzacții',text:'Comenzile tale, ca cumpărător și ca vânzător.',action:null,label:null},
     invoices:{title:'Facturi',text:'Facturile emise pentru contul tău.',action:null,label:null},
-    stats:{title:'Statistici anunțuri',text:'Vizualizări și apăsări pe telefon, pe anunț și pe zi.',action:null,label:null}
+    stats:{title:'Statistici',text:'Statistici pe cont (pe zile și luni) și pe fiecare anunț.',action:null,label:null}
   };
   currentToolView=view;
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
@@ -256,8 +256,10 @@ async function loadToolData(view, box, withId, refId){
   }else if(view==='invoices'){
     items=['<div class="info-card tool-item"><p>Nu există facturi emise. Completează datele de facturare în Setări cont ca să fie gata când vei avea nevoie.</p><div class="row"><button class="btn ghost small" data-go="settings">Deschide Setări cont</button></div></div>'];
   }else if(view==='stats'){
-    statsData=await api('/api/stats/mine'); statsPick='all';
-    box.insertAdjacentHTML('beforeend','<div id="statsBox"></div>'); drawStats(); return;
+    statsPick='all'; statsView='cont'; accStats.data=null; accStats.sel.clear();
+    box.insertAdjacentHTML('beforeend','<div id="statsBox"><div id="statsSwitch"></div><div id="statsBody"></div></div>'); drawStatsSwitch(); drawAccStats();
+    const [ac,ls]=await Promise.all([api('/api/stats/account?range='+accStats.range),api('/api/stats/mine')]);
+    accStats.data=ac; statsData=ls; drawStatsPage(); return;
   }else if(view==='offers'){
     const r=await api('/api/offers/mine'); offersMine=r.offers;
     items=r.offers.map(o=>{
@@ -287,6 +289,63 @@ async function loadToolData(view, box, withId, refId){
   box.insertAdjacentHTML('beforeend',`<div class="tool-list">${items.join('')||'<p class="muted">Nu există nimic de afișat încă.</p>'}</div>`);
 }
 
+/* ---------- Statistici cont (tabel pe perioade) ---------- */
+let statsView='cont';
+const accStats={range:'12m',data:null,sel:new Set()};
+const ACC_ROWS=[['added','Anunțuri adăugate'],['ord_l','Comenzi din anunțuri'],['ord_l_v','Valoare comenzi din anunțuri (lei)'],['cr_p','Credite promovări anunțuri'],['cr_up','Credite UP anunțuri'],['offers','Oferte cereri',1],['won','Oferte câștigătoare'],['ord_o_v','Valoare comenzi din oferte cereri (lei)'],['lost','Oferte necâștigătoare'],['inactive','Oferte inactive'],['rv_pr','Calificative primite pozitive'],['rv_nr','Calificative primite negative'],['rv_pg','Calificative acordate pozitive'],['rv_ng','Calificative acordate negative'],['views','Vizualizări anunțuri'],['phone','Afișări telefon anunțuri'],['o_views','Vizualizări oferte cereri',1],['o_phone','Afișări telefon oferte cereri']];
+const MONTHS_RO=['Ian.','Feb.','Mar.','Apr.','Mai','Iun.','Iul.','Aug.','Sept.','Oct.','Nov.','Dec.'];
+const accColLabel=(d,u)=>(u==='month'?MONTHS_RO[Number(d.slice(5,7))-1]:d.slice(8,10)+'.'+d.slice(5,7))+'<br>'+d.slice(0,4);
+const accShort=(d,u)=>u==='month'?MONTHS_RO[Number(d.slice(5,7))-1]+' '+d.slice(2,4):d.slice(8,10)+'.'+d.slice(5,7);
+const ACC_COLORS=['#0d6efd','#f59e0b','#16a34a','#dc2626','#7c3aed','#0891b2'];
+function drawStatsSwitch(){
+  const b=$('#statsSwitch'); if(!b) return;
+  b.innerHTML=`<select id="statsViewSel" class="acc-title-sel" aria-label="Tip statistici"><option value="cont"${statsView==='cont'?' selected':''}>Statistici cont</option><option value="anunturi"${statsView==='anunturi'?' selected':''}>Statistici anunțuri</option></select>`;
+}
+function drawStatsPage(){ drawStatsSwitch(); if(statsView==='cont') drawAccStats(); else drawStats(); }
+function accChartSvg(D,keys){
+  const W=640,H=260,pl=44,pr=14,pt=14,pb=40,iw=W-pl-pr,ih=H-pt-pb,n=D.cols.length;
+  const series=keys.map(k=>D.rows[k]||D.cols.map(()=>0));
+  const max=Math.max(4,...series.flat().map(Number)), top=Math.ceil(max/4)*4;
+  const X=i=>pl+(n===1?iw/2:i*iw/(n-1)), Y=v=>pt+ih-(Number(v)||0)/top*ih;
+  let g='';
+  for(let i=0;i<=4;i++){ const y=pt+ih-ih*i/4, val=Math.round(top*i/4); g+=`<line x1="${pl}" y1="${y}" x2="${W-pr}" y2="${y}" stroke="#e3e9f1"/><text x="${pl-6}" y="${y+3}" font-size="10" fill="#6c7f97" text-anchor="end">${val}</text>`; }
+  const every=Math.ceil(n/8);
+  D.cols.forEach((d,i)=>{ if(i%every===0||i===n-1) g+=`<text x="${X(i).toFixed(1)}" y="${H-pb+16}" font-size="10" fill="#6c7f97" text-anchor="middle">${accShort(d,D.unit)}</text>`; });
+  series.forEach((a,si)=>{
+    const c=ACC_COLORS[si%ACC_COLORS.length];
+    g+=`<polyline fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" points="${a.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}"/>`;
+    a.forEach((v,i)=>{ g+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.5" fill="${c}"><title>${accShort(D.cols[i],D.unit)}: ${v}</title></circle>`; });
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Grafic statistici cont" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
+}
+function drawAccChart(){
+  const box=$('#accChart'), D=accStats.data; if(!box||!D) return;
+  const keys=ACC_ROWS.map(r=>r[0]).filter(k=>accStats.sel.has(k));
+  if(!keys.length){ box.innerHTML=''; return; }
+  const name=k=>(ACC_ROWS.find(r=>r[0]===k)||[,k])[1];
+  box.innerHTML=`<div class="stats-legend">${keys.map((k,i)=>`<span><i class="lg acc-c${i%ACC_COLORS.length}"></i>${esc(name(k))}</span>`).join('')}</div><div class="stats-chart">${accChartSvg(D,keys)}</div>`;
+}
+function accTabsHtml(){
+  const tab=(r,t)=>`<button type="button" class="acc-tab${accStats.range===r?' on':''}" data-acc-range="${r}" role="tab" aria-selected="${accStats.range===r}">${t}</button>`;
+  return `<div class="acc-tabs" role="tablist">${tab('14d','14 zile')}${tab('6m','6 luni')}${tab('12m','12 luni')}</div>`;
+}
+function drawAccStats(){
+  const box=$('#statsBody'); if(!box||statsView!=='cont') return;
+  const D=accStats.data; if(!D){ box.innerHTML=accTabsHtml()+'<p class="muted">Se încarcă…</p>'; return; }
+  const nf=v=>new Intl.NumberFormat('ro-RO').format(Number(v)||0);
+  const head=D.cols.map(c=>`<th>${accColLabel(c,D.unit)}</th>`).join('');
+  const body=ACC_ROWS.map(([k,label,trend])=>{
+    const a=D.rows[k]||D.cols.map(()=>0);
+    const tds=a.map((v,i)=>{ let ar=''; if(trend&&i>0){ if(v<a[i-1]) ar=' <i class="acc-dn">↓</i>'; else if(v>a[i-1]) ar=' <i class="acc-up">↑</i>'; } return `<td>${nf(v)}${ar}</td>`; }).join('');
+    return `<tr${trend?' class="acc-hl"':''}><th scope="row"><label class="acc-lbl"><input type="checkbox" data-acc-row="${k}"${accStats.sel.has(k)?' checked':''}><span>${esc(label)}</span></label></th>${tds}</tr>`;
+  }).join('');
+  const nodata='Rândurile fără date (credite, calificative, comenzi din anunțuri, statistici la oferte) vor fi completate când funcția respectivă este activată.';
+  const note=D.views_since?`<p class="muted stats-note">Vizualizările și afișările de telefon sunt numărate zilnic începând cu ${dmy(D.views_since)}; pentru perioadele anterioare apar 0. ${nodata}</p>`:`<p class="muted stats-note">${nodata}</p>`;
+  box.innerHTML=`${accTabsHtml()}<div class="acc-scroll"><table class="acc-table"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>
+    <button type="button" id="accGraphBtn" class="btn ghost acc-graph-btn"${accStats.sel.size?'':' disabled'}>Afișează grafic</button><div id="accChart"></div>${note}`;
+  drawAccChart();
+}
+
 /* ---------- statistici anunțuri (Utile) ---------- */
 let statsData=null, statsPick='all', currentToolView='', offersMine=[], requestsCache=new Map(), currentRequestModal=null;
 const sumLast=(a,n)=>a.slice(Math.max(0,a.length-n)).reduce((t,v)=>t+(Number(v)||0),0);
@@ -312,7 +371,7 @@ function statsChartSvg(days,v,p){
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Grafic vizualizări și apăsări pe telefon pe zile" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
 }
 function drawStats(){
-  const box=$('#statsBox'); if(!box||!statsData) return;
+  const box=$('#statsBody'); if(!box||!statsData) return;
   const D=statsData, N=D.days.length, sc=statsScope();
   if(!D.listings.length){ box.innerHTML='<div class="info-card"><p class="muted">Nu ai încă anunțuri. Statisticile apar după ce publici primul anunț.</p></div>'; return; }
   const n=(statsRange>0&&statsRange<N)?statsRange:N, from=N-n;
@@ -453,7 +512,23 @@ async function loadYears(make, model){
 }
 
 /* ---------- carduri ---------- */
+function cardMine(x){
+  const st=STATUS_LABEL[x.status]||['',''];
+  const im=Array.isArray(x.images)&&x.images[0]?x.images[0]:'';
+  const img=im?`<img src="${esc(im)}" alt="${esc(x.title)}" loading="lazy" decoding="async">`:`<div class="listing-placeholder">${x.type==='dezmembrari'?'🚗':'⚙️'}</div>`;
+  const canSold=(x.status==='approved'||x.status==='sold');
+  const btns=[
+    canSold?`<button type="button" class="mr-btn" data-sold-listing="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune la vânzare':'Marchează vândut'}" aria-label="${x.status==='sold'?'Repune la vânzare':'Marchează vândut'}">${x.status==='sold'?'↺':'✓'}</button>`:'',
+    x.status!=='blocked'?`<button type="button" class="mr-btn" data-edit-listing="${x.id}" title="Editează" aria-label="Editează">✎</button>`:'',
+    `<button type="button" class="mr-btn mr-del" data-del-listing="${x.id}" title="Șterge" aria-label="Șterge">🗑</button>`
+  ].join('');
+  return `<article class="listing mine-row" data-open="${x.id}" tabindex="0">
+    <div class="mr-top"><div class="mr-img">${img}</div>
+      <div class="mr-main"><h3 class="mr-title">${esc(x.title)}</h3>${st[0]?`<span class="badge ${st[1]}">${st[0]}</span>`:''}<div class="mr-acts">${btns}</div></div></div>
+    <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${money(x.price)}</b></div></article>`;
+}
 function card(x, o={}){
+  if(o.mine) return cardMine(x);
   const fav = favorites.includes(x.id);
   const meta = [x.make,x.model,x.year].filter(Boolean).join(' · ') || (x.category || 'Piesă auto');
   const kmTxt = x.type==='dezmembrari' && x.km!=null ? Number(x.km).toLocaleString('ro-RO')+' km' : '';
@@ -710,13 +785,17 @@ function detailHtml(x, phones, canContact){
   const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
   const spec = [['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
   const phone1 = (phones||[]).slice(0,1);
-  const callbar = (canContact && phone1.length) ? `<div class="ad-callbar"><a class="btn primary" data-track-phone="${Number(x.id)}" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(phone1[0].phone))}</a>${phone1[0].is_whatsapp?`<a class="btn wa" data-track-phone="${Number(x.id)}" target="_blank" rel="noopener noreferrer" href="${esc(waLink(phone1[0].phone))}">WhatsApp</a>`:''}</div>` : '';
+  const callbar = (canContact && phone1.length) ? `<div class="ad-callbar"><a class="btn primary" data-track-phone="${Number(x.id)}" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(phone1[0].phone))}</a>${phone1[0].is_whatsapp?`<a class=\"btn wa\" data-track-phone=\"${Number(x.id)}\" target=\"_blank\" rel=\"noopener noreferrer\" href=\"${esc(waLink(phone1[0].phone))}\">WhatsApp</a>`:''}${(currentUser&&currentUser.id===x.user_id)?'':`<button type="button" class="btn ghost" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 În coș'}</button>`}</div>` : '';
   const galleryImages = Array.isArray(x.images) ? x.images.filter(Boolean) : [];
   const gallery = galleryImages.length ? `<div class="detail-gallery">${galleryImages.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(x.title)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(x.title)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>` : '';
   const seller = esc(x.seller_name || 'Vânzător');
+  const isOwner = !!(currentUser && x.user_id && currentUser.id===x.user_id);
+  const ownSt = x.status || ((state.loaded.find(l=>l.id===x.id)||{}).status) || '';
+  const ownLbl = (STATUS_LABEL[ownSt]||[''])[0];
+  const ownerBox = isOwner ? `<div class="ad-owner"><b>Opțiuni:</b><div class="ad-owner-btns">${ownSt!=='blocked'?`<button type="button" class="btn ghost small" data-edit-listing="${x.id}">✎ Editează</button>`:''}${(ownSt==='approved'||ownSt==='sold')?`<button type="button" class="btn ghost small" data-sold-listing="${x.id}" data-to="${ownSt==='sold'?'approved':'sold'}">${ownSt==='sold'?'↺ Repune la vânzare':'✓ Marchează vândut'}</button>`:''}<button type="button" class="btn danger small" data-del-listing="${x.id}">🗑 Șterge</button></div><p>${ownLbl?`Stare: <b>${esc(ownLbl)}</b><br>`:''}Data adăugării: ${esc(fmtDate(x.created_at))}${x.views!=null?`<br>Vizualizări: ${Number(x.views)||0}`:''}</p></div>` : '';
   return `<div class="ad">
   <div class="ad-main">
-    ${gallery}
+    ${ownerBox}${gallery}
     <h2>${esc(x.title)}</h2>
     <p class="ad-sub">${[x.county,fmtDate(x.created_at)].filter(Boolean).map(esc).join(' · ')}</p>
     <div class="ad-price-m">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
@@ -1652,9 +1731,9 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-fav]'))){ e.stopPropagation(); toggleFavorite(Number(el.dataset.fav)); return; }
   if((el=t.closest('[data-cart]'))){ e.stopPropagation(); toggleCart(Number(el.dataset.cart),el); return; }
   if((el=t.closest('[data-cart-del]'))){ toggleCart(Number(el.dataset.cartDel)); renderAccountTool('cart'); return; }
-  if((el=t.closest('[data-edit-listing]'))){ e.stopPropagation(); navigate('vinde?edit='+Number(el.dataset.editListing)); return; }
-  if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
-  if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); toast('Anunțul a fost șters.'); })(); return; }
+  if((el=t.closest('[data-edit-listing]'))){ e.stopPropagation(); { const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); } navigate('vinde?edit='+Number(el.dataset.editListing)); return; }
+  if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); { const dm=$('#detailModal'); if(dm&&!dm.classList.contains('hidden')) openDetail(id,true); } toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
+  if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); { const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); } toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
   if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerEditId').value=''; $('#offerTitle').textContent='Trimite o ofertă'; $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
@@ -1662,6 +1741,8 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-offer-reject]'))){ if(confirm('Refuzi această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerReject+'/reject',{method:'POST'}); toast('Oferta a fost refuzată.'); refreshAfterOfferChange(); })(); return; }
   if((el=t.closest('[data-offer-edit]'))){ const o=offersMine.find(x=>x.id===Number(el.dataset.offerEdit)); if(!o) return; $('#offerRequestId').value=o.request_id; $('#offerEditId').value=o.id; $('#offerTitle').textContent='Modifică oferta'; $('#offerPrice').value=o.price; $('#offerMessage').value=o.message||''; setMsg($('#offerMessageStatus'),''); state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); $('#offerModal').classList.remove('hidden'); api('/api/offers/mine?id='+o.id).then(r=>{ const f=(r.offers||[])[0]; state.offerImages=((f&&f.images)||[]).filter(Boolean); state.offerImagesLoaded=true; renderImgBox('offerImages'); }).catch(()=>{}); return; }
   if((el=t.closest('[data-offer-del]'))){ if(confirm('Retragi această ofertă? Cumpărătorul nu o va mai vedea.')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerDel,{method:'DELETE'}); toast('Oferta a fost retrasă.'); $('#requestModal').classList.add('hidden'); refreshAfterOfferChange(); })(); return; }
+  if((el=t.closest('[data-acc-range]'))){ const r=el.dataset.accRange; if(accStats.range===r&&accStats.data) return; accStats.range=r; accStats.data=null; drawAccStats(); api('/api/stats/account?range='+r).then(d=>{ if(accStats.range!==r) return; accStats.data=d; drawAccStats(); }).catch(()=>{ const b=$('#statsBody'); if(b&&accStats.range===r) b.insertAdjacentHTML('beforeend','<p class="muted">Nu am putut încărca statisticile.</p>'); }); return; }
+  if(t.closest('#accGraphBtn')){ drawAccChart(); const c=$('#accChart'); if(c) c.scrollIntoView({block:'nearest',behavior:'smooth'}); return; }
   if((el=t.closest('[data-stats-range]'))){ statsRange=Number(el.dataset.statsRange)||0; drawStats(); return; }
   if((el=t.closest('[data-stats-pick]'))){ statsPick=el.dataset.statsPick; drawStats(); const sb=$('#statsBox'); if(sb) sb.scrollIntoView({block:'start',behavior:'smooth'}); return; }
   if((el=t.closest('[data-open-request],[data-offer-open]'))){
@@ -1720,7 +1801,7 @@ document.addEventListener('click', e=>{
     const show = input.type==='password'; input.type = show?'text':'password';
     el.textContent = show?'◌':'◉'; el.setAttribute('aria-label', show?'Ascunde parola':'Arată parola'); return;
   }
-  if((el=t.closest('[data-open]'))){ openDetail(Number(el.dataset.open)); return; }
+  if((el=t.closest('[data-open]'))){ openDetail(Number(el.dataset.open), state.mode==='mine'); return; }
 });
 document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); return; }
   const m=e.target.closest('[data-move-sell-image]'); if(m){ const i=Number(m.dataset.moveSellImage), k=i+Number(m.dataset.dir), a=state.sellImages; if(k>=0&&k<a.length){ [a[i],a[k]]=[a[k],a[i]]; renderSellImages(); } } });
@@ -1845,6 +1926,11 @@ function wire(){
   $('#reqExtra').addEventListener('click', e=>{ const b=e.target.closest('.rp-del'); if(b) b.closest('.req-part').remove(); });
   $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
   $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const editId=$('#offerEditId').value; if(state.offerImagesBusy){ toast('Așteaptă să se proceseze pozele.'); return; } const payload={price:$('#offerPrice').value,message:$('#offerMessage').value}; if(!editId||state.offerImagesLoaded) payload.images=state.offerImages; const body=JSON.stringify(payload); if(editId) await api('/api/offers/'+editId,{method:'PATCH',body}); else await api('/api/requests/'+$('#offerRequestId').value+'/offers',{method:'POST',body}); $('#offerModal').classList.add('hidden'); state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); toast(editId?'Oferta a fost modificată.':'Oferta a fost trimisă.'); refreshAfterOfferChange(); })(); });
+  document.addEventListener('change', e=>{
+    const x=e.target; if(!x) return;
+    if(x.id==='statsViewSel'){ statsView=x.value==='anunturi'?'anunturi':'cont'; drawStatsPage(); return; }
+    if(x.matches&&x.matches('[data-acc-row]')){ if(x.checked) accStats.sel.add(x.dataset.accRow); else accStats.sel.delete(x.dataset.accRow); const b=$('#accGraphBtn'); if(b) b.disabled=!accStats.sel.size; if(!accStats.sel.size) drawAccChart(); }
+  });
   document.addEventListener('change', e=>{ if(e.target&&e.target.id==='statsSelect'){ statsPick=e.target.value; drawStats(); } });
   $('#sellForm').addEventListener('submit', submitSell);
   $('#sellImages').addEventListener('change', handleSellImages);
