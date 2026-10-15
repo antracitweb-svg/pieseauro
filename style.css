@@ -1550,3 +1550,19 @@ html.menu-open,html.menu-open body{overflow:hidden}
 .similar-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))!important;gap:14px!important}
 .similar-grid .listing-desc,.similar-grid .listing-chips,.similar-grid .listing-seller{display:none}
 .similar-grid .listing-top h3{font-size:15px!important}
+
+/* ===== Culori unificate (temă șampanie/auriu) — insigne, liste, statistici ===== */
+.badge,.badge.new,.badge.pending,.badge.bad,.detail-top .badge,.detail-top .badge.new{background:#f4efe3;color:#6b5429;border:1px solid #e6e0d4}
+.lchip-ship{background:#fff;border-color:var(--line);color:#4a4437}
+.listing.mine-row:hover{background:#f7f5f0}
+.stats-range-btn{color:#7a5a28}
+.stats-range-btn.on{background:#14110c;color:#e9d3a8}
+.st-bar i{background:linear-gradient(90deg,#b8935a,#d4b483)}
+.stats-days summary{color:#7a5a28}
+.stats-days{background:#fffefb}
+.stats-listings tbody tr:hover{background:#f7f5f0}
+.stats-listings tr.sel{background:#f4efe3}
+.stats-listings tr.sel td:first-child{box-shadow:inset 3px 0 0 #b8935a}
+.acc-tab{color:#7a5a28}
+.acc-tab.on{border-bottom-color:#b8935a}
+.acc-lbl input{accent-color:#b8935a}

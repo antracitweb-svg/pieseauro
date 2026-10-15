@@ -269,8 +269,9 @@ async function loadToolData(view, box, withId, refId){
   }else if(view==='stats'){
     statsPick='all'; statsView='cont'; accStats.data=null; accStats.sel.clear();
     box.insertAdjacentHTML('beforeend','<div id="statsBox"><div id="statsSwitch"></div><div id="statsBody"></div></div>'); drawStatsSwitch(); drawAccStats();
-    const [ac,ls]=await Promise.all([api('/api/stats/account?range='+accStats.range),api('/api/stats/mine')]);
-    accStats.data=ac; statsData=ls; drawStatsPage(); return;
+    const pAc=api('/api/stats/account?range='+accStats.range).then(d=>{ accStats.data=d; if(statsView==='cont') drawAccStats(); }).catch(e=>{ const b=$('#statsBody'); if(b&&statsView==='cont') b.innerHTML=accTabsHtml()+'<p class="muted">Nu am putut încărca statisticile contului. '+esc(e.message||'')+'</p>'; });
+    const pLs=api('/api/stats/mine').then(d=>{ statsData=d; if(statsView!=='cont') drawStats(); }).catch(()=>{});
+    await Promise.all([pAc,pLs]); return;
   }else if(view==='offers'){
     const r=await api('/api/offers/mine'); offersMine=r.offers;
     items=r.offers.map(o=>{
@@ -382,7 +383,8 @@ function statsChartSvg(days,v,p){
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Grafic vizualizări și apăsări pe telefon pe zile" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
 }
 function drawStats(){
-  const box=$('#statsBody'); if(!box||!statsData) return;
+  const box=$('#statsBody'); if(!box) return;
+  if(!statsData){ box.innerHTML='<p class="muted">Se încarcă…</p>'; return; }
   const D=statsData, N=D.days.length, sc=statsScope();
   if(!D.listings.length){ box.innerHTML='<div class="info-card"><p class="muted">Nu ai încă anunțuri. Statisticile apar după ce publici primul anunț.</p></div>'; return; }
   const n=(statsRange>0&&statsRange<N)?statsRange:N, from=N-n;
