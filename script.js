@@ -15,7 +15,7 @@ const ERR = {
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',EMAIL_NOT_VERIFIED:'Confirmă adresa de email (verifică mesajul primit) ca să poți continua.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
   PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',BOT_CHECK:'Verificarea de securitate a expirat. Reîncarcă pagina.',PREA_MULTE_CERERI:'Prea multe cereri într-un timp scurt. Încearcă din nou peste un minut.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
-  CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',TERMENI_NEACCEPTATI:'Trebuie să accepți Termenii și Politica de confidențialitate.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',DESTINATAR_NEGASIT:'Nu am găsit niciun utilizator cu acest nickname.'
+  CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',TERMENI_NEACCEPTATI:'Trebuie să accepți Termenii și Politica de confidențialitate.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',COMANDA_PROPRIE:'Nu poți comanda propriul anunț.',CANTITATE_INVALIDA:'Cantitatea cerută nu este disponibilă.',ADRESA_LIPSA:'Completează județul, localitatea și adresa de livrare.',COMANDA_EXISTA:'Ai deja o comandă în așteptare pentru acest anunț.',COMANDA_INCHISA:'Comanda este deja închisă.',PREA_MULTE_COMENZI:'Ai trimis prea multe comenzi. Încearcă mai târziu.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',DESTINATAR_NEGASIT:'Nu am găsit niciun utilizator cu acest nickname.'
 };
 const CATEGORY_TREE = [
  ['Accesorii auto','🧰',['Covorașe și protecții','Huse scaune','Portbagaje și bare transversale','Cârlige de remorcare','Parasolare','Suporturi telefon','Alte accesorii']],
@@ -229,9 +229,9 @@ function renderAccountTool(view, withId, refId){
   const data = {
     cart:{title:'Coșul meu',text:'Anunțurile pe care vrei să le ții la îndemână.',action:'rezultate',label:'Vezi piesele'},
     offers:{title:'Oferte la cereri',text:'Aici vei putea trimite și gestiona ofertele pentru cererile de piese.',action:'requests',label:'Vezi cererile disponibile'},
-    'orders-seller':{title:'Comenzi din oferte',text:'Comenzile acceptate din ofertele tale vor apărea aici.',action:null,label:null},
+    'orders-seller':{title:'Comenzi primite',text:'Comenzile primite din anunțurile tale și din ofertele acceptate vor apărea aici.',action:null,label:null},
     'offers-received':{title:'Ofertele primite',text:'Ofertele primite la cererile tale vor apărea aici.',action:'requests?t=mine',label:'Vezi cererile mele'},
-    orders:{title:'Comenzile mele',text:'Comenzile tale vor apărea aici după ce o ofertă este acceptată.',action:null,label:null},
+    orders:{title:'Comenzile mele',text:'Comenzile tale vor apărea aici după ce comanzi o piesă sau după ce o ofertă este acceptată.',action:null,label:null},
     messages:{title:'Mesaje',text:'Conversațiile tale cu cumpărători și vânzători.',action:null,label:null},
     notifications:{title:'Notificări',text:'Notificările contului vor apărea aici când există activitate nouă.',action:null,label:null},
     credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
@@ -250,7 +250,7 @@ function renderAccountTool(view, withId, refId){
   }
 }
 
-const OFFER_ST={pending:'În așteptare',accepted:'Acceptată',rejected:'Respinsă'}, ORDER_ST={new:'Nouă'};
+const OFFER_ST={pending:'În așteptare',accepted:'Acceptată',rejected:'Respinsă'}, ORDER_ST={new:'Nouă',confirmed:'Confirmată',shipped:'Expediată',completed:'Finalizată',cancelled:'Anulată'};
 async function loadToolData(view, box, withId, refId){
   const money=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei';
   let items=[];
@@ -259,11 +259,11 @@ async function loadToolData(view, box, withId, refId){
     const ok=[],gone=[]; res.forEach((r,i)=>{ if(r.status==='fulfilled') ok.push(r.value.listing); else if(r.reason&&r.reason.status===404) gone.push(ids[i]); });
     if(gone.length) writeJSON('autopiese_cart',ids.filter(i=>!gone.includes(i)));
     const total=ok.reduce((n,x)=>n+(Number(x.price)||0),0);
-    items=ok.map(x=>`<div class="info-card tool-item"><b>${esc(x.title)}</b><p>${esc(money(x.price))} · ${esc(x.county||'')}${x.seller_name?' · '+esc(x.seller_name):''}</p><div class="row"><button class="btn primary small" data-open="${x.id}">Vezi anunțul</button><button class="btn ghost small" data-cart-del="${x.id}">Elimină</button></div></div>`);
-    if(ok.length) items.push(`<div class="info-card tool-item"><b>Total estimat: ${esc(money(total))}</b><p class="muted">Plata se face direct cu vânzătorul. Contactează-l din fiecare anunț.</p></div>`);
+    items=ok.map(x=>`<div class="info-card tool-item"><b>${esc(x.title)}</b><p>${esc(money(x.price))} · ${esc(x.county||'')}${x.seller_name?' · '+esc(x.seller_name):''}</p><div class="row"><button class="btn primary small" data-order="${x.id}">🛍️ Comandă</button><button class="btn ghost small" data-open="${x.id}">Vezi anunțul</button><button class="btn ghost small" data-cart-del="${x.id}">Elimină</button></div></div>`);
+    if(ok.length) items.push(`<div class="info-card tool-item"><b>Total estimat: ${esc(money(total))}</b><p class="muted">Apasă „Comandă” la fiecare piesă ca vânzătorul să primească comanda ta cu adresa de livrare. Plata se face direct cu vânzătorul.</p></div>`);
   }else if(view==='transactions'){
     const r=await api('/api/orders');
-    items=r.orders.map(o=>`<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}</b><p>${o.role==='buyer'?'Cumpărare':'Vânzare'} · ${money(o.price)} · ${esc(ORDER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p></div>`);
+    items=r.orders.map(orderCardHtml);
   }else if(view==='invoices'){
     items=['<div class="info-card tool-item"><p>Nu există facturi emise. Completează datele de facturare în Setări cont ca să fie gata când vei avea nevoie.</p><div class="row"><button class="btn ghost small" data-go="settings">Deschide Setări cont</button></div></div>'];
   }else if(view==='stats'){
@@ -284,7 +284,7 @@ async function loadToolData(view, box, withId, refId){
     items=r.offers.map(o=>`<div class="info-card tool-item"><b>${esc(o.request_title)}</b><p>${money(o.price)}${o.seller_name?' · '+esc(o.seller_name):''} · ${esc(OFFER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row"><button type="button" class="btn ghost small" data-open-request="${o.request_id}" data-mode="mine">Cererea și ofertanții</button>${o.status==='pending'?`<button class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button>`:''}<button class="btn ghost small" data-go="account-tool?view=messages&with=${o.seller_id}">Scrie mesaj</button></div></div>`);
   }else if(view==='orders'||view==='orders-seller'){
     const r=await api('/api/orders'), role=view==='orders'?'buyer':'seller';
-    items=r.orders.filter(o=>o.role===role).map(o=>`<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}</b><p>${money(o.price)} · ${esc(ORDER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p></div>`);
+    items=r.orders.filter(o=>o.role===role).map(orderCardHtml);
   }else if(view==='messages'){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
@@ -299,6 +299,46 @@ async function loadToolData(view, box, withId, refId){
     api('/api/notifications/read',{method:'POST'}).catch(()=>{});
   }
   box.insertAdjacentHTML('beforeend',`<div class="tool-list">${items.join('')||'<p class="muted">Nu există nimic de afișat încă.</p>'}</div>`);
+}
+
+/* ---------- comenzi din anunțuri / coș ---------- */
+function orderCardHtml(o){
+  const money=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei', seller=o.role==='seller';
+  const addr=[o.ship_address,o.ship_city,o.ship_county].filter(Boolean).join(', ');
+  const closed=['cancelled','completed'].includes(o.status);
+  const btns=[];
+  if(seller&&!closed){
+    if(o.status==='new') btns.push(['confirmed','Confirmă comanda','primary']);
+    if(o.status==='new'||o.status==='confirmed') btns.push(['shipped','Marchează expediată','primary']);
+    if(o.status==='shipped') btns.push(['completed','Finalizată','primary']);
+    btns.push(['cancelled','Anulează','danger']);
+  }else if(!seller&&o.status==='new') btns.push(['cancelled','Anulează comanda','danger']);
+  const cls=o.status==='new'?'pending':(o.status==='cancelled'?'bad':'new');
+  return `<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</b><p>${seller?'Vânzare':'Cumpărare'} · ${money(o.price)} · <span class="badge ${cls}">${esc(ORDER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}</p>${o.other_name?`<p class="muted">${seller?'Cumpărător':'Vânzător'}: ${esc(o.other_name)}</p>`:''}${addr?`<p>📍 Livrare: ${esc(addr)}</p>`:''}${o.note?`<p class="muted">Mesaj: ${esc(o.note)}</p>`:''}${(seller&&o.phones&&o.phones.length)?contactHtml(o.phones,'Cumpărătorul'):''}<div class="row">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}">${b[1]}</button>`).join('')}${o.listing_id?`<button type="button" class="btn ghost small" data-open="${o.listing_id}">Vezi anunțul</button>`:''}</div></div>`;
+}
+async function openOrder(id){
+  if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
+  const x=(await api('/api/listings/'+id+'?noview=1')).listing;
+  if(!x) return;
+  $('#orderListingId').value=x.id; state.orderDelivery=!!x.delivery;
+  $('#orderSummary').textContent=x.title+' · '+Number(x.price||0).toLocaleString('ro-RO')+' lei / buc.';
+  const q=$('#orderQty'); q.max=Math.max(1,Number(x.quantity)||1); q.value=1;
+  $('#orderDeliveryHint').textContent=x.delivery?'Completează adresa unde vrei să primești piesa.':'Vânzătorul nu a bifat livrare: poți lăsa adresa goală și stabiliți ridicarea personală.';
+  const sc=$('#orderCounty'); if(sc.options.length<2) sc.insertAdjacentHTML('beforeend',COUNTIES.map(c=>`<option>${esc(c)}</option>`).join(''));
+  sc.value=''; $('#orderCity').value=''; $('#orderAddress').value=''; $('#orderNote').value=''; setMsg($('#orderMsg'),'');
+  try{ const u=(await api('/api/account/settings')).user||{}; sc.value=u.ship_county||''; $('#orderCity').value=u.ship_city||''; $('#orderAddress').value=u.ship_details||''; }catch{}
+  $('#orderModal').classList.remove('hidden');
+}
+async function submitOrder(){
+  const msg=$('#orderMsg'); setMsg(msg,'');
+  const body={listing_id:Number($('#orderListingId').value),quantity:Number($('#orderQty').value)||1,ship_county:$('#orderCounty').value,ship_city:$('#orderCity').value.trim(),ship_address:$('#orderAddress').value.trim(),note:$('#orderNote').value.trim()};
+  if(!body.ship_county){ setMsg(msg,'Alege județul.','error'); return; }
+  if(state.orderDelivery&&(!body.ship_city||!body.ship_address)){ setMsg(msg,'Completează localitatea și adresa de livrare.','error'); return; }
+  try{
+    await api('/api/orders',{method:'POST',body:JSON.stringify(body)});
+    writeJSON('autopiese_cart',cartIds().filter(i=>i!==body.listing_id));
+    closeModal($('#orderModal')); toast('Comanda a fost trimisă vânzătorului.'); navigate('account-tool?view=orders');
+  }catch(err){ setMsg(msg,err.message,'error'); }
 }
 
 /* ---------- Statistici cont (tabel pe perioade) ---------- */
@@ -422,7 +462,7 @@ function drawStats(){
 /* ---------- cereri: fereastră cu detalii + oferte ---------- */
 const REQ_ST={open:'Deschisă',matched:'Ofertă acceptată',closed:'Închisă'}, REQ_KIND={noi:'Piese noi','second-hand':'Piese second-hand',ambele:'Noi sau second-hand'};
 function reqDetailsHtml(x){
-  const rows=[['Marcă',x.make],['Model',x.model],['An',x.year],['Variantă',x.variant],['Motor',x.engine],['Serie șasiu (VIN)',x.vin],['Caut',REQ_KIND[x.kind]],['Locație',[x.city,x.county].filter(Boolean).join(', ')],['Publicată',x.created_at?fmtDate(x.created_at):'']].filter(r=>r[1]);
+  const rows=[['Marcă',x.make],['Model',x.model],['An',x.year],['Variantă',x.variant],['Motor',x.engine],['Serie șasiu (VIN)',x.vin],['Caut',REQ_KIND[x.kind]],['Locație',[x.city,x.county].filter(Boolean).join(', ')],['Adresa de livrare',x.ship_address],['Publicată',x.created_at?fmtDate(x.created_at):'']].filter(r=>r[1]);
   let extra=[]; try{ extra=typeof x.extra_parts==='string'?JSON.parse(x.extra_parts||'[]'):(x.extra_parts||[]); }catch{}
   extra=Array.isArray(extra)?extra.filter(p=>p&&p.title):[];
   return `${rows.length?`<dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>`:''}
@@ -457,7 +497,7 @@ function myOfferHtml(o){
       ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:'<p class="muted">Fără mesaj.</p>'}
       ${imgGalleryHtml(o.images,'Poza ofertei mele')}
       <div class="row">${pend&&open?`<button type="button" class="btn primary small" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small" data-seller-msg="${o.buyer_id}">✉️ Scrie mesaj</button></div></div>
-    ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b>${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}`;
+    ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b>${(o.ship_address||o.city||o.county)?`<p>📍 Livrare: ${esc([o.ship_address,o.city,o.county].filter(Boolean).join(', '))}</p>`:''}${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}`;
 }
 function publicRequestHtml(x){
   return `<div class="eyebrow">CERERE DE PIESE</div><h2>${esc(x.title)}</h2><p class="muted">${esc(x.user_name||'Cumpărător')} · ${fmtDate(x.created_at)}</p>
@@ -868,7 +908,7 @@ function detailHtml(x, phones, canContact){
     <div class="contact-row">
       ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<button class="btn ghost small" data-msg-open="1">✉️ Mesaj</button>`:''}
       <button class="btn ghost small" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'} Favorit</button>
-      ${canContact?`<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
+      ${canContact?`${(currentUser&&currentUser.id===x.user_id)?'':'<button class="btn primary small" data-order="'+x.id+'">🛍️ Comandă</button>'}<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
     </div>
     ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<div class="msg-box hidden" id="msgBox" data-to="${Number(x.user_id)}" data-listing="${x.id}"><b>Mesaj pentru ${seller}</b>
       <div class="msg-quick"><button type="button" data-msg-quick="Bună ziua! Mai este disponibilă piesa?">Mai este disponibilă?</button><button type="button" data-msg-quick="Bună ziua! Care este ultimul preț?">Ultimul preț?</button><button type="button" data-msg-quick="Bună ziua! Se poate livra în ">Se poate livra?</button>${x.negotiable&&Number(x.price)>0?'<button type="button" data-msg-quick="Bună ziua! Aș putea oferi ___ lei pentru piesă. Vă convine?">Propune un preț</button>':''}</div>
@@ -1341,6 +1381,7 @@ function ensureOption(el, val){
 }
 async function enterRequestForm(fromId){
   const form = $('#requestForm'); form.reset(); $('#reqExtra').innerHTML = ''; setMsg($('#requestMessage'),''); state.reqImages=[]; renderImgBox('reqImages');
+  api('/api/account/settings').then(r=>{ const u=r.user||{}; if(!$('#reqCounty').value&&u.ship_county) $('#reqCounty').value=u.ship_county; if(!$('#reqCity').value) $('#reqCity').value=u.ship_city||''; if(!$('#reqAddress').value) $('#reqAddress').value=u.ship_details||''; }).catch(()=>{});
   await loadModels('','reqModel');
   if(!fromId){
     const g = garageActive();
@@ -1374,7 +1415,7 @@ async function submitRequest(e){
   if(state.reqImagesBusy){ setMsg(msg,'Așteaptă să se proceseze pozele.','error'); return; }
   const extra=[...document.querySelectorAll('#reqExtra .req-part')].map(p=>({title:p.querySelector('.rp-title').value.trim(),details:p.querySelector('.rp-details').value.trim()})).filter(x=>x.title);
   try{
-    await api('/api/requests',{method:'POST',body:JSON.stringify({title:$('#reqTitle').value.trim(),make:$('#reqMake').value,model:$('#reqModel').value,year,description:$('#reqDescription').value,variant:$('#reqVariant').value.trim(),engine:$('#reqEngine').value.trim(),vin:$('#reqVin').value.trim(),kind:$('#reqKind').value,county:$('#reqCounty').value,city:$('#reqCity').value.trim(),extra_parts:extra,images:state.reqImages})});
+    await api('/api/requests',{method:'POST',body:JSON.stringify({title:$('#reqTitle').value.trim(),make:$('#reqMake').value,model:$('#reqModel').value,year,description:$('#reqDescription').value,variant:$('#reqVariant').value.trim(),engine:$('#reqEngine').value.trim(),vin:$('#reqVin').value.trim(),kind:$('#reqKind').value,county:$('#reqCounty').value,city:$('#reqCity').value.trim(),ship_address:$('#reqAddress').value.trim(),extra_parts:extra,images:state.reqImages})});
     e.target.reset(); $('#reqExtra').innerHTML=''; state.reqImages=[]; renderImgBox('reqImages'); await loadModels('','reqModel');
     setMsg(msg,'Cererea a fost trimisă. O găsești în Cererile mele.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
@@ -1837,6 +1878,8 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); { const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); } toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
+  if((el=t.closest('[data-order]'))){ e.stopPropagation(); safe(openOrder)(Number(el.dataset.order)); return; }
+  if((el=t.closest('[data-order-status]'))){ const oid=el.dataset.orderStatus, to=el.dataset.to; if(to==='cancelled'&&!confirm('Sigur vrei să anulezi comanda?')) return; safe(async()=>{ await api('/api/orders/'+oid+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); toast('Comanda a fost actualizată.'); renderAccountTool(currentToolView||'orders'); })(); return; }
   if((el=t.closest('[data-offer-request]'))){ if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; } $('#offerEditId').value=''; $('#offerTitle').textContent='Trimite o ofertă'; $('#offerRequestId').value=el.dataset.offerRequest; $('#offerPrice').value=''; $('#offerMessage').value=''; state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); setMsg($('#offerMessageStatus'),''); $('#offerModal').classList.remove('hidden'); return; }
   if((el=t.closest('[data-offer-accept]'))){ if(confirm('Accepți această ofertă? Celelalte oferte vor fi respinse.')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerAccept+'/accept',{method:'POST'}); toast('Ofertă acceptată. Comanda a fost creată.'); refreshAfterOfferChange(); })(); return; }
   if((el=t.closest('[data-offer-reject]'))){ if(confirm('Refuzi această ofertă?')) safe(async()=>{ await api('/api/offers/'+el.dataset.offerReject+'/reject',{method:'POST'}); toast('Oferta a fost refuzată.'); refreshAfterOfferChange(); })(); return; }
@@ -2031,6 +2074,7 @@ function wire(){
   $('#reqAddPart').addEventListener('click', addReqPart);
   $('#reqExtra').addEventListener('click', e=>{ const b=e.target.closest('.rp-del'); if(b) b.closest('.req-part').remove(); });
   $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
+  $('#orderForm').addEventListener('submit', e=>{ e.preventDefault(); safe(submitOrder)(); });
   $('#offerForm').addEventListener('submit', e=>{ e.preventDefault(); safe(async()=>{ const editId=$('#offerEditId').value; if(state.offerImagesBusy){ toast('Așteaptă să se proceseze pozele.'); return; } const payload={price:$('#offerPrice').value,message:$('#offerMessage').value}; if(!editId||state.offerImagesLoaded) payload.images=state.offerImages; const body=JSON.stringify(payload); if(editId) await api('/api/offers/'+editId,{method:'PATCH',body}); else await api('/api/requests/'+$('#offerRequestId').value+'/offers',{method:'POST',body}); $('#offerModal').classList.add('hidden'); state.offerImages=[]; state.offerImagesLoaded=false; renderImgBox('offerImages'); toast(editId?'Oferta a fost modificată.':'Oferta a fost trimisă.'); refreshAfterOfferChange(); })(); });
   document.addEventListener('change', e=>{
     const x=e.target; if(!x) return;
