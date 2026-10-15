@@ -1573,7 +1573,45 @@ async function confirmEmailChange(params){
 }
 
 /* ---------- administrare ---------- */
-let adminTab = 'dashboard', adminData = null;
+let adminTab = 'dashboard', adminData = null, adminFilter = 'all', adminQuery = '', adminOpenId = null;
+function adminListRows(){
+  const q = adminQuery.trim().toLowerCase();
+  const L = adminData.listings.filter(x=>(adminFilter==='all'||x.status===adminFilter) && (!q || [x.id,x.title,x.seller_name,x.seller_email,x.make,x.model,x.oem].join(' ').toLowerCase().includes(q)));
+  if(!L.length) return '<p class="muted">Nu există anunțuri pentru filtrul ales.</p>';
+  return L.map(x=>{
+    const st = STATUS_LABEL[x.status]||[x.status,''], n = Number(x.image_count)||0;
+    return `<article class="adm-row" data-admin-open="${x.id}">
+      <div class="adm-thumb">${n?`<img loading="lazy" decoding="async" alt="" src="/api/admin/listings/${x.id}/img/0">`:'<span>📷</span>'}${n>1?`<span class="adm-count">${n} poze</span>`:''}</div>
+      <div class="adm-main"><b>#${x.id} · ${esc(x.title)}</b> <span class="badge ${st[1]}">${esc(st[0])}</span>
+        <p>${money(x.price)} · ${esc(x.type)} · ${esc(x.county||'—')} · ${fmtDate(x.created_at)} · 👁 ${Number(x.views)||0}</p>
+        <p class="muted">${esc(x.seller_name||'Fără vânzător')} · ${esc(x.seller_email||'')}</p>
+        <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button></div></div>
+    </article>`;
+  }).join('');
+}
+function adminListingsHtml(){
+  const s = adminData.s, all = adminData.listings;
+  const cnt = k => k==='all' ? all.length : all.filter(x=>x.status===k).length;
+  const chips = [['all','Toate'],['pending','În așteptare'],['approved','Publicate'],['sold','Vândute'],['rejected','Respinse'],['blocked','Blocate'],['deleted','Șterse']]
+    .map(([k,l])=>`<button type="button" class="adm-chip${adminFilter===k?' on':''}" data-adm-filter="${k}">${l} <i>${cnt(k)}</i></button>`).join('');
+  return `${s.pending?`<div class="admin-actions" style="margin:0 0 12px"><button class="btn primary small" data-admin="approve-all">Aprobă toate cele ${s.pending} în așteptare</button></div>`:''}
+    <div class="adm-toolbar"><input id="adminSearch" type="search" placeholder="Caută după titlu, ID, vânzător, email, marcă, OEM…" value="${esc(adminQuery)}"><div class="adm-chips">${chips}</div></div>
+    <div class="admin-list adm-list" id="adminListBox">${adminListRows()}</div>`;
+}
+async function openAdminListing(id){
+  adminOpenId = id;
+  const modal = $('#adminListingModal'), box = $('#adminListingBody');
+  box.innerHTML = '<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden');
+  const x = (await api('/api/admin/listings/'+id)).listing, n = Number(x.image_count)||0;
+  const st = STATUS_LABEL[x.status]||[x.status,''];
+  const row = (l,v)=> v||v===0 ? `<div><small>${l}</small><b>${esc(v)}</b></div>` : '';
+  const imgs = n ? `<div class="adm-gallery"><div class="adm-main-img"><img id="admMainImg" alt="" src="/api/admin/listings/${x.id}/img/0"></div>${n>1?`<div class="adm-thumbs">${Array.from({length:n},(_,i)=>`<button type="button" class="${i?'':'on'}" data-adm-img="${i}"><img loading="lazy" alt="" src="/api/admin/listings/${x.id}/img/${i}"></button>`).join('')}</div>`:''}</div>` : '<p class="muted">Anunțul nu are poze.</p>';
+  box.innerHTML = `<h3 class="adm-title">#${x.id} · ${esc(x.title)}</h3><p><span class="badge ${st[1]}">${esc(st[0])}</span> <b class="adm-price">${money(x.price)}</b>${x.negotiable?' · negociabil':''}</p>${imgs}
+    <div class="adm-grid">${row('Tip',x.type)}${row('Stare',x.condition)}${row('Marcă',x.make)}${row('Model',x.model)}${row('An',x.year)}${row('Motor',x.engine)}${row('Combustibil',x.fuel)}${row('Categorie',x.category)}${row('OEM',x.oem)}${row('Cantitate',x.quantity)}${row('Județ',x.county)}${row('Livrare',x.delivery?'Da':'Nu')}${row('Vizualizări',x.views)}${row('Publicat',x.created_at?new Date(x.created_at).toLocaleString('ro-RO'):'')}</div>
+    ${x.description?`<div class="adm-desc"><small>Descriere</small><p>${esc(x.description).replace(/\n/g,'<br>')}</p></div>`:''}
+    <div class="adm-seller"><small>Vânzător</small><p><b>${esc(x.seller_name||'Fără vânzător')}</b> · ${esc(x.seller_email||'')}${x.seller_phone?' · '+esc(x.seller_phone):''}</p></div>
+    <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button></div>`;
+}
 async function loadAdmin(){
   if(!currentUser || currentUser.role!=='admin'){ navigate('home'); toast('Zona de administrare este disponibilă doar administratorului.'); return; }
   try{
@@ -1593,7 +1631,7 @@ function renderAdmin(){
   if(adminTab==='dashboard') body += `<div class="stat-grid" style="margin-top:12px"><div class="stat"><b>Oferte</b><h3>${s.offers||0}</h3></div><div class="stat"><b>Comenzi</b><h3>${s.orders||0}</h3></div><div class="stat"><b>Mesaje trimise</b><h3>${s.messages||0}</h3><small>doar numărul, conținutul e privat</small></div></div>`;
   if(adminTab==='offers') body = `<div class="admin-list">${d.offers.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.request_title)}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small></article>`).join('')||'<p>Nu există oferte.</p>'}</div>`;
   if(adminTab==='orders') body = `<div class="admin-list">${d.orders.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title||'Comandă')}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small></article>`).join('')||'<p>Nu există comenzi.</p>'}</div>`;
-  if(adminTab==='listings') body = `${s.pending?`<div class="admin-actions" style="margin:0 0 12px"><button class="btn primary small" data-admin="approve-all">Aprobă toate cele ${s.pending} în așteptare</button></div>`:''}<div class="admin-list">${d.listings.map(x=>{const st=STATUS_LABEL[x.status]||[x.status,''];return `<article class="info-card"><b>#${x.id} · ${esc(x.title)}</b> <span class="badge ${st[1]}">${esc(st[0])}</span><p>${money(x.price)} · ${esc(x.type)} · ${esc(x.county||'—')} · ${fmtDate(x.created_at)}</p><p>${esc(x.seller_name||'Fără vânzător')} · ${esc(x.seller_email||'')}</p>${x.description?`<p>${esc(x.description.slice(0,200))}</p>`:''}<div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button></div></article>`;}).join('')||'<p>Nu există anunțuri.</p>'}</div>`;
+  if(adminTab==='listings') body = adminListingsHtml();
   if(adminTab==='users') body = `<div class="admin-list">${d.users.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · ${esc(x.role)} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked']])}</div></article>`).join('')||'<p>Nu există utilizatori.</p>'}</div>`;
   if(adminTab==='requests') body = `<div class="admin-list">${d.requests.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title)}</b><p>${esc(x.user_name||'—')} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`).join('')||'<p>Nu există cereri.</p>'}</div>`;
   if(adminTab==='reports') body = `<div class="admin-list">${d.reports.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${esc(x.reporter_name||'—')} · ${esc(x.status)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions">${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`).join('')||'<p>Nu există raportări.</p>'}</div>`;
@@ -1645,11 +1683,12 @@ async function adminAction(el){
   const {admin:kind,id,status} = el.dataset;
   if(kind==='listing') await api(`/api/admin/listings/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   else if(kind==='approve-all'){ if(!confirm('Aprobi toate anunțurile aflate în așteptare?')) return; const r=await api('/api/admin/listings/approve-all',{method:'POST'}); toast(`Aprobate: ${r.approved}.`); }
-  else if(kind==='listing-del'){ if(!confirm('Ștergi definitiv anunțul?')) return; await api(`/api/admin/listings/${id}`,{method:'DELETE'}); }
+  else if(kind==='listing-del'){ if(!confirm('Ștergi definitiv anunțul?')) return; await api(`/api/admin/listings/${id}`,{method:'DELETE'}); if(String(adminOpenId)===String(id)){ adminOpenId=null; closeModal($('#adminListingModal')); } }
   else if(kind==='user') await api(`/api/admin/users/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   else if(kind==='request') await api(`/api/admin/requests/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   else if(kind==='report') await api(`/api/admin/reports/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   await loadAdmin();
+  if(adminOpenId && !$('#adminListingModal').classList.contains('hidden')) await openAdminListing(adminOpenId);
 }
 
 
@@ -1854,6 +1893,9 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-admin-tab]'))){ adminTab=el.dataset.adminTab; renderAdmin(); return; }
   if((el=t.closest('[data-veh]'))){ safe(vehAction)(el); return; }
   if((el=t.closest('[data-admin]'))){ safe(adminAction)(el); return; }
+  if((el=t.closest('[data-adm-filter]'))){ adminFilter=el.dataset.admFilter; renderAdmin(); return; }
+  if((el=t.closest('[data-adm-img]'))){ const m=$('#admMainImg'); if(m) m.src=el.querySelector('img').src.replace(/\/img\/\d+$/,'/img/'+el.dataset.admImg); $$('#adminListingBody [data-adm-img]').forEach(b=>b.classList.toggle('on',b===el)); return; }
+  if((el=t.closest('[data-admin-open]'))){ safe(openAdminListing)(el.dataset.adminOpen); return; }
   if((el=t.closest('[data-action]'))){ doAction(el.dataset.action); return; }
   if((el=t.closest('[data-account]'))){ accountAction(el.dataset.account); return; }
   if((el=t.closest('[data-go]'))){ navigate(el.dataset.go); return; }
@@ -2257,3 +2299,5 @@ document.addEventListener('submit', e=>{
 
 /* apăsare vizibilă pe telefon */
 document.addEventListener('touchstart',()=>{},{passive:true});
+
+document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminSearch'){ adminQuery=e.target.value; const b=$('#adminListBox'); if(b) b.innerHTML=adminListRows(); } });
