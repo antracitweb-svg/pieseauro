@@ -942,12 +942,13 @@ app.get('/api/stats/account',auth,requireDb,ah(async(req,res)=>{
  const tz=c=>`(${c} AT TIME ZONE 'Europe/Bucharest')`;
  const bk=c=>`to_char(date_trunc($2::text,${tz(c)})::date,'YYYY-MM-DD')`;
  const bkd=`to_char(date_trunc($2::text,s.day::timestamp)::date,'YYYY-MM-DD')`;
+ const q=(n,sql,p)=>pool.query(sql,p).catch(e=>{console.error('stats/account '+n+':',e.message);return {rows:[]};});
  const [ad,vw,of,od,fs]=await Promise.all([
-  pool.query(`SELECT ${bk('created_at')} b,COUNT(*)::int n FROM listings WHERE user_id=$1 AND ${tz('created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
-  pool.query(`SELECT ${bkd} b,COALESCE(SUM(s.views),0)::int v,COALESCE(SUM(s.phone_clicks),0)::int p FROM listing_stats s JOIN listings l ON l.id=s.listing_id WHERE l.user_id=$1 AND s.day>=$3::date AND $2::text<>'' GROUP BY 1`,P),
-  pool.query(`SELECT ${bk('o.created_at')} b,COUNT(*)::int n,COUNT(*) FILTER (WHERE o.status='accepted')::int won,COUNT(*) FILTER (WHERE o.status='rejected')::int lost,COUNT(*) FILTER (WHERE o.status='pending' AND pr.status<>'open')::int idle FROM offers o JOIN part_requests pr ON pr.id=o.request_id WHERE o.seller_id=$1 AND ${tz('o.created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
-  pool.query(`SELECT ${bk('created_at')} b,COALESCE(SUM(price),0)::float val FROM orders WHERE seller_id=$1 AND ${tz('created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
-  pool.query(`SELECT to_char(MIN(s.day),'YYYY-MM-DD') d FROM listing_stats s JOIN listings l ON l.id=s.listing_id WHERE l.user_id=$1`,[req.user.id])
+  q('ad',`SELECT ${bk('created_at')} b,COUNT(*)::int n FROM listings WHERE user_id=$1 AND ${tz('created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  q('vw',`SELECT ${bkd} b,COALESCE(SUM(s.views),0)::int v,COALESCE(SUM(s.phone_clicks),0)::int p FROM listing_stats s JOIN listings l ON l.id=s.listing_id WHERE l.user_id=$1 AND s.day>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  q('of',`SELECT ${bk('o.created_at')} b,COUNT(*)::int n,COUNT(*) FILTER (WHERE o.status='accepted')::int won,COUNT(*) FILTER (WHERE o.status='rejected')::int lost,COUNT(*) FILTER (WHERE o.status='pending' AND pr.status<>'open')::int idle FROM offers o JOIN part_requests pr ON pr.id=o.request_id WHERE o.seller_id=$1 AND ${tz('o.created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  q('od',`SELECT ${bk('created_at')} b,COALESCE(SUM(price),0)::float val FROM orders WHERE seller_id=$1 AND ${tz('created_at')}::date>=$3::date AND $2::text<>'' GROUP BY 1`,P),
+  q('fs',`SELECT to_char(MIN(s.day),'YYYY-MM-DD') d FROM listing_stats s JOIN listings l ON l.id=s.listing_id WHERE l.user_id=$1`,[req.user.id])
  ]);
  const z=()=>cols.map(()=>0), rows={added:z(),offers:z(),won:z(),lost:z(),inactive:z(),ord_o_v:z(),views:z(),phone:z()};
  const put=(rs,fn)=>{for(const r of rs){const i=idx.get(r.b);if(i!==undefined)fn(r,i);}};
