@@ -138,3 +138,10 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Pagina Statistici are acum un selector sus: **Statistici cont** (tabel cu tab-uri 14 zile / 6 luni / 12 luni, rânduri cu bife și buton „Afișează grafic”) și **Statistici anunțuri** (panoul detaliat de mai înainte).
 - Endpoint nou: `GET /api/stats/account?range=14d|6m|12m`. Date reale: anunțuri adăugate, vizualizări, afișări telefon, oferte, oferte câștigătoare/necâștigătoare/inactive, valoare comenzi din oferte. Rândurile pentru credite, calificative, comenzi din anunțuri și statistici la oferte afișează 0 până există backend pentru ele.
 - Contoarele zilnice se păstrează acum `STATS_KEEP_DAYS` zile (implicit 400) ca să existe istoric pe 12 luni; `STATS_RETENTION_DAYS` rămâne fereastra graficului din „Statistici anunțuri” (15 zile). Istoricul de dinainte de această versiune nu poate fi recuperat (era șters după 15 zile).
+
+## V27 — carduri și pagină de anunț mai informative
+- Card de anunț: număr de poze, cod OEM, „Livrare”, cantitate, „negociabil”, stare, vânzător cu tip (Parc dezmembrări / Firmă / Particular) și număr de anunțuri active, județ și „Actualizat azi la 14:20 / ieri / la 09 oct. 2026”. Data vine din `created_at`, pe care butonul „Reactualizează” (`/bump`) îl actualizează.
+- Rezultate: contoare **Toate / Nou / Second hand** pentru căutarea curentă (`facets.condition` în `GET /api/listings`, calculate fără filtrul de stare), „Vezi și:” cu categorii și modele din rezultate, bloc „Cere oferte” sub listă și în pagina fără rezultate.
+- Pagina anunțului: chipuri cu stare/cantitate/livrare/negociabil, statistici vânzător („14 anunțuri active · pe AutoPiese din 2025”), mesaj rapid „Propune un preț” (doar la prețuri negociabile) și secțiunea „Anunțuri similare”.
+- Server: `image_count`, `seller_since`, `seller_ads` în listări; index `listings(user_id,status)`. Nicio coloană nouă.
+- Culorile, fonturile și identitatea vizuală au rămas neschimbate.

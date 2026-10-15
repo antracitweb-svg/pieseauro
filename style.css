@@ -1497,3 +1497,56 @@ html.menu-open,html.menu-open body{overflow:hidden}
 .detail-gallery-item:first-child{height:min(62vh,460px);border-radius:12px}
 @media(max-width:560px){.detail-gallery{margin-left:-12px;margin-right:-12px}.detail-gallery-item:first-child{border-radius:0;border-left:0;border-right:0;height:min(58vh,420px)}}
 .ad-callbar .btn[data-cart]{background:#fff;color:var(--ink);border:2px solid #12233b}
+
+
+/* =====================================================================
+   V27 — informații de anunț inspirate de piața de piese auto
+   (poze, stare, livrare, vânzător, dată actualizare, contoare, similare)
+   Folosește tokenii existenți (aur / ivoire / cărbune) — culorile nu se schimbă.
+   ===================================================================== */
+.photo-count{position:absolute;left:10px;bottom:10px;z-index:2;display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:rgba(14,15,18,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--gold-pale);font-size:12px;font-weight:700;pointer-events:none}
+.listing-image{position:relative}
+.listing-chips,.ad-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0}
+.ad-chips{margin:0 0 14px}
+.lchip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:#fff;color:#4a4437;font-size:12px;font-weight:650;line-height:1.5;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lchip-oem{font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.lchip-ship{background:#e6f3ea;border-color:#c9e4d1;color:#1c6d42}
+.listing-price small{display:block;font-family:var(--font-sans);font-size:12px;font-weight:600;letter-spacing:0;color:var(--muted);margin-top:1px}
+.listing-seller{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:10px;font-size:13px;color:#3b3224}
+.ls-name{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ls-type{padding:2px 8px;border-radius:6px;background:#f3ead8;color:var(--gold-ink);font-size:11.5px;font-weight:700}
+.ls-ads{color:var(--muted);font-size:12.5px}
+.listing-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.listing-foot .lf-time{margin-left:auto}
+
+/* contoare Nou / Second hand */
+.facet-bar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.facet-bar:empty{display:none}
+.facet{min-height:var(--tap);display:inline-flex;align-items:center;gap:8px;padding:0 16px;border:1px solid #ddd3bf;border-radius:999px;background:var(--paper);color:#3b3224;font:inherit;font-size:14px;font-weight:650;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.facet b{font-weight:800;color:var(--gold-ink)}
+.facet:hover{background:#f6edd9;border-color:var(--gold)}
+.facet.on{background:#0e0f12;border-color:#0e0f12;color:var(--gold-pale)}
+.facet.on b{color:var(--gold-soft)}
+
+/* „Vezi și” + cere oferte */
+.related-searches{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:20px 0 0}
+.related-searches:empty{display:none}
+.rel-label{font-size:13px;font-weight:800;color:var(--gold-ink);margin-right:2px}
+.rel-chip{min-height:36px;padding:0 14px;border:1px solid #ddd3bf;border-radius:999px;background:var(--paper);color:#3b3224;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.rel-chip:hover{background:#f6edd9;border-color:var(--gold)}
+.cta-request{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:24px 0 0;padding:18px 20px;border:1px solid #d8c9aa;border-radius:var(--r-lg);background:linear-gradient(135deg,#faf5ea,#f3ead8)}
+.cta-request div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cta-request b{font-size:16px;color:#14110c}
+.cta-request span{font-size:14px;color:var(--muted)}
+#noResults .btn{margin-top:6px}
+#noResults p{margin:0 0 8px}
+@media(max-width:560px){.cta-request{flex-direction:column;align-items:stretch;text-align:left}.cta-request .btn{width:100%}}
+
+/* pagina anunțului */
+.seller-stats{margin:10px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+.seller-stats .seller-link{font-size:13px;text-decoration:underline;padding:0;min-height:0}
+.similar-box{margin-top:22px;padding-top:6px;border-top:1px solid var(--line);grid-column:1/-1}
+.similar-box:empty{display:none}
+.similar-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))!important;gap:14px!important}
+.similar-grid .listing-desc,.similar-grid .listing-chips,.similar-grid .listing-seller{display:none}
+.similar-grid .listing-top h3{font-size:15px!important}

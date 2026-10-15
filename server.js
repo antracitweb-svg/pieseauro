@@ -81,6 +81,84 @@ app.use(cookieParser());
 const LIST_CACHE=new Map(),LIST_CACHE_TTL=10000,LIST_CACHE_MAX=300;
 app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listings|admin\/users|account)/.test(req.path))res.on('finish',()=>LIST_CACHE.clear());next();});
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
+/* ===== BOT-GUARD:START — verificare de browser, limitare cereri, blocare scrapere ===== */
+const dns=require('dns').promises;
+const BOT_CHECK=IS_PROD&&String(process.env.BOT_CHECK||'true').toLowerCase()!=='false';
+const BOT_BITS=Math.min(20,Math.max(10,Number(process.env.BOT_DIFFICULTY)||15));
+const BOT_BASE=process.env.BOT_SECRET||((DB_URL||process.env.ADMIN_PASSWORD)?DB_URL+'|'+(process.env.ADMIN_PASSWORD||''):'');
+// Fără BOT_SECRET/DATABASE_URL, cheia e aleatoare (verificările se refac la fiecare repornire).
+const BOT_SECRET=BOT_BASE?crypto.createHash('sha256').update('bot|'+BOT_BASE).digest('hex'):crypto.randomBytes(32).toString('hex');
+const botHmac=v=>crypto.createHmac('sha256',BOT_SECRET).update(v).digest('base64url');
+const uaHash=req=>crypto.createHash('sha256').update(String(req.headers['user-agent']||'')).digest('base64url').slice(0,16);
+const safeEq=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
+function zeroBits(buf){let n=0;for(const b of buf){if(b===0){n+=8;continue;}n+=Math.clz32(b)-24;break;}return n;}
+function newChallenge(req){const p=Buffer.from(JSON.stringify({t:Date.now(),n:crypto.randomBytes(9).toString('base64url'),u:uaHash(req),b:BOT_BITS})).toString('base64url');return p+'.'+botHmac(p);}
+function hasPass(req){const [exp,u,sig]=String((req.cookies&&req.cookies.bv)||'').split('.');return !!(exp&&u&&sig&&Number(exp)>Date.now()&&safeEq(u,uaHash(req))&&safeEq(sig,botHmac(exp+'.'+u)));}
+const GOOD_BOT_RE=/Googlebot|bingbot|Applebot|YandexBot/i;
+const GOOD_HOST_RE=/\.(googlebot\.com|google\.com|search\.msn\.com|applebot\.apple\.com|yandex\.(ru|net|com))$/i;
+const SOCIAL_RE=/facebookexternalhit|Facebot|WhatsApp|TelegramBot|Twitterbot|LinkedInBot|Slackbot|Discordbot/i;
+const BAD_UA_RE=/curl|wget|python|aiohttp|httpx|scrapy|go-http-client|java\/|libwww|node-fetch|undici|axios|headless|phantom|selenium|puppeteer|playwright|httrack|crawler|spider|scraper/i;
+const goodBotCache=new Map(),usedChal=new Map(),apiHits=new Map(),dataHits=new Map(),botAttempts=new Map();
+// Googlebot/Bingbot se acceptă doar după verificare DNS inversă (nu doar după User-Agent, care se poate falsifica).
+async function verifiedBot(ip,ua){
+ if(!GOOD_BOT_RE.test(ua))return false;
+ const c=goodBotCache.get(ip); if(c&&c.until>Date.now())return c.ok;
+ let ok=false;
+ try{for(const h of await dns.reverse(ip)){if(!GOOD_HOST_RE.test(h))continue;if((await dns.lookup(h,{all:true})).some(a=>a.address.toLowerCase()===ip.toLowerCase())){ok=true;break;}}}catch{}
+ if(goodBotCache.size>2000)goodBotCache.clear();
+ goodBotCache.set(ip,{ok,until:Date.now()+24*3600*1000});return ok;
+}
+setInterval(()=>{const now=Date.now();for(const m of [apiHits,dataHits,botAttempts])for(const [k,v] of m){if(!v.length||now-v[v.length-1]>10*60*1000)m.delete(k);}for(const [k,t] of usedChal)if(t<now)usedChal.delete(k);},5*60*1000).unref();
+const BOT_JS=`(function(){var el=document.querySelector('script[data-c]');if(!el)return;var chal=el.getAttribute('data-c'),bits=Number(el.getAttribute('data-b'))||15,msg=document.getElementById('bc-msg'),enc=new TextEncoder();
+function zb(h){var n=0;for(var i=0;i<h.length;i++){if(h[i]===0){n+=8;continue;}n+=Math.clz32(h[i])-24;break;}return n;}
+function fail(t){msg.textContent=t;msg.className='bc-err';}
+(async function(){try{if(!window.crypto||!crypto.subtle)throw new Error('nocrypto');var i=0;for(;;){var h=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(chal+':'+i)));if(zb(h)>=bits)break;i++;}
+var r=await fetch('/api/botcheck',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({chal:chal,counter:i})});
+if(r.ok){location.reload();return;}fail(r.status===429?'Prea multe încercări. Așteaptă câteva minute și reîncarcă pagina.':'Verificarea nu a reușit. Reîncarcă pagina.');}
+catch(e){fail('Browserul nu a putut face verificarea. Folosește un browser actual, cu HTTPS și JavaScript activ.');}})();})();`;
+function challengePage(req){
+ const c=newChallenge(req);
+ return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Verificăm browserul… | AutoPiese</title><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#0e0f12;color:#e9d3a8;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;text-align:center}.bc{padding:24px;max-width:420px}.bc h1{font-size:22px;margin:18px 0 8px;font-weight:650}.bc p{margin:0;color:#a89c86;font-size:15px;line-height:1.5}.bc .bc-err{color:#f0b4b4}.bc-spin{width:42px;height:42px;margin:0 auto;border-radius:50%;border:3px solid rgba(212,180,131,.25);border-top-color:#d4b483;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.bc-spin{animation-duration:3s}}</style></head><body><main class="bc"><div class="bc-spin" aria-hidden="true"></div><h1>Verificăm browserul…</h1><p id="bc-msg" role="status">Durează câteva secunde. Pagina se reîncarcă automat.</p><noscript><p class="bc-err">Activează JavaScript pentru a continua.</p></noscript></main><script src="/bot-check.js" data-c="${c}" data-b="${BOT_BITS}" defer></script></body></html>`;
+}
+app.get('/bot-check.js',(req,res)=>{res.set('Cache-Control','public, max-age=3600').type('application/javascript').send(BOT_JS);});
+app.post('/api/botcheck',(req,res)=>{
+ if(!throttle(botAttempts,clientIp(req),30,10*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+ const {chal,counter}=req.body||{};
+ if(typeof chal!=='string'||chal.length>400||!Number.isInteger(counter)||counter<0||counter>1e9)return res.status(400).json({error:'DATE_INVALIDE'});
+ const [p,sig]=chal.split('.');
+ if(!p||!sig||!safeEq(sig,botHmac(p)))return res.status(400).json({error:'BOT_CHECK'});
+ let d;try{d=JSON.parse(Buffer.from(p,'base64url').toString());}catch{return res.status(400).json({error:'BOT_CHECK'});}
+ const age=Date.now()-Number(d.t);
+ if(!(age>=0&&age<5*60*1000)||d.u!==uaHash(req)||usedChal.has(d.n))return res.status(400).json({error:'BOT_CHECK'});
+ if(zeroBits(crypto.createHash('sha256').update(chal+':'+counter).digest())<Number(d.b))return res.status(400).json({error:'BOT_CHECK'});
+ usedChal.set(d.n,Date.now()+10*60*1000);
+ const exp=Date.now()+12*3600*1000,u=uaHash(req);
+ res.cookie('bv',exp+'.'+u+'.'+botHmac(exp+'.'+u),safeCookieOptions(12*3600*1000));
+ res.json({ok:true});
+});
+const BOT_FREE=new Set(['/api/health','/robots.txt','/sitemap.xml','/bot-check.js','/api/botcheck','/style.css','/script.js','/favicon.ico']);
+app.use(async(req,res,next)=>{
+ try{
+  const p=req.path,ip=clientIp(req),ua=String(req.headers['user-agent']||'');
+  if(p.startsWith('/assets/')||BOT_FREE.has(p))return next();
+  // Limitare de cereri pe IP (activă și când verificarea de browser e oprită).
+  if(p.startsWith('/api/')){
+   const tooMany=()=>res.status(429).set('Retry-After','60').json({error:'PREA_MULTE_CERERI'});
+   if(!throttle(apiHits,ip,Number(process.env.API_RATE_PER_MIN)||600,60000))return tooMany();
+   if(req.method==='GET'&&/^\/api\/(listings|requests|sellers|stores|offers)/.test(p)&&!throttle(dataHits,ip,Number(process.env.DATA_RATE_PER_MIN)||200,60000))return tooMany();
+  }
+  if(!BOT_CHECK)return next();
+  if(req.method==='GET'){
+   if(SOCIAL_RE.test(ua)&&/^\/piese\//.test(p))return next();   // previzualizări WhatsApp/Facebook pentru linkurile de anunț
+   if(await verifiedBot(ip,ua))return next();                     // Google/Bing/Apple/Yandex verificați prin DNS
+  }
+  if(!ua||BAD_UA_RE.test(ua))return res.status(403).type('text/plain').send('Acces refuzat.');
+  if(hasPass(req))return next();
+  if(req.method==='GET'&&String(req.headers.accept||'').includes('text/html'))return res.status(403).set({'Cache-Control':'no-store','X-Robots-Tag':'noindex'}).type('html').send(challengePage(req));
+  return res.status(403).set('Cache-Control','no-store').json({error:'BOT_CHECK'});
+ }catch(e){next(e);}
+});
+/* ===== BOT-GUARD:END ===== */
 for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,f));});
 app.use('/assets',express.static(ASSETS_DIR,{index:false,dotfiles:'ignore',maxAge:'7d'}));
 
@@ -207,6 +285,7 @@ async function dbReady(){
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS phone_clicks INTEGER NOT NULL DEFAULT 0',
+  'CREATE INDEX IF NOT EXISTS listings_user_status_idx ON listings(user_id,status)',
   'ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ',
   "ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
   "ALTER TABLE offers ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
@@ -752,8 +831,9 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,async(req,res)=>{await pool.q
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.images[1:1] AS images";
-const LISTING_SELECT=`SELECT ${LIST_COLS},COALESCE(u.nickname,u.name) seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id`;
+const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.images[1:1] AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
+const SELLER_COLS="COALESCE(u.nickname,u.name) seller_name,u.created_at seller_since,(SELECT COUNT(*)::int FROM listings sl WHERE sl.user_id=l.user_id AND sl.status='approved') seller_ads";
+const LISTING_SELECT=`SELECT ${LIST_COLS},${SELLER_COLS} FROM listings l LEFT JOIN users u ON u.id=l.user_id`;
 const CATEGORIES=['Accesorii auto','Accesorii roți','Alimentare combustibil','Aprindere','Cabluri auto','Car audio','Caroserie','Climatizare','Direcție','Diverse','Electrică & Electronică Auto','Evacuare','Faruri stopuri lumini','Filtre auto','Frâne','Instalații GPL','Interior','Motor','Suspensie','Transmisie',
  'Iluminare','Roți','Electrică','Filtre','Altele'];
 const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
@@ -791,8 +871,9 @@ app.get('/api/listings',requireDb,async(req,res)=>{
    where.push('('+cols.join(' OR ')+')');vals.push('%'+term+'%');i++;
   }
  }
+ let condClause=null;
  for(const [key,col] of [['type','l.type'],['condition','l.condition'],['year','l.year'],['seller_type','l.seller_type']]){
-  if(req.query[key]){where.push(`${col}=$${i}`);vals.push(String(req.query[key]).slice(0,100));i++;}
+  if(req.query[key]){where.push(`${col}=$${i}`);if(key==='condition')condClause={at:where.length-1,param:i};vals.push(String(req.query[key]).slice(0,100));i++;}
  }
  // Marcă/model/județ/categorie: fără diferențe de majuscule, diacritice, spații sau cratime ("Land Rover" = "LandRover").
  for(const [key,col] of [['make','l.make'],['model','l.model'],['county','l.county'],['category','l.category']]){
@@ -806,14 +887,17 @@ app.get('/api/listings',requireDb,async(req,res)=>{
  // Anunțurile fără preț (0) apar la final și la sortare crescătoare.
  const order={price_asc:'(COALESCE(l.price,0)=0) ASC, l.price ASC, l.id DESC',price_desc:'l.price DESC NULLS LAST, l.id DESC'}[req.query.sort]||'l.created_at DESC, l.id DESC';
  const limit=Math.min(60,Math.max(1,Math.floor(Number(req.query.limit))||30)), offset=Math.min(100000,Math.max(0,Math.floor(Number(req.query.offset))||0));
- const [cnt,r]=await Promise.all([pool.query(`SELECT COUNT(*)::int n FROM listings l WHERE ${where.join(' AND ')}`,vals),pool.query(`${LISTING_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`,vals)]);
- const body={listings:r.rows,total:cnt.rows[0].n,limit,offset};
+ // Facete: câte anunțuri sunt Noi / Second-hand pentru aceeași căutare (filtrul de stare nu se aplică, dar parametrul rămâne folosit).
+ const fWhere=where.map((w,ix)=>condClause&&ix===condClause.at?`($${condClause.param}::text IS NOT NULL)`:w);
+ const [cnt,r,fc]=await Promise.all([pool.query(`SELECT COUNT(*)::int n FROM listings l WHERE ${where.join(' AND ')}`,vals),pool.query(`${LISTING_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ${limit} OFFSET ${offset}`,vals),pool.query(`SELECT l.condition c,COUNT(*)::int n FROM listings l WHERE ${fWhere.join(' AND ')} GROUP BY l.condition`,vals)]);
+ const facets={condition:{}};for(const row of fc.rows)if(row.c)facets.condition[row.c]=row.n;
+ const body={listings:r.rows,total:cnt.rows[0].n,limit,offset,facets};
  if(LIST_CACHE.size>=LIST_CACHE_MAX)LIST_CACHE.clear();
  LIST_CACHE.set(ckey,{at:Date.now(),body});
  res.json(body);
 });
 app.get('/api/listings/:id',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT l.*,COALESCE(u.nickname,u.name) seller_name,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[req.params.id]);
+ const r=await pool.query(`SELECT l.*,${SELLER_COLS},u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'`,[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const x=r.rows[0]; let phones=[];
  if(req.query.noview!=='1'){const me=await optUserId(req);if(!me||me!==x.user_id){pool.query('UPDATE listings SET views=views+1 WHERE id=$1',[x.id]).catch(()=>{});bumpStat(x.id,'views');x.views=(Number(x.views)||0)+1;}}
@@ -1198,7 +1282,7 @@ app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
 }));
 app.post('/api/notifications/read',auth,requireDb,ah(async(req,res)=>{await pool.query('UPDATE notifications SET is_read=TRUE WHERE user_id=$1',[req.user.id]);res.json({ok:true});}));
 
-app.get('/robots.txt',(req,res)=>{res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${appBaseUrl(req)}/sitemap.xml\n`);});
+app.get('/robots.txt',(req,res)=>{res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\n\n${['GPTBot','ChatGPT-User','OAI-SearchBot','ClaudeBot','anthropic-ai','Google-Extended','CCBot','PerplexityBot','Bytespider','Amazonbot','Applebot-Extended','Diffbot','ImagesiftBot','Omgilibot','cohere-ai','meta-externalagent'].map(b=>`User-agent: ${b}\nDisallow: /\n`).join('\n')}\nSitemap: ${appBaseUrl(req)}/sitemap.xml\n`);});
 app.get('/sitemap.xml',async(req,res)=>{
  const base=appBaseUrl(req); const urls=[base+'/'];
  if(pool){try{const r=await pool.query("SELECT id,title,created_at FROM listings WHERE status='approved' ORDER BY created_at DESC LIMIT 5000");urls.push(...r.rows.map(x=>`${base}/piese/${x.id}-${slugify(x.title)}`));}catch(e){console.error(e);}}
