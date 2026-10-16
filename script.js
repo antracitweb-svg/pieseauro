@@ -2361,3 +2361,47 @@ document.addEventListener('submit', e=>{
 document.addEventListener('touchstart',()=>{},{passive:true});
 
 document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminSearch'){ adminQuery=e.target.value; const b=$('#adminListBox'); if(b) b.innerHTML=adminListRows(); } });
+
+/* ---------- ferestre: o singură fereastră deschisă + butonul Înapoi le închide ---------- */
+/* - când se deschide o fereastră, cele din spate se închid (în afară de login)
+   - deschiderea adaugă o intrare în istoric (pushState, fără hashchange => lista din spate nu se reîncarcă)
+   - Înapoi (telefon/browser) închide fereastra în loc să scoată omul din pagină
+   - închiderea cu ×, Escape sau click pe fundal elimină intrarea (history.back), fără „Înapoi” inutil */
+(function modalHistory(){
+  const AUTH='authModal';                       // login-ul nu are intrare în istoric (are propriul flux: __afterAuth)
+  const all=[...document.querySelectorAll('.modal')];
+  if(!all.length || !window.MutationObserver) return;
+  const shown=new Set();
+  const isOpen=m=>!m.classList.contains('hidden');
+  const hasEntry=()=>{ const s=history.state; return !!(s && s.modal); };
+  try{ if(hasEntry()) history.replaceState(null,'',location.href); }catch{}   // după reload nu rămâne o intrare goală
+
+  const obs=new MutationObserver(muts=>{
+    for(const r of muts){
+      const el=r.target, id=el.id, open=isOpen(el);
+      if(open && !shown.has(id)){
+        shown.add(id);
+        if(id===AUTH) continue;
+        // închide celelalte ferestre din spate (login-ul rămâne)
+        all.forEach(m=>{ if(m!==el && m.id!==AUTH && isOpen(m)) m.classList.add('hidden'); });
+        try{
+          const st={modal:id};
+          if(hasEntry()) history.replaceState(st,'',location.href);   // înlocuiește fereastra anterioară
+          else history.pushState(st,'',location.href);                // intrare nouă în istoric
+        }catch{}
+      }else if(!open && shown.has(id)){
+        shown.delete(id);
+        if(id===AUTH) continue;
+        // dacă între timp s-a făcut o navigare sau s-a deschis altă fereastră, nu mai facem back
+        setTimeout(()=>{ const s=history.state; if(s && s.modal===id && !shown.has(id)) history.back(); },0);
+      }
+    }
+  });
+  all.forEach(m=>obs.observe(m,{attributes:true,attributeFilter:['class']}));
+
+  // Înapoi / Înainte din browser: închide fereastra deschisă dacă intrarea de istoric nu mai e a ei
+  window.addEventListener('popstate',e=>{
+    const want=e.state && e.state.modal;
+    all.forEach(m=>{ if(m.id!==AUTH && m.id!==want && isOpen(m)) m.classList.add('hidden'); });
+  });
+})();
