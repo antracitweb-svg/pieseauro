@@ -158,3 +158,10 @@ Atenție: pozele rămân în bucket și după ștergerea anunțului (curățarea
 - Pagina anunțului: chipuri cu stare/cantitate/livrare/negociabil, statistici vânzător („14 anunțuri active · pe AutoPiese din 2025”), mesaj rapid „Propune un preț” (doar la prețuri negociabile) și secțiunea „Anunțuri similare”.
 - Server: `image_count`, `seller_since`, `seller_ads` în listări; index `listings(user_id,status)`. Nicio coloană nouă.
 - Culorile, fonturile și identitatea vizuală au rămas neschimbate.
+
+## V29 — format compact pentru anunțuri și cereri
+Toate listele de anunțuri (rezultate, favorite, anunțurile unui vânzător, dezmembrări, anunțuri similare, coș) și lista de cereri (publice și „Cererile mele”) folosesc acum același rând compact ca „Anunțurile mele”: poză în stânga, titlu albastru, butoane sub titlu, iar jos vizualizări · bucăți · preț.
+- `script.js`: `adRowHtml()` (anunțuri), `reqRowHtml()` (cereri); `card()` le folosește peste tot.
+- `style.css`: blocul „V29” de la final (clase `ar-*`); aspectul din „Anunțurile mele” a fost aliniat la același model.
+- `index.html`: containerele listelor au clasa `ar-list`.
+

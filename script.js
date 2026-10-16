@@ -150,7 +150,7 @@ function showPage(id){ $$('.page').forEach(p=>p.classList.toggle('active',p.id==
 
 const BN_MAP={home:'home',rezultate:'rezultate',saved:'rezultate',vinde:'vinde',mesagerie:'mesagerie',cont:'cont',settings:'cont','anunturile-mele':'cont'};
 function setBottomNav(name){ const t=BN_MAP[name]||''; $$('#bottomNav [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t)); }
-const SKEL=Array(6).fill('<div class="skel-card"><div class="skel skel-img"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div>').join('');
+const SKEL=Array(6).fill('<div class="ar-row ar-skel"><div class="skel ar-thumb"></div><div class="ar-main"><div class="skel skel-line"></div><div class="skel skel-line short"></div></div></div>').join('');
 function route(){
   const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); closeLightbox();
   const { name, params } = parseHash();
@@ -259,7 +259,7 @@ async function loadToolData(view, box, withId, refId){
     const ok=[],gone=[]; res.forEach((r,i)=>{ if(r.status==='fulfilled') ok.push(r.value.listing); else if(r.reason&&r.reason.status===404) gone.push(ids[i]); });
     if(gone.length) writeJSON('autopiese_cart',ids.filter(i=>!gone.includes(i)));
     const total=ok.reduce((n,x)=>n+(Number(x.price)||0),0);
-    items=ok.map(x=>`<div class="info-card tool-item"><b>${esc(x.title)}</b><p>${esc(money(x.price))} · ${esc(x.county||'')}${x.seller_name?' · '+esc(x.seller_name):''}</p><div class="row"><button class="btn primary small" data-order="${x.id}">🛍️ Comandă</button><button class="btn ghost small" data-open="${x.id}">Vezi anunțul</button><button class="btn ghost small" data-cart-del="${x.id}">Elimină</button></div></div>`);
+    items=ok.map(x=>{ const im=Array.isArray(x.images)&&x.images[0]?x.images[0]:''; return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}"><div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>'}</div><div class="ar-main"><h3 class="ar-title">${esc(x.title)}</h3><div class="ar-sub">📍 ${esc(x.county||'România')}${x.seller_name?' · '+esc(x.seller_name):''}</div><div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-order="${x.id}">🛍️ Comandă</button><button type="button" class="ar-btn ar-del" data-cart-del="${x.id}" title="Elimină din coș" aria-label="Elimină din coș">🗑</button></div></div><div class="ar-foot"><span class="ar-views">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${esc(money(x.price))}</span></div></article>`; });
     if(ok.length) items.push(`<div class="info-card tool-item"><b>Total estimat: ${esc(money(total))}</b><p class="muted">Apasă „Comandă” la fiecare piesă ca vânzătorul să primească comanda ta cu adresa de livrare. Plata se face direct cu vânzătorul.</p></div>`);
   }else if(view==='transactions'){
     const r=await api('/api/orders');
@@ -580,47 +580,45 @@ function cardMine(x){
       <div class="mr-main"><h3 class="mr-title">${esc(x.title)}</h3>${st[0]?`<span class="badge ${st[1]}">${st[0]}</span>`:''}<div class="mr-acts">${btns}</div></div></div>
     <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${money(x.price)}</b></div></article>`;
 }
-function card(x, o={}){
-  if(o.mine) return cardMine(x);
+/* Format compact (ca în „Anunțurile mele”): poză stânga, titlu, butoane, apoi vizualizări · bucăți · preț. Folosit peste tot unde apar anunțuri. */
+function adRowHtml(x){
   const fav = favorites.includes(x.id);
   const isDism = x.type==='dezmembrari';
-  const compat = [x.make,x.model,x.year].filter(Boolean).join(' ') + (x.engine?' · '+x.engine:'');
-  const metaParts = [compat || (x.category||'Piesă auto')];
-  if(compat && x.category && !isDism) metaParts.push(x.category);
-  if(isDism && x.km!=null) metaParts.push(Number(x.km).toLocaleString('ro-RO')+' km');
-  const partChips = isDism && x.parts_avail ? `<div class="part-chips">${String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).slice(0,5).map(t=>`<b>${esc(t)}</b>`).join('')}</div>` : '';
-  const firstImage = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
+  const im = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
   const nImg = Number(x.image_count)||0;
-  const img = firstImage
-    ? `<button type="button" class="listing-image-button" data-lightbox-src="${esc(firstImage)}" data-lightbox-alt="${esc(x.title)}" aria-label="Vezi poza mai mare"><img src="${esc(firstImage)}" alt="${esc(x.title)}" loading="lazy" decoding="async"><span class="image-zoom-hint">⌕</span></button>`
-    : `<div class="listing-placeholder">${isDism?'🚗':'⚙️'}</div>`;
+  const thumb = im ? `<img src="${esc(im)}" alt="" loading="lazy" decoding="async">` : `<span class="ar-ph">${isDism?'🚗':'⚙️'}</span>`;
+  const compat = [x.make,x.model,x.year].filter(Boolean).join(' ') + (x.engine?' · '+x.engine:'');
+  const meta = [compat || x.category || 'Piesă auto'];
+  if(compat && x.category && !isDism) meta.push(x.category);
+  if(isDism && x.km!=null && x.km!=='') meta.push(Number(x.km).toLocaleString('ro-RO')+' km');
   const chips = [
+    x.condition ? `<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>` : '',
     x.oem ? `<span class="lchip lchip-oem" title="Cod OEM">OEM ${esc(x.oem)}</span>` : '',
     x.delivery ? `<span class="lchip lchip-ship">🚚 Livrare</span>` : '',
-    Number(x.quantity)>1 ? `<span class="lchip">${Number(x.quantity)} buc.</span>` : ''
+    ...(isDism && x.parts_avail ? String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).slice(0,3).map(t=>`<span class="lchip">${esc(t)}</span>`) : [])
   ].join('');
-  const sellerName = x.seller_name ? esc(x.seller_name) : '';
-  const sellerType = SELLER_SHORT[x.seller_type] || '';
-  const price = Number(x.price)>0;
-  return `<article class="listing" data-open="${x.id}" tabindex="0">
-    <div class="listing-image">${img}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
-    <div class="listing-body">
-      <div class="listing-top"><h3>${esc(x.title)}</h3><button class="listing-fav" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'}</button></div>
-      <div class="listing-meta">${metaParts.map(esc).join(' · ')}</div>${partChips}
-      ${chips?`<div class="listing-chips">${chips}</div>`:''}
-      ${x.description?`<p class="listing-desc">${esc(x.description)}</p>`:''}
-      <div class="listing-bottom">
-        <div class="listing-price">${money(x.price)}${price&&x.negotiable?'<small>negociabil</small>':''}</div>
-        <div class="listing-actions">${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
-      </div>
-      ${sellerName?`<div class="listing-seller"><span class="ls-name">${sellerName}</span>${sellerType?`<span class="ls-type">${esc(sellerType)}</span>`:''}${x.seller_ads>1?`<span class="ls-ads">${adsLabel(x.seller_ads)}</span>`:''}</div>`:''}
-      <div class="listing-foot"><span class="lf-loc">📍 ${esc(x.county||'România')}</span><span class="lf-time">${esc(fmtUpdated(x.created_at))}</span></div>
-    </div></article>`;
+  const sType = SELLER_SHORT[x.seller_type] || '';
+  const sub = [`📍 ${esc(x.county||'România')}`, esc(fmtUpdated(x.created_at)), x.seller_name ? esc(x.seller_name)+(sType?' ('+esc(sType)+')':'') : ''].filter(Boolean).join(' · ');
+  const hasPrice = Number(x.price)>0;
+  return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}">
+    <div class="ar-thumb">${thumb}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
+    <div class="ar-main">
+      <h3 class="ar-title">${esc(x.title)}</h3>
+      <div class="ar-meta">${meta.map(esc).join(' · ')}</div>
+      ${chips?`<div class="ar-chips">${chips}</div>`:''}
+      <div class="ar-sub">${sub}</div>
+      <div class="ar-acts"><button type="button" class="ar-btn ar-fav${fav?' on':''}" data-fav="${x.id}" title="Favorite" aria-label="Favorite">${fav?'♥':'♡'}</button></div>
+    </div>
+    <div class="ar-foot"><span class="ar-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${esc(money(x.price))}${hasPrice&&x.negotiable?'<small>negociabil</small>':''}</span></div></article>`;
+}
+function card(x, o={}){
+  if(o.mine) return cardMine(x);
+  return adRowHtml(x);
 }
 
 function updateFavUI(){
   $('#favCount').textContent = favorites.length;
-  $$('[data-fav]').forEach(b=>{ const on=favorites.includes(Number(b.dataset.fav)); b.textContent=(on?'♥':'♡')+(b.classList.contains('btn')?' Favorit':''); });
+  $$('[data-fav]').forEach(b=>{ const on=favorites.includes(Number(b.dataset.fav)); b.textContent=(on?'♥':'♡')+(b.classList.contains('btn')?' Favorit':''); b.classList.toggle('on',on); });
 }
 function toggleFavorite(id){
   const was = favorites.includes(id);
@@ -942,7 +940,7 @@ async function loadSimilar(x){
     let items=r.listings.filter(l=>l.id!==x.id);
     if(items.length<3 && x.category){ qs.delete('category'); r=await api('/api/listings?'+qs.toString()); items=r.listings.filter(l=>l.id!==x.id); }
     if(!$('#similarBox')||!items.length) return;
-    $('#similarBox').innerHTML=`<h3 class="ad-h">Anunțuri similare</h3><div class="listing-grid similar-grid">${items.slice(0,4).map(l=>card(l)).join('')}</div>`;
+    $('#similarBox').innerHTML=`<h3 class="ad-h">Anunțuri similare</h3><div class="listing-grid similar-grid ar-list">${items.slice(0,4).map(l=>card(l)).join('')}</div>`;
   }catch{}
 }
 async function sendReport(id){
@@ -975,6 +973,32 @@ function extraPartsHtml(x){
   if(!items.length) return '';
   return `<p class="muted">+ ${items.length} ${items.length===1?'piesă suplimentară':'piese suplimentare'}: ${items.join('; ')}</p>`;
 }
+function extraPartsCount(x){
+  let list = [];
+  try{ list = typeof x.extra_parts === 'string' ? JSON.parse(x.extra_parts || '[]') : (x.extra_parts || []); }catch{ list = []; }
+  return Array.isArray(list) ? list.filter(p=>p && p.title).length : 0;
+}
+/* Cerere în același format compact ca anunțurile */
+function reqRowHtml(x, mine){
+  const mode = mine ? 'mine' : 'public', n = Number(x.offers_count)||0, np = Number(x.offers_pending)||0;
+  const car = [x.make,x.model,x.year].filter(Boolean).join(' · ') || 'Orice mașină';
+  const im = x.images && x.images[0] ? x.images[0] : '';
+  const ex = extraPartsCount(x);
+  const where = [x.county, x.city].filter(Boolean).join(', ');
+  const acts = mine
+    ? `<button type="button" class="ar-btn ar-wide ar-primary" data-open-request="${x.id}" data-mode="mine">Vezi cererea și ofertele</button><button type="button" class="ar-btn ar-del" data-del-request="${x.id}" title="Șterge" aria-label="Șterge cererea">🗑</button>`
+    : `<button type="button" class="ar-btn ar-wide ar-primary" data-offer-request="${x.id}">Oferă piesa</button><button type="button" class="ar-btn" data-req-contact="${x.id}" title="Contactează" aria-label="Contactează">✉</button><button type="button" class="ar-btn" data-open-request="${x.id}" data-mode="public" title="Detalii" aria-label="Detalii cerere">ⓘ</button>`;
+  return `<article class="ar-row ar-req" data-request="${x.id}" data-open-request="${x.id}" data-mode="${mode}" tabindex="0" role="link" aria-label="${esc(x.title)}">
+    <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">🔎</span>'}</div>
+    <div class="ar-main">
+      <h3 class="ar-title">${esc(x.title)}</h3>
+      <div class="ar-meta">${esc(car)}${ex?` · +${ex} ${ex===1?'piesă suplimentară':'piese suplimentare'}`:''}</div>
+      ${x.description?`<p class="ar-desc">${esc(x.description.slice(0,140))}${x.description.length>140?'…':''}</p>`:''}
+      <div class="ar-sub">${mine?esc(REQ_ST[x.status]||x.status):(where?'📍 '+esc(where)+' · ':'')+esc(x.user_name||'Cumpărător')}</div>
+      <div class="ar-acts${mine?'':' contact-slot'}">${acts}</div>
+    </div>
+    <div class="ar-foot"><span class="ar-views">${mine?`💬 ${n} ${n===1?'ofertă':'oferte'}${np?` (${np} noi)`:''}`:esc(REQ_KIND[x.kind]||'Cerere piesă')}</span><span class="ar-qty">${esc(fmtDate(x.created_at))}</span><span class="ar-price ar-state">${mine?esc(REQ_ST[x.status]||x.status):'Deschisă'}</span></div></article>`;
+}
 async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
   $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
@@ -984,16 +1008,7 @@ async function loadRequests(mine){
   try{
     const r = await api(mine ? '/api/requests/mine' : '/api/requests');
     requestsCache=new Map(r.requests.map(x=>[x.id,x]));
-    grid.innerHTML = r.requests.map(x=>{
-      const mode=mine?'mine':'public', n=Number(x.offers_count)||0, np=Number(x.offers_pending)||0;
-      return `<article class="info-card req-card" data-request="${x.id}" data-open-request="${x.id}" data-mode="${mode}">
-      ${(x.images&&x.images[0])?`<img class="req-card-thumb" src="${esc(x.images[0])}" alt="" loading="lazy" decoding="async">`:''}
-      <b>${esc([x.make,x.model,x.year].filter(Boolean).join(' · ')||'Orice mașină')}</b><h3>${esc(x.title)}</h3>
-      ${x.description?`<p>${esc(x.description.slice(0,160))}${x.description.length>160?'…':''}</p>`:''}
-      ${extraPartsHtml(x)}
-      <p class="muted">${esc(mine ? (REQ_ST[x.status]||x.status) : (x.user_name||'Cumpărător'))} · ${fmtDate(x.created_at)}${mine?` · <b>${n} ${n===1?'ofertă':'oferte'}</b>${np?` (${np} noi)`:''}`:''}</p>
-      <div class="contact-slot">${mine?`<button type="button" class="btn primary small" data-open-request="${x.id}" data-mode="mine">Vezi cererea și ofertele</button> <button class="btn danger small" data-del-request="${x.id}">Șterge</button>`:`<button type="button" class="btn ghost small" data-open-request="${x.id}" data-mode="public">Detalii</button> <button class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button>`}</div></article>`;
-    }).join('');
+    grid.innerHTML = r.requests.map(x=>reqRowHtml(x,mine)).join('');
     $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -1962,7 +1977,8 @@ document.addEventListener('keydown', e=>{
     if(e.key==='ArrowRight'){ e.preventDefault(); moveLightbox(1); return; }
   }
   if(e.key==='Escape'){ const m=$$('.modal').find(x=>!x.classList.contains('hidden')); if(m) closeModal(m); }
-  if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.listing[data-open]')){ e.preventDefault(); openDetail(Number(e.target.dataset.open)); }
+  if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.listing[data-open],.ar-row[data-open]')){ e.preventDefault(); openDetail(Number(e.target.dataset.open)); }
+  if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.ar-row[data-open-request]')){ e.preventDefault(); openRequestModal(Number(e.target.dataset.openRequest), e.target.dataset.mode||'public'); }
 });
 
 function getRecentSearches(){ return readJSON('autopiese_recent_searches',[]).filter(x=>typeof x==='string'&&x.trim()).slice(0,10); }
