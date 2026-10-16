@@ -1721,3 +1721,15 @@ html.menu-open,html.menu-open body{overflow:hidden}
   .mine-list>.mine-row .mine-thumb{width:140px;height:140px}
   .mine-list>.mine-row .mine-name{font-size:18px}
 }
+
+
+/* ===== V29b: pagina anunțului ===== */
+/* caseta proprietarului: culorile site-ului (fildeș + auriu), nu galben */
+.ad-owner{background:var(--ivory,#f7f5f0);border:1px solid var(--line,#e6e0d4);border-radius:10px}
+.ad-owner .btn,.ad-owner .btn.small,.ad-owner .btn.ghost{background:#fff;border:1px solid var(--line,#e6e0d4);color:var(--ink,#17181b);box-shadow:none}
+.ad-owner .btn:hover{border-color:var(--gold-soft,#d4b483);background:#fffefb}
+.ad-owner .btn.danger,.ad-owner [data-del-listing]{color:#a3322b;border-color:#e6cfcb;background:#fff}
+.ad-owner p,.ad-owner .ad-owner-info{color:var(--muted,#6f6b62)}
+/* titlul și textul de sub poze merg pe toată lățimea */
+h1,h2{text-wrap:wrap}
+.ad-main h2,.ad-main .ad-sub,.ad-main p,.detail-desc{max-width:none;text-wrap:wrap}
