@@ -19,6 +19,30 @@ const DB_URL = process.env.DATABASE_URL || '';
 const DB_LOCAL = /localhost|127\.0\.0\.1/.test(DB_URL);
 const pool = DB_URL ? new Pool({connectionString:DB_URL,ssl:DB_LOCAL?false:{rejectUnauthorized:process.env.DATABASE_SSL_STRICT==='true'},max:10,idleTimeoutMillis:30000}) : null;
 if(pool)pool.on('error',e=>console.error('pg pool error',e.message));
+
+/* ---------- poze în Supabase Storage (opțional) ---------- */
+// Dacă SUPABASE_URL și SUPABASE_SERVICE_KEY sunt setate, pozele noi se încarcă în bucket, iar în baza de date rămâne doar linkul.
+// Fără ele, pozele rămân ca înainte (base64 în PostgreSQL).
+let SUPA_URL = (process.env.SUPABASE_URL||'').trim().replace(/\/(rest|storage|auth)\/v1.*$/,'').replace(/\/+$/,'');
+try{ if(SUPA_URL) new URL(SUPA_URL); }catch{ console.error('SUPABASE_URL invalid (trebuie să înceapă cu https://) – pozele rămân în baza de date.'); SUPA_URL=''; }
+const SUPA_KEY = (process.env.SUPABASE_SERVICE_KEY||'').trim();
+const SUPA_BUCKET = (process.env.SUPABASE_BUCKET||'pieseauto').trim();
+const STORAGE_ON = !!(SUPA_URL && SUPA_KEY);
+const STORAGE_PUBLIC = STORAGE_ON ? SUPA_URL+'/storage/v1/object/public/'+SUPA_BUCKET+'/' : '';
+const isDataImg = s => typeof s==='string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s);
+const isStoredUrl = s => STORAGE_ON && typeof s==='string' && s.length<400 && s.startsWith(STORAGE_PUBLIC) && !s.includes('..') && /^[A-Za-z0-9_\-./]+$/.test(s.slice(STORAGE_PUBLIC.length));
+async function uploadImage(dataUrl,userId){
+  const m=/^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(dataUrl);
+  const key='u'+userId+'/'+Date.now()+'-'+crypto.randomBytes(6).toString('hex')+'.'+(m[1]==='jpeg'?'jpg':m[1]);
+  const r=await fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET+'/'+key,{method:'POST',headers:{Authorization:'Bearer '+SUPA_KEY,apikey:SUPA_KEY,'Content-Type':'image/'+m[1],'cache-control':'max-age=31536000'},body:Buffer.from(m[2],'base64')});
+  if(!r.ok){ console.error('Supabase Storage upload:',r.status,(await r.text()).slice(0,200)); throw new Error('STORAGE'); }
+  return STORAGE_PUBLIC+key;
+}
+async function storeImages(images,userId){
+  if(!STORAGE_ON) return images;
+  return Promise.all(images.map(img=>isDataImg(img)?uploadImage(img,userId):img));
+}
+console.log(STORAGE_ON?'Poze: Supabase Storage (bucket '+SUPA_BUCKET+')':'Poze: salvate în baza de date (SUPABASE_URL / SUPABASE_SERVICE_KEY lipsesc)');
 const { CURATED_VEHICLES } = require('./vehicles-catalog');
 // Anunțurile noi se publică automat. Pentru moderare manuală setează AUTO_APPROVE=false în Render.
 const AUTO_APPROVE = String(process.env.AUTO_APPROVE||'true').toLowerCase()!=='false';
@@ -71,7 +95,7 @@ app.param('id',(req,res,next,v)=>/^\d{1,10}$/.test(v)?next():res.status(400).jso
 app.use(helmet({
  contentSecurityPolicy:{useDefaults:false,directives:{
   defaultSrc:["'self'"],scriptSrc:["'self'"],scriptSrcAttr:["'none'"],styleSrc:["'self'","'unsafe-inline'"],
-  imgSrc:["'self'","data:"],connectSrc:["'self'"],fontSrc:["'self'","data:"],objectSrc:["'none'"],
+  imgSrc:["'self'","data:",...(STORAGE_ON?[new URL(SUPA_URL).origin]:[])],connectSrc:["'self'"],fontSrc:["'self'","data:"],objectSrc:["'none'"],
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
 if(compression)app.use(compression());
@@ -1022,7 +1046,7 @@ function parseListing(x){
  if(x.seller_type&&!SELLER_TYPES.includes(x.seller_type))return bad('DATE_INVALIDE');
  if(x.km!=null&&String(x.km).trim()!==''){const k=Number(x.km);if(!Number.isFinite(k)||k<0||k>3000000)return bad('DATE_INVALIDE');}
  const images=Array.isArray(x.images)?x.images.slice(0,8):[];
- for(const img of images){if(typeof img!=='string'||!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img))return bad('POZA_INVALIDA');if(img.length>700000)return bad('POZE_PREA_MARI');}
+ for(const img of images){if(typeof img!=='string'||!(isDataImg(img)||isStoredUrl(img)))return bad('POZA_INVALIDA');if(img.length>700000)return bad('POZE_PREA_MARI');}
  if(images.reduce((n,v)=>n+v.length,0)>4500000)return bad('POZE_PREA_MARI');
  return {v:{type:x.type,title:x.title.trim(),price,condition:x.type==='dezmembrari'?(clip(x.condition,30)||'Second-hand'):clip(x.condition,30),make:clip(x.make,60),model:clip(x.model,80),
   year:clip(x.year,10),seller_type:clip(x.seller_type,30),quantity:x.quantity==null?null:Math.min(9999,Math.max(1,Number(x.quantity)||1)),negotiable:!!x.negotiable,county:clip(x.county,60),
@@ -1041,7 +1065,7 @@ function parseExtraImages(raw,max=6){
  if(raw==null)return {images:[]};
  if(!Array.isArray(raw))return {error:'POZA_INVALIDA'};
  const images=raw.slice(0,max);
- for(const img of images){if(typeof img!=='string'||!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img))return {error:'POZA_INVALIDA'};if(img.length>700000)return {error:'POZE_PREA_MARI'};}
+ for(const img of images){if(typeof img!=='string'||!(isDataImg(img)||isStoredUrl(img)))return {error:'POZA_INVALIDA'};if(img.length>700000)return {error:'POZE_PREA_MARI'};}
  if(imgBytes(images)>4500000)return {error:'POZE_PREA_MARI'};
  return {images};
 }
@@ -1050,6 +1074,7 @@ app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
  const p=parseListing(req.body||{}); if(p.error)return res.status(p.status).json({error:p.error});
  const v=p.v;
  if(await imageQuotaExceeded(req.user.id,v.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});
+ try{v.images=await storeImages(v.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
  // Cont gratuit: maximum 100 de anunțuri active (la început; schimbabil cu ACTIVE_LISTINGS_LIMIT) (publicate sau în așteptare; cele vândute nu se numără), ca pe site-urile de profil. Adminul nu are limită.
  if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);if(act.rows[0].n>=ACTIVE_LISTINGS_LIMIT)return res.status(403).json({error:'LIMITA_ANUNTURI'});}
  const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING *`,
@@ -1071,6 +1096,7 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
  const p=parseListing(req.body||{}); if(p.error)return res.status(p.status).json({error:p.error});
  const v=p.v;
  if(await imageQuotaExceeded(req.user.id,v.images,cur.id))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});
+ try{v.images=await storeImages(v.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
  const norm2=a=>String(a==null?'':a).trim();
  const contentChanged=['type','title','description','category','subcategory','make','model','oem','year'].some(k=>norm2(cur[k])!==norm2(v[k]))||JSON.stringify([...(cur.images||[])].sort())!==JSON.stringify([...(v.images||[])].sort());
  let status=cur.status;
@@ -1125,7 +1151,7 @@ app.delete('/api/requests/:id',auth,requireDb,async(req,res)=>{
  if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  res.json({ok:true});
 });
-app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,ship_address,extra_parts,images:rawImages}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const pi=parseExtraImages(rawImages,6);if(pi.error)return res.status(400).json({error:pi.error});if(pi.images.length&&await imageQuotaExceeded(req.user.id,pi.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts,images,ship_address) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id,title,status,created_at',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title)),pi.images,clip(ship_address,300)]);res.status(201).json({request:r.rows[0]});});
+app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,ship_address,extra_parts,images:rawImages}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const pi=parseExtraImages(rawImages,6);if(pi.error)return res.status(400).json({error:pi.error});if(pi.images.length&&await imageQuotaExceeded(req.user.id,pi.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});try{pi.images=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts,images,ship_address) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id,title,status,created_at',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title)),pi.images,clip(ship_address,300)]);res.status(201).json({request:r.rows[0]});});
 
 app.get('/api/admin/overview',auth,admin,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.get('/api/admin/listings',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
@@ -1134,6 +1160,7 @@ app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res
 app.get('/api/admin/listings/:id/img/:n',auth,admin,requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
  const r=await pool.query('SELECT images[$2::int] img FROM listings WHERE id=$1',[req.params.id,n+1]);
+if(r.rowCount&&/^https?:\/\//.test(r.rows[0].img||''))return res.redirect(r.rows[0].img);
  const m=r.rowCount&&/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(r.rows[0].img||'');
  if(!m)return res.status(404).end();
  res.set({'Content-Type':m[1],'Cache-Control':'private, max-age=3600'}).send(Buffer.from(m[2],'base64'));
@@ -1170,6 +1197,7 @@ app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res
  if(!r)return res.status(404).json({error:'NOT_FOUND'});
  if(r.user_id===req.user.id)return res.status(400).json({error:'CERERE_PROPRIE'});
  if((await pool.query("SELECT 1 FROM offers WHERE request_id=$1 AND seller_id=$2 AND status='pending'",[r.id,req.user.id])).rowCount)return res.status(409).json({error:'OFERTA_EXISTA'});
+ try{pi.images=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
  const o=await pool.query('INSERT INTO offers(request_id,seller_id,price,message,images) VALUES($1,$2,$3,$4,$5) RETURNING id',[r.id,req.user.id,price,message,pi.images]);
  await notify(r.user_id,'Ofertă nouă la cererea „'+r.title+'”: '+price+' lei');
  res.json({ok:true,id:o.rows[0].id});
@@ -1187,7 +1215,7 @@ app.patch('/api/offers/:id',auth,needVerified,requireDb,ah(async(req,res)=>{
  const price=Number(req.body&&req.body.price),message=String((req.body&&req.body.message)||'').trim().slice(0,2000);
  if(!isFinite(price)||price<0||price>10000000)return res.status(400).json({error:'PRET_INVALID'});
  let newImages=null;
- if(req.body&&req.body.images!==undefined){const pi=parseExtraImages(req.body.images,6);if(pi.error)return res.status(400).json({error:pi.error});if(pi.images.length&&await imageQuotaExceeded(req.user.id,pi.images,0,Number(req.params.id)))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});newImages=pi.images;}
+ if(req.body&&req.body.images!==undefined){const pi=parseExtraImages(req.body.images,6);if(pi.error)return res.status(400).json({error:pi.error});if(pi.images.length&&await imageQuotaExceeded(req.user.id,pi.images,0,Number(req.params.id)))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});try{newImages=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}}
  const r=await pool.query("UPDATE offers o SET price=$1,message=$2,images=COALESCE($5::text[],o.images),updated_at=NOW() FROM part_requests q WHERE o.id=$3 AND o.seller_id=$4 AND o.status='pending' AND q.id=o.request_id AND q.status='open' RETURNING o.id,q.user_id buyer_id,q.title",[price,message,req.params.id,req.user.id,newImages]);
  if(!r.rowCount)return res.status(409).json({error:'OFERTA_NU_MAI_E_DISPONIBILA'});
  await notify(r.rows[0].buyer_id,'Oferta la cererea „'+r.rows[0].title+'” a fost modificată: '+price+' lei');

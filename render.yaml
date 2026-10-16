@@ -28,5 +28,11 @@ services:
         value: "true"
       - key: BOT_SECRET
         generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: pieseauto
       - key: VEHICLE_CATALOG_URL
         value: https://cdn.jsdelivr.net/gh/vehiclesdb/vehiclesdb@latest/dist/vehicles.json

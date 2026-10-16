@@ -15,7 +15,9 @@ Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și con
 ## Variabile de mediu (Render → Environment)
 | Variabilă | Obligatorie | Rol |
 |---|---|---|
-| `DATABASE_URL` | da | conexiunea PostgreSQL |
+| `DATABASE_URL` | da | conexiunea PostgreSQL (Supabase: adresa „Session pooler”) |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | pentru poze în Storage | adresa proiectului și cheia `service_role` (secretă, doar în Render); fără ele pozele rămân în PostgreSQL |
+| `SUPABASE_BUCKET` | nu | numele bucketului public (implicit `pieseauto`) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | da (prima pornire) | creează contul de administrator |
 | `APP_URL` | recomandat | adresa publică, folosită în linkurile din emailuri |
 | `RESEND_API_KEY`, `RESEND_FROM` | pentru emailuri | recuperare parolă, schimbare email (sender verificat în Resend) |
@@ -47,10 +49,21 @@ Commit pe `main` → Render face deploy automat. Nu încărca arhiva ZIP în rep
 - Securitate: Content-Security-Policy activă (fără scripturi inline), nickname fără `@` (evită confuzia cu emailul la login), limitare la înregistrare și cereri, validare telefon și categorii, ștergerea sesiunilor expirate la intervale regulate.
 - Server: endpointuri noi `GET /api/listings/:id`, `DELETE /api/listings/:id`, `GET /api/requests`, `GET /api/requests/mine`, `GET /api/sellers`, `PATCH /api/account/privacy`; verificări 404 în panoul admin; cache și timeout pentru catalogul de vehicule; oprire curată la SIGTERM; `sitemap.xml` și `robots.txt` folosesc `APP_URL`.
 
+## Mutare pe Supabase (baza de date + poze)
+1. supabase.com → **New project** (alege regiunea cea mai apropiată, ex. Frankfurt) și o parolă pentru baza de date.
+2. **Project Settings → Database → Connection string → Session pooler**: copiază adresa și înlocuiește `[YOUR-PASSWORD]`. O pui în Render ca `DATABASE_URL`. Nu folosi „Direct connection” (IPv6, nu merge de pe Render gratuit).
+3. **Storage → New bucket**: nume `pieseauto`, bifează **Public bucket**.
+4. **Project Settings → API**: copiază *Project URL* (`SUPABASE_URL`) și cheia **service_role** (`SUPABASE_SERVICE_KEY`). Cheia service_role e secretă: o pui doar în Render, nu în cod sau frontend.
+5. Render → Environment: setează `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (și `SUPABASE_BUCKET` dacă ai alt nume) → **Save** → serverul repornește.
+6. La prima pornire se creează tabelele și contul de administrator (`ADMIN_EMAIL`, `ADMIN_PASSWORD`). Dacă baza veche are date de păstrat: `pg_dump` din baza veche și `psql` în Supabase.
+7. Test: publică un anunț cu poză; în Supabase → Storage → `pieseauto` trebuie să apară folderul `u<id>/`.
+
+Atenție: pozele rămân în bucket și după ștergerea anunțului (curățarea se poate face manual din Storage).
+
 ## Poze anunțuri
 - Formularul „Vinde o piesă” acceptă până la 8 imagini JPG, PNG sau WebP de pe telefon, tabletă, laptop și desktop.
 - Imaginile sunt redimensionate și comprimate în browser înainte de trimitere, pentru încărcare mai rapidă.
-- Pozele sunt salvate în PostgreSQL în coloana `listings.images`, fără folder nou în proiect.
+- Cu `SUPABASE_URL` și `SUPABASE_SERVICE_KEY` setate, pozele noi se încarcă în Supabase Storage (bucket public) și în coloanele `images` rămâne doar linkul. Fără ele, pozele se salvează ca base64 în PostgreSQL (coloanele `images`). Pozele vechi din baza de date continuă să funcționeze.
 - Prima poză apare în cardul anunțului, iar pagina de detaliu afișează galerie cu miniaturi.
 - Interfața folosește grile diferite pentru desktop/laptop, tabletă și telefon.
 
