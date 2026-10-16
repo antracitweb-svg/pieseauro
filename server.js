@@ -592,6 +592,7 @@ async function sendMail(to,subject,text,html){
  }
  return data;
 }
+function maskEmail(e){const [u,d]=String(e||'').split('@');return (u||'').slice(0,2)+'***@'+(d||'');}
 function appBaseUrl(req){
  // Linkurile din emailuri (resetare parolă etc.) nu trebuie să depindă de antetul Host trimis de client.
  const fixed=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;
@@ -625,7 +626,7 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   if(!throttle(recoveryAttempts,key,3,15*60*1000))return res.status(429).json({error:'RECOVERY_RATE_LIMIT'});
   const r=await pool.query('SELECT id,email,name FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1',[em]);
   // Always use the same success response for unknown addresses.
-  if(!r.rowCount)return res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
+  if(!r.rowCount){console.log('Recovery: niciun cont pentru',maskEmail(em));return res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});}
 
   const raw=crypto.randomBytes(32).toString('base64url');
   const userId=r.rows[0].id;
@@ -633,7 +634,8 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[userId,hashToken(raw)]);
   const link=`${appBaseUrl(req)}/#/reset-password?token=${encodeURIComponent(raw)}`;
   try{
-   await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href=\"${link}\">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+   const sent=await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href=\"${link}\">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+   console.log('Recovery: Resend a acceptat emailul pentru',maskEmail(em),'id:',(sent&&sent.id)||'?');
   }catch(mailErr){
    // Never leave a valid reset token behind when delivery failed.
    await pool.query('DELETE FROM password_resets WHERE user_id=$1',[userId]);
