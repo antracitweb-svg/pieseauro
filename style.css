@@ -1749,3 +1749,10 @@ h1,h2{text-wrap:wrap}
 /* ===== Setări: ștergere cont ===== */
 .btn.danger-btn{background:#c0392b;border-color:#c0392b;color:#fff}
 .btn.danger-btn:hover{background:#a5301f}
+
+/* ===== Mod vacanță, utilizatori blocați, sesiuni active ===== */
+.vac-banner{margin:0 0 12px;padding:10px 14px;border:1px solid var(--gold-soft,#d4b483);background:var(--ivory,#f7f5f0);border-radius:10px;font-size:14px;line-height:1.4}
+.sess-row,.block-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)}
+.sess-row small,.block-row small{display:block;color:var(--muted);margin-top:2px}
+.thread-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.saved-alert{margin:0 10px 0 auto;font-size:13px;white-space:nowrap}

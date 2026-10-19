@@ -293,6 +293,14 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_msg BOOLEAN NOT NULL DEFAULT TRUE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_offer BOOLEAN NOT NULL DEFAULT TRUE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_order BOOLEAN NOT NULL DEFAULT TRUE',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS vacation BOOLEAN NOT NULL DEFAULT FALSE',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS vacation_until DATE',
+  'CREATE TABLE IF NOT EXISTS user_blocks (blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(blocker_id,blocked_id))',
+  'CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks(blocked_id)',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_alert BOOLEAN NOT NULL DEFAULT TRUE',
+  'CREATE TABLE IF NOT EXISTS saved_searches (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, label TEXT NOT NULL, qs TEXT NOT NULL, alerts BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_alert_at TIMESTAMPTZ, UNIQUE(user_id,qs))',
+  'CREATE INDEX IF NOT EXISTS saved_searches_alerts_idx ON saved_searches(alerts) WHERE alerts',
+  'CREATE TABLE IF NOT EXISTS saved_search_hits (search_id INTEGER NOT NULL REFERENCES saved_searches(id) ON DELETE CASCADE, listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE, PRIMARY KEY(search_id,listing_id))',
   "CREATE TABLE IF NOT EXISTS offers (id SERIAL PRIMARY KEY, request_id INTEGER NOT NULL REFERENCES part_requests(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, price NUMERIC(12,2) NOT NULL, message TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
   "CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, offer_id INTEGER REFERENCES offers(id) ON DELETE SET NULL, request_id INTEGER REFERENCES part_requests(id) ON DELETE SET NULL, buyer_id INTEGER REFERENCES users(id) ON DELETE SET NULL, seller_id INTEGER REFERENCES users(id) ON DELETE SET NULL, title TEXT, price NUMERIC(12,2) NOT NULL, status TEXT NOT NULL DEFAULT 'new', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS listing_id INTEGER REFERENCES listings(id) ON DELETE SET NULL',
@@ -384,6 +392,17 @@ const clip=(v,n)=>v==null||v===''?null:String(v).trim().slice(0,n);
 const STATS_DAYS=Math.min(90,Math.max(1,Math.floor(Number(process.env.STATS_RETENTION_DAYS))||15));
 const STATS_KEEP_DAYS=Math.min(800,Math.max(STATS_DAYS,Math.floor(Number(process.env.STATS_KEEP_DAYS))||400));
 const TODAY_SQL="(NOW() AT TIME ZONE 'Europe/Bucharest')::date";
+/* ---------- mod vacanță / utilizatori blocați ----------
+   Vacanța e activă cât timp users.vacation=TRUE și (vacation_until e NULL sau >= azi). Fără dată = până o oprește utilizatorul;
+   cu dată = reapar automat în ziua de după (nu e nevoie de job periodic). */
+const VAC_SQL=a=>`(${a}.vacation AND (${a}.vacation_until IS NULL OR ${a}.vacation_until>=${TODAY_SQL}))`;
+const NOT_VAC_LISTING=`NOT EXISTS (SELECT 1 FROM users vu WHERE vu.id=l.user_id AND ${VAC_SQL('vu')})`;
+const BLK_IN=" AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=m.sender_id)";
+async function blockState(me,other){
+ if(!me||!other)return {byMe:false,byThem:false};
+ const r=await pool.query('SELECT COUNT(*) FILTER (WHERE blocker_id=$1)::int by_me, COUNT(*) FILTER (WHERE blocker_id=$2)::int by_them FROM user_blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',[me,other]);
+ return {byMe:r.rows[0].by_me>0,byThem:r.rows[0].by_them>0};
+}
 function bumpStat(listingId,col){
  if(!pool||!['views','phone_clicks'].includes(col))return;
  pool.query(`INSERT INTO listing_stats(listing_id,day,${col}) VALUES($1,${TODAY_SQL},1) ON CONFLICT(listing_id,day) DO UPDATE SET ${col}=listing_stats.${col}+1`,[listingId]).catch(e=>console.error('stats',e.message));
@@ -725,7 +744,7 @@ app.put('/api/account/details',requireDb,auth,async(req,res)=>{
 });
 app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
  try{
-  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,(store_logo IS NOT NULL) has_logo,mail_msg,mail_offer,mail_order FROM users WHERE id=$1',[req.user.id])).rows[0];
+  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,(store_logo IS NOT NULL) has_logo,mail_msg,mail_offer,mail_order,mail_alert,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
   const phones=(await pool.query('SELECT id,phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id',[req.user.id])).rows;
   res.json({user:u,phones});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
@@ -865,8 +884,16 @@ app.post('/api/account/password',auth,requireDb,ah(async(req,res)=>{
  res.json({ok:true});
 }));
 app.post('/api/auth/logout-all',auth,requireDb,async(req,res)=>{await pool.query('DELETE FROM sessions WHERE user_id=$1',[req.user.id]);res.clearCookie('session',{httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/'});res.json({ok:true});});
-app.get('/api/auth/sessions',auth,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,created_at,last_seen_at,expires_at,user_agent FROM sessions WHERE user_id=$1 ORDER BY last_seen_at DESC',[req.user.id]);res.json({sessions:r.rows});});
-app.delete('/api/auth/sessions/:id',auth,requireDb,async(req,res)=>{await pool.query('DELETE FROM sessions WHERE id=$1 AND user_id=$2',[Number(req.params.id),req.user.id]);res.json({ok:true});});
+app.get('/api/auth/sessions',auth,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT id,created_at,last_seen_at,expires_at,user_agent,(id=$2) AS current FROM sessions WHERE user_id=$1 AND expires_at>NOW() ORDER BY (id=$2) DESC,last_seen_at DESC LIMIT 50',[req.user.id,req.sessionId]);res.json({sessions:r.rows});}));
+// „Deconectează celelalte dispozitive”: toate sesiunile în afară de cea curentă. Definit înaintea rutei /:id.
+app.delete('/api/auth/sessions/others',auth,requireDb,ah(async(req,res)=>{const r=await pool.query('DELETE FROM sessions WHERE user_id=$1 AND id<>$2',[req.user.id,req.sessionId]);res.json({ok:true,removed:r.rowCount});}));
+app.delete('/api/auth/sessions/:id',auth,requireDb,ah(async(req,res)=>{
+ if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
+ const id=Number(req.params.id),r=await pool.query('DELETE FROM sessions WHERE id=$1 AND user_id=$2',[id,req.user.id]);
+ if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ const current=id===req.sessionId; if(current)res.clearCookie('session',{httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/'});
+ res.json({ok:true,current});
+}));
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
@@ -896,11 +923,8 @@ app.delete('/api/favorites/:id',auth,requireDb,async(req,res)=>{
  await pool.query("DELETE FROM favorites WHERE user_id=$1 AND listing_id=$2",[req.user.id,req.params.id]);
  res.json({ok:true});
 });
-app.get('/api/listings',requireDb,async(req,res)=>{
- const ckey=req.originalUrl,hit=LIST_CACHE.get(ckey);
- if(hit&&Date.now()-hit.at<LIST_CACHE_TTL)return res.json(hit.body);
- // Public: doar anunțuri aprobate. Statusul NU este controlat din query string.
- const {q,delivery}=req.query; const where=["l.status='approved'","l.type <> 'masina'"],vals=[];let i=1;
+function buildListingFilter(query){
+ const {q,delivery}=query; const where=["l.status='approved'","l.type <> 'masina'",NOT_VAC_LISTING],vals=[];let i=1;
  if(q){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
   for(const term of terms){
@@ -912,17 +936,24 @@ app.get('/api/listings',requireDb,async(req,res)=>{
  }
  let condClause=null;
  for(const [key,col] of [['type','l.type'],['condition','l.condition'],['year','l.year'],['seller_type','l.seller_type']]){
-  if(req.query[key]){where.push(`${col}=$${i}`);if(key==='condition')condClause={at:where.length-1,param:i};vals.push(String(req.query[key]).slice(0,100));i++;}
+  if(query[key]){where.push(`${col}=$${i}`);if(key==='condition')condClause={at:where.length-1,param:i};vals.push(String(query[key]).slice(0,100));i++;}
  }
  // Marcă/model/județ/categorie: fără diferențe de majuscule, diacritice, spații sau cratime ("Land Rover" = "LandRover").
  for(const [key,col] of [['make','l.make'],['model','l.model'],['county','l.county'],['category','l.category']]){
-  const v=norm(String(req.query[key]||'').slice(0,100)).replace(/\s+/g,'');
+  const v=norm(String(query[key]||'').slice(0,100)).replace(/\s+/g,'');
   if(v){where.push(`${flat(col)}=$${i}`);vals.push(v);i++;}
  }
- if(/^\d{1,10}$/.test(String(req.query.seller_id||''))){where.push(`l.user_id=$${i}`);vals.push(Number(req.query.seller_id));i++;}
- const mp=Number(req.query.maxPrice);
- if(req.query.maxPrice!==undefined&&req.query.maxPrice!==''&&Number.isFinite(mp)){where.push(`l.price <= $${i}`);vals.push(mp);i++;}
+ if(/^\d{1,10}$/.test(String(query.seller_id||''))){where.push(`l.user_id=$${i}`);vals.push(Number(query.seller_id));i++;}
+ const mp=Number(query.maxPrice);
+ if(query.maxPrice!==undefined&&query.maxPrice!==''&&Number.isFinite(mp)){where.push(`l.price <= $${i}`);vals.push(mp);i++;}
  if(delivery==='true')where.push('l.delivery=true');
+ return {where,vals,condClause};
+}
+app.get('/api/listings',requireDb,async(req,res)=>{
+ const ckey=req.originalUrl,hit=LIST_CACHE.get(ckey);
+ if(hit&&Date.now()-hit.at<LIST_CACHE_TTL)return res.json(hit.body);
+ // Public: doar anunțuri aprobate. Statusul NU este controlat din query string.
+ const {where,vals,condClause}=buildListingFilter(req.query);
  // Anunțurile fără preț (0) apar la final și la sortare crescătoare.
  const order={price_asc:'(COALESCE(l.price,0)=0) ASC, l.price ASC, l.id DESC',price_desc:'l.price DESC NULLS LAST, l.id DESC'}[req.query.sort]||'l.created_at DESC, l.id DESC';
  const limit=Math.min(60,Math.max(1,Math.floor(Number(req.query.limit))||30)), offset=Math.min(100000,Math.max(0,Math.floor(Number(req.query.offset))||0));
@@ -936,7 +967,7 @@ app.get('/api/listings',requireDb,async(req,res)=>{
  res.json(body);
 });
 app.get('/api/listings/:id',requireDb,async(req,res)=>{
- const r=await pool.query(`SELECT l.*,${SELLER_COLS},u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'`,[req.params.id]);
+ const r=await pool.query(`SELECT l.*,${SELLER_COLS},u.show_phone seller_show_phone,${VAC_SQL('u')} seller_vacation,CASE WHEN ${VAC_SQL('u')} THEN u.vacation_until::text END seller_vacation_until FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'`,[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const x=r.rows[0]; let phones=[];
  if(req.query.noview!=='1'){const me=await optUserId(req);if(!me||me!==x.user_id){pool.query('UPDATE listings SET views=views+1 WHERE id=$1',[x.id]).catch(()=>{});bumpStat(x.id,'views');x.views=(Number(x.views)||0)+1;}}
@@ -1026,20 +1057,20 @@ app.post('/api/listings/:id/bump',auth,requireDb,async(req,res)=>{
  res.json({listing:r.rows[0]});
 });
 app.get('/api/sellers',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
+ const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
  res.json({sellers:r.rows});
 });
 /* ===== Notificări email, export date, ștergere cont ===== */
 app.put('/api/account/notif-prefs',requireDb,auth,ah(async(req,res)=>{
   const b=req.body||{};
-  await pool.query('UPDATE users SET mail_msg=$1,mail_offer=$2,mail_order=$3 WHERE id=$4',[!!b.mail_msg,!!b.mail_offer,!!b.mail_order,req.user.id]);
+  await pool.query('UPDATE users SET mail_msg=$1,mail_offer=$2,mail_order=$3,mail_alert=COALESCE($5,mail_alert) WHERE id=$4',[!!b.mail_msg,!!b.mail_offer,!!b.mail_order,req.user.id,b.mail_alert===undefined?null:!!b.mail_alert]);
   res.json({ok:true});
 }));
 app.get('/api/account/export',requireDb,auth,ah(async(req,res)=>{
   if(!throttle(authAttempts,'exp:'+req.user.id,3,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
   const uid=req.user.id,q=async sql=>(await pool.query(sql,[uid])).rows;
-  const [account,phones,listings,favorites,requests,offers,orders,messages,notifications,reports]=await Promise.all([
-    q('SELECT id,name,nickname,email,phone,show_phone,role,status,email_verified,created_at,terms_accepted_at,ship_county,ship_city,ship_details,bill_company,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,mail_msg,mail_offer,mail_order FROM users WHERE id=$1'),
+  const [account,phones,listings,favorites,requests,offers,orders,messages,notifications,reports,blocked,saved]=await Promise.all([
+    q('SELECT id,name,nickname,email,phone,show_phone,role,status,email_verified,created_at,terms_accepted_at,ship_county,ship_city,ship_details,bill_company,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,mail_msg,mail_offer,mail_order,mail_alert,vacation,vacation_until FROM users WHERE id=$1'),
     q('SELECT phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id'),
     q('SELECT id,type,title,price,condition,make,model,generation,year,engine,fuel,category,subcategory,oem,vin,km,quantity,negotiable,delivery,county,description,status,views,COALESCE(cardinality(images),0) image_count,created_at FROM listings WHERE user_id=$1 ORDER BY id'),
     q('SELECT listing_id FROM favorites WHERE user_id=$1'),
@@ -1048,9 +1079,11 @@ app.get('/api/account/export',requireDb,auth,ah(async(req,res)=>{
     q('SELECT id,title,price,quantity,status,created_at,(buyer_id=$1) AS as_buyer FROM orders WHERE buyer_id=$1 OR seller_id=$1 ORDER BY id'),
     q('SELECT id,sender_id,recipient_id,body,created_at FROM messages WHERE sender_id=$1 OR recipient_id=$1 ORDER BY id'),
     q('SELECT text,is_read,created_at FROM notifications WHERE user_id=$1 ORDER BY id'),
-    q('SELECT listing_id,reason,details,status,created_at FROM reports WHERE reporter_id=$1 ORDER BY id')
+    q('SELECT listing_id,reason,details,status,created_at FROM reports WHERE reporter_id=$1 ORDER BY id'),
+    q('SELECT blocked_id,created_at FROM user_blocks WHERE blocker_id=$1 ORDER BY created_at'),
+    q('SELECT label,qs,alerts,created_at FROM saved_searches WHERE user_id=$1 ORDER BY id')
   ]);
-  const data={exported_at:new Date().toISOString(),note:'Pozele nu sunt incluse (doar numărul lor). Parola nu se exportă.',account:account[0]||null,phones,listings,favorites:favorites.map(f=>f.listing_id),requests,offers,orders,messages,notifications,reports};
+  const data={exported_at:new Date().toISOString(),note:'Pozele nu sunt incluse (doar numărul lor). Parola nu se exportă.',account:account[0]||null,phones,listings,favorites:favorites.map(f=>f.listing_id),requests,offers,orders,messages,notifications,reports,blocked_users:blocked,saved_searches:saved};
   res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="autopiese-date-cont-'+uid+'.json"','Cache-Control':'no-store'});
   res.send(JSON.stringify(data,null,2));
 }));
@@ -1107,12 +1140,13 @@ app.put('/api/account/store',requireDb,auth,ah(async(req,res)=>{
 app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const id=Number(req.params.id);
  if(!Number.isInteger(id)||id<=0)return res.status(404).json({error:'NOT_FOUND'});
- const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,created_at FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
+ const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
  const s=(await pool.query("SELECT COUNT(*)::int n,COALESCE(BOOL_OR(type='dezmembrari'),FALSE) dism,(ARRAY_AGG(seller_type ORDER BY created_at DESC))[1] seller_type,(ARRAY_AGG(county ORDER BY created_at DESC) FILTER (WHERE county IS NOT NULL AND county<>''))[1] county FROM listings WHERE user_id=$1 AND status='approved'",[id])).rows[0];
  const phones=u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[id])).rows:[];
  const isCompany=s.dism||(s.seller_type&&s.seller_type!=='Persoană fizică');
- res.json({seller:{id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones}});
+ const me=await optUserId(req); const blocked=me&&me!==id?(await blockState(me,id)).byMe:false;
+ res.json({seller:{id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked}});
 }));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 function parseListing(x){
@@ -1162,6 +1196,7 @@ app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
  if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);if(act.rows[0].n>=ACTIVE_LISTINGS_LIMIT)return res.status(403).json({error:'LIMITA_ANUNTURI'});}
  const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING *`,
   [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail]);
+ if(NEW_LISTING_STATUS==='approved')alertForListings([r.rows[0].id]);
  res.status(201).json({listing:r.rows[0]});
 });
 // Anunțul propriu, cu toate pozele, în orice stare (pentru formularul de editare).
@@ -1238,8 +1273,8 @@ app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!thrott
 
 app.get('/api/admin/overview',auth,admin,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.get('/api/admin/listings',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
-app.patch('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['pending','approved','rejected','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE listings SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_listing','listing',req.params.id,status]);res.json({listing:r.rows[0]});});
-app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved' WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);res.json({approved:r.rowCount});}));
+app.patch('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['pending','approved','rejected','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE listings SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_listing','listing',req.params.id,status]);if(status==='approved')alertForListings([r.rows[0].id]);res.json({listing:r.rows[0]});});
+app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved' WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
 app.get('/api/admin/listings/:id/img/:n',auth,admin,requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
  const r=await pool.query('SELECT images[$2::int] img FROM listings WHERE id=$1',[req.params.id,n+1]);
@@ -1269,7 +1304,7 @@ app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempt
 
 /* ---------- oferte, comenzi, notificări ---------- */
 const mailGate=new Map();
-const MAIL_COL={msg:'mail_msg',offer:'mail_offer',order:'mail_order'};
+const MAIL_COL={msg:'mail_msg',offer:'mail_offer',order:'mail_order',alert:'mail_alert'};
 async function mailNotify(uid,kind,text){
   try{
     const col=MAIL_COL[kind];
@@ -1296,6 +1331,7 @@ app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res
  const r=(await pool.query("SELECT id,user_id,title FROM part_requests WHERE id=$1 AND status='open'",[req.params.id])).rows[0];
  if(!r)return res.status(404).json({error:'NOT_FOUND'});
  if(r.user_id===req.user.id)return res.status(400).json({error:'CERERE_PROPRIE'});
+ if(r.user_id){const bs=await blockState(req.user.id,r.user_id);if(bs.byMe||bs.byThem)return res.status(403).json({error:bs.byMe?'BLOCAT_DE_TINE':'BLOCAT'});}
  if((await pool.query("SELECT 1 FROM offers WHERE request_id=$1 AND seller_id=$2 AND status='pending'",[r.id,req.user.id])).rowCount)return res.status(409).json({error:'OFERTA_EXISTA'});
  try{pi.images=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
  const o=await pool.query('INSERT INTO offers(request_id,seller_id,price,message,images) VALUES($1,$2,$3,$4,$5) RETURNING id',[r.id,req.user.id,price,message,pi.images]);
@@ -1370,6 +1406,7 @@ app.post('/api/messages',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!throttle(authAttempts,'msg:'+req.user.id,60,60*60*1000))return res.status(429).json({error:'PREA_MULTE_MESAJE'});
  const u=(await pool.query("SELECT id FROM users WHERE id=$1 AND status='active'",[to])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
+ {const bs=await blockState(req.user.id,to);if(bs.byMe||bs.byThem)return res.status(403).json({error:bs.byMe?'BLOCAT_DE_TINE':'BLOCAT'});}
  // Referință opțională către un anunț (apare ca „Ref: titlu” în Mesagerie).
  let listingId=null, refTitle=null;
  if(/^\d{1,10}$/.test(String(b.listing_id||''))){
@@ -1384,16 +1421,16 @@ app.post('/api/messages',auth,needVerified,requireDb,ah(async(req,res)=>{
 app.get('/api/messages/box',auth,requireDb,ah(async(req,res)=>{
  const box=['inbox','sent','archived'].includes(req.query.box)?req.query.box:'inbox';
  const where={
-  inbox:'m.recipient_id=$1 AND NOT m.arch_r',
+  inbox:'m.recipient_id=$1 AND NOT m.arch_r'+BLK_IN,
   sent:'m.sender_id=$1 AND NOT m.arch_s',
-  archived:'((m.recipient_id=$1 AND m.arch_r) OR (m.sender_id=$1 AND m.arch_s))'
+  archived:'((m.recipient_id=$1 AND m.arch_r'+BLK_IN+') OR (m.sender_id=$1 AND m.arch_s))'
  }[box];
  const r=await pool.query(`SELECT m.id,m.body,m.created_at,m.is_read,m.listing_id,m.ref_title,(m.sender_id=$1) mine,
    CASE WHEN m.sender_id=$1 THEN m.recipient_id ELSE m.sender_id END other,
    COALESCE(u.nickname,u.name) other_name
   FROM messages m JOIN users u ON u.id=(CASE WHEN m.sender_id=$1 THEN m.recipient_id ELSE m.sender_id END)
   WHERE ${where} ORDER BY m.created_at DESC,m.id DESC LIMIT 300`,[req.user.id]);
- const c=(await pool.query(`SELECT COUNT(*) FILTER (WHERE recipient_id=$1 AND NOT arch_r AND NOT is_read)::int unread FROM messages WHERE recipient_id=$1`,[req.user.id])).rows[0];
+ const c=(await pool.query(`SELECT COUNT(*) FILTER (WHERE recipient_id=$1 AND NOT arch_r AND NOT is_read AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=messages.sender_id))::int unread FROM messages WHERE recipient_id=$1`,[req.user.id])).rows[0];
  res.json({messages:r.rows,unread:c.unread,box});
 }));
 app.post('/api/messages/archive',auth,requireDb,ah(async(req,res)=>{
@@ -1410,7 +1447,7 @@ app.post('/api/messages/read',auth,requireDb,ah(async(req,res)=>{
  res.json({ok:true});
 }));
 app.get('/api/messages',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query(`SELECT t.other,COALESCE(u.nickname,u.name) AS name,t.body,t.created_at,t.unread FROM (SELECT other,body,created_at,SUM(ui) OVER (PARTITION BY other) unread,ROW_NUMBER() OVER (PARTITION BY other ORDER BY created_at DESC,id DESC) rn FROM (SELECT CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END other,body,created_at,id,CASE WHEN recipient_id=$1 AND NOT is_read THEN 1 ELSE 0 END ui FROM messages WHERE sender_id=$1 OR recipient_id=$1) m) t JOIN users u ON u.id=t.other WHERE t.rn=1 ORDER BY t.created_at DESC LIMIT 100`,[req.user.id]);
+ const r=await pool.query(`SELECT t.other,COALESCE(u.nickname,u.name) AS name,t.body,t.created_at,t.unread FROM (SELECT other,body,created_at,SUM(ui) OVER (PARTITION BY other) unread,ROW_NUMBER() OVER (PARTITION BY other ORDER BY created_at DESC,id DESC) rn FROM (SELECT CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END other,body,created_at,id,CASE WHEN recipient_id=$1 AND NOT is_read THEN 1 ELSE 0 END ui FROM messages WHERE (sender_id=$1 OR recipient_id=$1) AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=(CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END))) m) t JOIN users u ON u.id=t.other WHERE t.rn=1 ORDER BY t.created_at DESC LIMIT 100`,[req.user.id]);
  res.json({threads:r.rows.map(x=>({...x,unread:Number(x.unread)}))});
 }));
 app.get('/api/messages/:uid',auth,requireDb,ah(async(req,res)=>{
@@ -1419,7 +1456,8 @@ app.get('/api/messages/:uid',auth,requireDb,ah(async(req,res)=>{
  if(!other)return res.status(404).json({error:'NOT_FOUND'});
  const m=await pool.query('SELECT id,body,created_at,listing_id,ref_title,(sender_id=$1) mine FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at,id LIMIT 500',[req.user.id,other.id]);
  await pool.query('UPDATE messages SET is_read=TRUE WHERE recipient_id=$1 AND sender_id=$2 AND NOT is_read',[req.user.id,other.id]);
- res.json({other,messages:m.rows});
+ const bs=await blockState(req.user.id,other.id);
+ res.json({other,messages:m.rows,blocked_by_me:bs.byMe,blocked_me:bs.byThem});
 }));
 app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!throttle(authAttempts,'order:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_COMENZI'});
@@ -1428,6 +1466,8 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  const l=(await pool.query('SELECT id,user_id,title,price,quantity,delivery,status FROM listings WHERE id=$1',[id])).rows[0];
  if(!l||l.status!=='approved'||!l.user_id)return res.status(404).json({error:'NOT_FOUND'});
  if(l.user_id===req.user.id)return res.status(400).json({error:'COMANDA_PROPRIE'});
+ {const bs=await blockState(req.user.id,l.user_id);if(bs.byMe||bs.byThem)return res.status(403).json({error:bs.byMe?'BLOCAT_DE_TINE':'BLOCAT'});}
+ if((await pool.query('SELECT 1 FROM users u WHERE u.id=$1 AND '+VAC_SQL('u'),[l.user_id])).rowCount)return res.status(409).json({error:'VANZATOR_IN_VACANTA'});
  const avail=Math.max(1,Number(l.quantity)||1), qty=Math.floor(Number(b.quantity)||1);
  if(qty<1||qty>avail)return res.status(400).json({error:'CANTITATE_INVALIDA'});
  const county=clip(b.ship_county,60), city=clip(b.ship_city,80), addr=clip(b.ship_address,300), note=clip(b.note,500);
@@ -1463,10 +1503,108 @@ app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
 }));
 app.post('/api/notifications/read',auth,requireDb,ah(async(req,res)=>{await pool.query('UPDATE notifications SET is_read=TRUE WHERE user_id=$1',[req.user.id]);res.json({ok:true});}));
 
+/* ===== Mod vacanță ===== */
+app.put('/api/account/vacation',requireDb,auth,ah(async(req,res)=>{
+ const b=req.body||{}, on=b.on===true; let until=null;
+ if(on&&b.until!=null&&String(b.until).trim()!==''){
+  const v=String(b.until).trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return res.status(400).json({error:'DATA_INVALIDA'});
+  let ok=false;
+  try{ok=(await pool.query(`SELECT ($1::date>=${TODAY_SQL} AND $1::date<=${TODAY_SQL}+365) ok`,[v])).rows[0].ok;}catch{ok=false;}
+  if(!ok)return res.status(400).json({error:'DATA_INVALIDA'});
+  until=v;
+ }
+ const r=await pool.query('UPDATE users SET vacation=$1,vacation_until=$2 WHERE id=$3 RETURNING vacation,vacation_until::text vacation_until',[on,until,req.user.id]);
+ res.json({vacation:r.rows[0].vacation,vacation_until:r.rows[0].vacation_until});
+}));
+/* ===== Utilizatori blocați ===== */
+app.get('/api/blocks',auth,requireDb,ah(async(req,res)=>{
+ const r=await pool.query('SELECT b.blocked_id id,COALESCE(u.nickname,u.name) name,b.created_at FROM user_blocks b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=$1 ORDER BY b.created_at DESC LIMIT 200',[req.user.id]);
+ res.json({blocks:r.rows});
+}));
+app.post('/api/blocks',auth,requireDb,ah(async(req,res)=>{
+ if(!throttle(authAttempts,'blk:'+req.user.id,60,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+ const b=req.body||{}; let id=Number(b.user_id);
+ if(!Number.isInteger(id)&&typeof b.nickname==='string'&&b.nickname.trim()){
+  const f=(await pool.query('SELECT id FROM users WHERE LOWER(nickname)=LOWER($1)',[b.nickname.trim().slice(0,30)])).rows[0];
+  if(!f)return res.status(404).json({error:'DESTINATAR_NEGASIT'});
+  id=f.id;
+ }
+ if(!Number.isInteger(id)||id<=0||id===req.user.id)return res.status(400).json({error:'DATE_INVALIDE'});
+ const t=(await pool.query('SELECT id,role FROM users WHERE id=$1',[id])).rows[0];
+ if(!t)return res.status(404).json({error:'NOT_FOUND'});
+ if(t.role==='admin')return res.status(400).json({error:'NU_SE_POATE_BLOCA'});
+ if(Number((await pool.query('SELECT COUNT(*) n FROM user_blocks WHERE blocker_id=$1',[req.user.id])).rows[0].n)>=200)return res.status(400).json({error:'MAX_BLOCARI'});
+ await pool.query('INSERT INTO user_blocks(blocker_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[req.user.id,id]);
+ res.json({ok:true});
+}));
+app.delete('/api/blocks/:uid',auth,requireDb,ah(async(req,res)=>{
+ if(!/^\d{1,10}$/.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
+ await pool.query('DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2',[req.user.id,Number(req.params.uid)]);
+ res.json({ok:true});
+}));
+/* ===== Căutări salvate + alerte pentru anunțuri noi =====
+   Căutarea se salvează pe cont (qs = parametrii din URL-ul rezultatelor). La fiecare aprobare de anunț (admin, „aprobă tot” sau publicare
+   automată) se verifică căutările cu alerte active, cu ACELEAȘI filtre ca în căutarea publică (buildListingFilter). saved_search_hits
+   împiedică alerta dublă pentru același anunț (ex. după editare + reaprobare). Alerta = notificare în site (+ email dacă e activat). */
+const SAVED_KEYS=['q','type','condition','year','seller_type','make','model','county','category','seller_id','maxPrice','delivery','sort','sname'];
+const SAVED_FILTER_KEYS=['q','type','condition','year','seller_type','make','model','county','category','seller_id','maxPrice','delivery'];
+const MAX_SAVED_SEARCHES=30;
+function cleanSavedQs(raw){
+ const src=new URLSearchParams(String(raw||'').slice(0,800)),out=new URLSearchParams();
+ for(const k of SAVED_KEYS){const v=String(src.get(k)||'').trim().slice(0,100);if(v)out.set(k,v);}
+ return SAVED_FILTER_KEYS.some(k=>out.has(k))?out.toString():null;
+}
+async function alertForListings(ids){
+ try{
+  if(!pool||!Array.isArray(ids))return;
+  ids=ids.map(Number).filter(n=>Number.isInteger(n)&&n>0).slice(0,500);
+  if(!ids.length)return;
+  const ss=(await pool.query("SELECT s.id,s.user_id,s.label,s.qs FROM saved_searches s JOIN users u ON u.id=s.user_id WHERE s.alerts AND u.status='active' ORDER BY s.id LIMIT 5000")).rows;
+  for(const s of ss){
+   const f=buildListingFilter(Object.fromEntries(new URLSearchParams(s.qs))), k=f.vals.length;
+   // anunțul trebuie să treacă filtrele, să nu fie al celui care caută și să nu existe blocare între cei doi
+   const m=await pool.query(`SELECT l.id,l.title FROM listings l WHERE l.id=ANY($${k+1}::int[]) AND l.user_id IS DISTINCT FROM $${k+2} AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id=$${k+2} AND b.blocked_id=l.user_id) OR (b.blocker_id=l.user_id AND b.blocked_id=$${k+2})) AND ${f.where.join(' AND ')} ORDER BY l.id`,[...f.vals,ids,s.user_id]);
+   if(!m.rowCount)continue;
+   const fresh=await pool.query('INSERT INTO saved_search_hits(search_id,listing_id) SELECT $1,x FROM unnest($2::int[]) x ON CONFLICT DO NOTHING RETURNING listing_id',[s.id,m.rows.map(x=>x.id)]);
+   if(!fresh.rowCount)continue;
+   const first=m.rows.find(x=>x.id===fresh.rows[0].listing_id)||m.rows[0];
+   const label=String(s.label).slice(0,60);
+   await notify(s.user_id,fresh.rowCount===1?`Anunț nou pentru căutarea „${label}”: ${String(first.title).slice(0,120)}`:`${fresh.rowCount} anunțuri noi pentru căutarea „${label}”`,'alert');
+   await pool.query('UPDATE saved_searches SET last_alert_at=NOW() WHERE id=$1',[s.id]);
+  }
+ }catch(e){console.error('alertForListings',e.message);}
+}
+app.get('/api/saved-searches',auth,requireDb,ah(async(req,res)=>{
+ const r=await pool.query('SELECT id,label,qs,alerts,created_at,last_alert_at FROM saved_searches WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100',[req.user.id]);
+ res.json({searches:r.rows});
+}));
+app.post('/api/saved-searches',auth,requireDb,ah(async(req,res)=>{
+ if(!throttle(authAttempts,'ssr:'+req.user.id,60,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+ const b=req.body||{}, qs=cleanSavedQs(b.qs), label=clip(b.label,120);
+ if(!qs||!label)return res.status(400).json({error:'DATE_INVALIDE'});
+ const c=(await pool.query('SELECT COUNT(*)::int n,COALESCE(BOOL_OR(qs=$2),FALSE) has FROM saved_searches WHERE user_id=$1',[req.user.id,qs])).rows[0];
+ if(!c.has&&c.n>=MAX_SAVED_SEARCHES)return res.status(400).json({error:'MAX_CAUTARI'});
+ const alerts=b.alerts!==false;
+ // import=true (mutarea căutărilor locale pe cont): nu suprascrie o căutare deja salvată.
+ const r=await pool.query(`INSERT INTO saved_searches(user_id,label,qs,alerts) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,qs) DO ${b.import===true?'NOTHING':'UPDATE SET label=EXCLUDED.label,alerts=EXCLUDED.alerts'} RETURNING id,label,qs,alerts`,[req.user.id,label,qs,alerts]);
+ res.status(201).json({search:r.rows[0]||null});
+}));
+app.patch('/api/saved-searches/:id',auth,requireDb,ah(async(req,res)=>{
+ if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
+ const r=await pool.query('UPDATE saved_searches SET alerts=$1 WHERE id=$2 AND user_id=$3 RETURNING id,alerts',[(req.body||{}).alerts===true,Number(req.params.id),req.user.id]);
+ if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ res.json({search:r.rows[0]});
+}));
+app.delete('/api/saved-searches/:id',auth,requireDb,ah(async(req,res)=>{
+ if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
+ await pool.query('DELETE FROM saved_searches WHERE id=$1 AND user_id=$2',[Number(req.params.id),req.user.id]);
+ res.json({ok:true});
+}));
 app.get('/robots.txt',(req,res)=>{res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\n\n${['GPTBot','ChatGPT-User','OAI-SearchBot','ClaudeBot','anthropic-ai','Google-Extended','CCBot','PerplexityBot','Bytespider','Amazonbot','Applebot-Extended','Diffbot','ImagesiftBot','Omgilibot','cohere-ai','meta-externalagent'].map(b=>`User-agent: ${b}\nDisallow: /\n`).join('\n')}\nSitemap: ${appBaseUrl(req)}/sitemap.xml\n`);});
 app.get('/sitemap.xml',async(req,res)=>{
  const base=appBaseUrl(req); const urls=[base+'/'];
- if(pool){try{const r=await pool.query("SELECT id,title,created_at FROM listings WHERE status='approved' ORDER BY created_at DESC LIMIT 5000");urls.push(...r.rows.map(x=>`${base}/piese/${x.id}-${slugify(x.title)}`));}catch(e){console.error(e);}}
+ if(pool){try{const r=await pool.query("SELECT l.id,l.title,l.created_at FROM listings l WHERE l.status='approved' AND "+NOT_VAC_LISTING+" ORDER BY l.created_at DESC LIMIT 5000");urls.push(...r.rows.map(x=>`${base}/piese/${x.id}-${slugify(x.title)}`));}catch(e){console.error(e);}}
  res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map(u=>`<url><loc>${escapeXml(u)}</loc></url>`).join('')+'</urlset>');
 });
 function escapeXml(s){return String(s).replace(/[<>&'"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]));}
@@ -1474,12 +1612,12 @@ app.get('/piese/:idSlug',async(req,res,next)=>{
  if(!pool)return next();
  const id=Number(String(req.params.idSlug).split('-')[0]); if(!Number.isInteger(id)||id<=0)return next();
  try{
-  const r=await pool.query("SELECT l.*,COALESCE(u.nickname,u.name) seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[id]);
+  const r=await pool.query("SELECT l.*,COALESCE(u.nickname,u.name) seller_name,"+VAC_SQL('u')+" on_vac FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'",[id]);
   if(!r.rowCount)return next();
   const x=r.rows[0]; const base=appBaseUrl(req); const slug=slugify(x.title);
   if(req.params.idSlug!==`${x.id}-${slug}`)return res.redirect(301,`/piese/${x.id}-${slug}`);
   const canonical=`${escapeHtml(base)}/piese/${x.id}-${slug}`;
-  const product={'@context':'https://schema.org','@type':'Product',name:x.title,description:x.description||x.title,sku:x.oem||String(x.id),brand:x.make?{'@type':'Brand',name:x.make}:undefined,itemCondition:x.condition==='Nouă'?'https://schema.org/NewCondition':'https://schema.org/UsedCondition',offers:{'@type':'Offer',price:Number(x.price||0),priceCurrency:'RON',availability:'https://schema.org/InStock',url:canonical}};
+  const product={'@context':'https://schema.org','@type':'Product',name:x.title,description:x.description||x.title,sku:x.oem||String(x.id),brand:x.make?{'@type':'Brand',name:x.make}:undefined,itemCondition:x.condition==='Nouă'?'https://schema.org/NewCondition':'https://schema.org/UsedCondition',offers:{'@type':'Offer',price:Number(x.price||0),priceCurrency:'RON',availability:x.on_vac?'https://schema.org/OutOfStock':'https://schema.org/InStock',url:canonical}};
   const clean=JSON.stringify(product).replace(/</g,'\\u003c');
   const price=Number(x.price||0)>0?new Intl.NumberFormat('ro-RO').format(Number(x.price))+' lei':'La cerere';
   res.set('Cache-Control','public, max-age=300').type('html').send(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(x.title)} | AutoPiese</title><meta name="description" content="${escapeHtml((x.description||x.title).slice(0,155))}"><link rel="canonical" href="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css"><script type="application/ld+json">${clean}</script></head><body><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Piese</span></a></div></header><main class="container ssr-page"><p class="crumbs"><a href="/">AutoPiese</a> › ${escapeHtml(x.category||'Piese auto')}</p><h1>${escapeHtml(x.title)}</h1><p class="ssr-meta">${escapeHtml([x.make,x.model,x.year].filter(Boolean).join(' · '))}</p><p class="ssr-price">${price}</p><p>${escapeHtml(x.description||'')}</p><dl class="ssr-dl"><dt>Stare</dt><dd>${escapeHtml(x.condition||'—')}</dd><dt>Cod OEM</dt><dd>${escapeHtml(x.oem||'—')}</dd><dt>Județ</dt><dd>${escapeHtml(x.county||'—')}</dd><dt>Vânzător</dt><dd>${escapeHtml(x.seller_name||'—')}</dd></dl><p><a class="btn primary" href="/#/rezultate">Vezi toate anunțurile</a></p></main></body></html>`);

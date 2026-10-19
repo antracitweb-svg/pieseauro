@@ -14,7 +14,7 @@ const ERR = {
   LOGIN_RATE_LIMIT:'Prea multe încercări. Încearcă din nou mai târziu.',RESET_EXPIRED:'Linkul a expirat sau a fost deja folosit.',
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',EMAIL_NOT_VERIFIED:'Confirmă adresa de email (verifică mesajul primit) ca să poți continua.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
-  PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',BOT_CHECK:'Verificarea de securitate a expirat. Reîncarcă pagina.',PREA_MULTE_CERERI:'Prea multe cereri într-un timp scurt. Încearcă din nou peste un minut.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
+  PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',MAX_CAUTARI:'Ai atins limita de 30 de căutări salvate. Șterge una ca să poți salva alta.',BLOCAT:'Nu poți trimite acestui utilizator.',BLOCAT_DE_TINE:'Ai blocat acest utilizator. Deblochează-l din Setări cont ca să continui.',VANZATOR_IN_VACANTA:'Vânzătorul este în vacanță și nu primește comenzi acum.',DATA_INVALIDA:'Data aleasă nu este validă (cel mult 365 de zile de acum).',NU_SE_POATE_BLOCA:'Acest utilizator nu poate fi blocat.',MAX_BLOCARI:'Ai atins limita de 200 de utilizatori blocați.',BOT_CHECK:'Verificarea de securitate a expirat. Reîncarcă pagina.',PREA_MULTE_CERERI:'Prea multe cereri într-un timp scurt. Încearcă din nou peste un minut.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
   CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',TERMENI_NEACCEPTATI:'Trebuie să accepți Termenii și Politica de confidențialitate.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',COMANDA_PROPRIE:'Nu poți comanda propriul anunț.',CANTITATE_INVALIDA:'Cantitatea cerută nu este disponibilă.',ADRESA_LIPSA:'Completează județul, localitatea și adresa de livrare.',STORAGE_EROARE:'Pozele nu au putut fi încărcate. Încearcă din nou.',COMANDA_EXISTA:'Ai deja o comandă în așteptare pentru acest anunț.',COMANDA_INCHISA:'Comanda este deja închisă.',PREA_MULTE_COMENZI:'Ai trimis prea multe comenzi. Încearcă mai târziu.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',DESTINATAR_NEGASIT:'Nu am găsit niciun utilizator cu acest nickname.'
 };
 const CATEGORY_TREE = [
@@ -288,7 +288,7 @@ async function loadToolData(view, box, withId, refId){
   }else if(view==='messages'){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
-      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><b>${nm}</b>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p>${m.ref_title&&m.listing_id?`<p class="muted">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></p>`:''}<p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}<form class="clean-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form></div>`);
+      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><div class="thread-head"><b>${nm}</b><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></div>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p>${m.ref_title&&m.listing_id?`<p class="muted">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></p>`:''}<p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="clean-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form>`}</div>`);
       return;
     }
     const r=await api('/api/messages');
@@ -882,6 +882,7 @@ function detailHtml(x, phones, canContact){
   return `<div class="ad">
   <div class="ad-main">
     ${ownerBox}${gallery}
+    ${x.seller_vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${x.seller_vacation_until?' până la '+esc(fmtDate(x.seller_vacation_until+'T00:00:00')):''}. Poți trimite mesaje, dar comenzile sunt oprite până se întoarce.</div>`:''}
     <h2>${esc(x.title)}</h2>
     <p class="ad-sub">${[x.county,fmtUpdated(x.created_at)].filter(Boolean).map(esc).join(' · ')}</p>
     <div class="ad-chips">${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}${Number(x.quantity)>1?`<span class="lchip">${Number(x.quantity)} buc. disponibile</span>`:''}${x.delivery?'<span class="lchip lchip-ship">🚚 Livrare</span>':''}${x.negotiable&&Number(x.price)>0?'<span class="lchip">Preț negociabil</span>':''}</div>
@@ -906,7 +907,7 @@ function detailHtml(x, phones, canContact){
     <div class="contact-row">
       ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<button class="btn ghost small" data-msg-open="1">✉️ Mesaj</button>`:''}
       <button class="btn ghost small" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'} Favorit</button>
-      ${canContact?`${(currentUser&&currentUser.id===x.user_id)?'':'<button class="btn primary small" data-order="'+x.id+'">🛍️ Comandă</button>'}<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
+      ${canContact?`${(currentUser&&currentUser.id===x.user_id)?'':(x.seller_vacation?'<button class="btn ghost small" disabled>🛍️ Indisponibil (vacanță)</button>':'<button class="btn primary small" data-order="'+x.id+'">🛍️ Comandă</button>')}<button class="btn ghost small" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button><button class="btn ghost small" data-copy-link="${x.id}">Copiază linkul</button><button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
     </div>
     ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<div class="msg-box hidden" id="msgBox" data-to="${Number(x.user_id)}" data-listing="${x.id}"><b>Mesaj pentru ${seller}</b>
       <div class="msg-quick"><button type="button" data-msg-quick="Bună ziua! Mai este disponibilă piesa?">Mai este disponibilă?</button><button type="button" data-msg-quick="Bună ziua! Care este ultimul preț?">Ultimul preț?</button><button type="button" data-msg-quick="Bună ziua! Se poate livra în ">Se poate livra?</button>${x.negotiable&&Number(x.price)>0?'<button type="button" data-msg-quick="Bună ziua! Aș putea oferi ___ lei pentru piesă. Vă convine?">Propune un preț</button>':''}</div>
@@ -1034,18 +1035,42 @@ async function loadStores(parks){
 function getSaved(){
   return readJSON('autopiese_saved_searches',[]).map(s=>typeof s==='string'?{label:s,qs:'q='+encodeURIComponent(s)}:s).filter(s=>s&&s.qs!==undefined);
 }
-function saveCurrentSearch(){
+async function saveCurrentSearch(){
   const p = filtersToParams(); p.delete('mode');
   const label = [state.filters.q, state.filters.category, state.filters.make, state.filters.model, state.filters.county].filter(Boolean).join(' · ');
   if(!label){ toast('Scrie întâi ce piesă cauți sau alege un filtru.'); return; }
+  if(currentUser){
+    try{ await api('/api/saved-searches',{method:'POST',body:JSON.stringify({label,qs:p.toString(),alerts:true})}); toast('Căutarea a fost salvată. Te anunțăm când apare un anunț nou care i se potrivește.'); }
+    catch(e){ toast(e.message); }
+    return;
+  }
   const saved = getSaved().filter(s=>s.qs!==p.toString());
   saved.unshift({label, qs:p.toString()});
   writeJSON('autopiese_saved_searches', saved.slice(0,20));
-  toast('Căutarea a fost salvată.');
+  toast('Căutarea a fost salvată pe acest dispozitiv. Intră în cont ca să primești alerte pentru anunțuri noi.');
 }
-function renderSaved(){
-  const list = getSaved();
-  $('#savedList').innerHTML = list.length ? list.map((s,i)=>`<div class="saved-row"><button class="link" data-saved-open="${i}">${esc(s.label)}</button><button class="btn danger small" data-saved-del="${i}">Șterge</button></div>`).join('') : '<div class="saved-row muted">Nu ai căutări salvate.</div>';
+async function renderSaved(){
+  const box=$('#savedList');
+  if(!currentUser){
+    const list = getSaved();
+    box.innerHTML = (list.length ? list.map((s,i)=>`<div class="saved-row"><button class="link" data-saved-open="${i}">${esc(s.label)}</button><button class="btn danger small" data-saved-del="${i}">Șterge</button></div>`).join('') : '<div class="saved-row muted">Nu ai căutări salvate.</div>') + '<div class="saved-row muted">Intră în cont ca să păstrezi căutările pe cont și să primești o alertă când apar anunțuri noi care li se potrivesc.</div>';
+    return;
+  }
+  box.innerHTML='<div class="saved-row muted">Se încarcă…</div>';
+  try{
+    /* căutările salvate înainte pe acest dispozitiv se mută o singură dată pe cont, cu alertele oprite */
+    const local=getSaved();
+    if(local.length){
+      const keep=[];
+      for(const s of local.slice(0,30)){
+        try{ await api('/api/saved-searches',{method:'POST',body:JSON.stringify({label:s.label,qs:s.qs,alerts:false,import:true})}); }
+        catch(e){ if(!e.status || e.status>=500 || e.status===429 || e.code==='MAX_CAUTARI') keep.push(s); }
+      }
+      writeJSON('autopiese_saved_searches', keep);
+    }
+    const list=(await api('/api/saved-searches')).searches||[];
+    box.innerHTML = list.length ? list.map(x=>`<div class="saved-row"><button class="link" data-saved-go="${esc(x.qs)}">${esc(x.label)}</button><label class="check saved-alert"><input type="checkbox" data-saved-alert="${x.id}" ${x.alerts?'checked':''}> 🔔 Alerte</label><button class="btn danger small" data-saved-rm="${x.id}">Șterge</button></div>`).join('') : '<div class="saved-row muted">Nu ai căutări salvate.</div>';
+  }catch(e){ box.innerHTML=`<div class="saved-row muted">${esc(e.message||'Nu am putut încărca căutările salvate.')}</div>`; }
 }
 
 /* ---------- autentificare ---------- */
@@ -1543,15 +1568,74 @@ async function loadSettings(){
   const pv = $('#storeLogoPreview');
   if(u.has_logo){ pv.src = '/api/stores/'+u.id+'/logo?v='+Date.now(); pv.classList.remove('hidden'); $('#storeLogoRemove').classList.remove('hidden'); }
   else { pv.removeAttribute('src'); pv.classList.add('hidden'); $('#storeLogoRemove').classList.add('hidden'); }
-  $('#mailMsg').checked = u.mail_msg !== false; $('#mailOffer').checked = u.mail_offer !== false; $('#mailOrder').checked = u.mail_order !== false;
+  $('#mailMsg').checked = u.mail_msg !== false; $('#mailOffer').checked = u.mail_offer !== false; $('#mailOrder').checked = u.mail_order !== false; $('#mailAlert').checked = u.mail_alert !== false;
   $('#deletePassword').value = ''; $('#deleteConfirm').checked = false;
+  $('#vacationOn').checked = !!u.vacation; $('#vacationUntil').value = u.vacation_until || '';
+  $('#vacationUntil').min = new Date().toISOString().slice(0,10); $('#vacationUntil').disabled = !u.vacation; setMsg($('#vacationMsg'),'');
   renderPhones();
+  loadSessions().catch(()=>{}); loadBlocks().catch(()=>{});
 }
 async function saveNotifPrefs(e){
   e.preventDefault(); const msg=$('#notifMsg'); setMsg(msg,'');
-  try{ await api('/api/account/notif-prefs',{method:'PUT',body:JSON.stringify({mail_msg:$('#mailMsg').checked,mail_offer:$('#mailOffer').checked,mail_order:$('#mailOrder').checked})}); setMsg(msg,'Preferințele au fost salvate.','ok'); }
+  try{ await api('/api/account/notif-prefs',{method:'PUT',body:JSON.stringify({mail_msg:$('#mailMsg').checked,mail_offer:$('#mailOffer').checked,mail_order:$('#mailOrder').checked,mail_alert:$('#mailAlert').checked})}); setMsg(msg,'Preferințele au fost salvate.','ok'); }
   catch(err){ setMsg(msg,err.message,'error'); }
 }
+/* ---------- mod vacanță, utilizatori blocați, sesiuni active ---------- */
+function uaLabel(ua){
+  const s=String(ua||'');
+  const dev=/iPhone/.test(s)?'iPhone':/iPad/.test(s)?'iPad':/Android/.test(s)?'Android':/Windows/.test(s)?'Windows':/Mac OS X|Macintosh/.test(s)?'Mac':/Linux|X11/.test(s)?'Linux':'dispozitiv necunoscut';
+  const br=/Edg\//.test(s)?'Edge':/OPR\/|Opera/.test(s)?'Opera':/Firefox\//.test(s)?'Firefox':/Chrome\/|CriOS\//.test(s)?'Chrome':/Safari\//.test(s)?'Safari':'Browser';
+  return br+' pe '+dev;
+}
+function fmtDateTime(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleString('ro-RO',{dateStyle:'short',timeStyle:'short'}); }
+async function loadSessions(){
+  const box=$('#sessionList'); if(!box) return;
+  const r=await api('/api/auth/sessions'), list=r.sessions||[];
+  box.innerHTML=list.map(x=>`<div class="sess-row"><div><b>${esc(uaLabel(x.user_agent))}</b>${x.current?' <span class="badge new">Acest dispozitiv</span>':''}<small>Ultima activitate: ${esc(fmtDateTime(x.last_seen_at))} · conectat pe ${esc(fmtDate(x.created_at))}</small></div>${x.current?'':`<button type="button" class="set-btn" data-session-del="${x.id}">Deconectează</button>`}</div>`).join('')||'<p class="muted">Nu există sesiuni active.</p>';
+  $('#sessionsOthersBtn').classList.toggle('hidden', list.filter(x=>!x.current).length===0);
+}
+async function loadBlocks(){
+  const box=$('#blockList'); if(!box) return;
+  const r=await api('/api/blocks'), list=r.blocks||[];
+  box.innerHTML=list.map(b=>`<div class="block-row"><div><b>${esc(b.name||'Utilizator')}</b><small>blocat pe ${esc(fmtDate(b.created_at))}</small></div><button type="button" class="set-btn" data-unblock="${b.id}">Deblochează</button></div>`).join('')||'<p class="muted">Nu ai blocat pe nimeni.</p>';
+}
+async function saveVacation(e){
+  e.preventDefault(); const msg=$('#vacationMsg'); setMsg(msg,'');
+  try{
+    const on=$('#vacationOn').checked, until=$('#vacationUntil').value||null;
+    const r=await api('/api/account/vacation',{method:'PUT',body:JSON.stringify({on,until})});
+    setMsg(msg, r.vacation ? ('Modul vacanță este activ'+(r.vacation_until?' până la '+fmtDate(r.vacation_until+'T00:00:00'):'')+'. Anunțurile tale sunt ascunse din căutări.') : 'Modul vacanță este oprit. Anunțurile tale sunt din nou vizibile.','ok');
+  }catch(err){ setMsg(msg,err.message,'error'); }
+}
+async function addBlock(e){
+  e.preventDefault(); const msg=$('#blockMsg'), inp=$('#blockNick'); setMsg(msg,'');
+  const nick=inp.value.trim(); if(!nick) return;
+  try{ await api('/api/blocks',{method:'POST',body:JSON.stringify({nickname:nick})}); inp.value=''; await loadBlocks(); setMsg(msg,'Utilizatorul a fost blocat.','ok'); }
+  catch(err){ setMsg(msg,err.message,'error'); }
+}
+async function toggleBlock(uid,isBlocked){
+  if(!isBlocked && !confirm('Blochezi acest utilizator? Nu îți va mai putea trimite mesaje, comenzi sau oferte.')) return false;
+  if(isBlocked) await api('/api/blocks/'+encodeURIComponent(uid),{method:'DELETE'});
+  else await api('/api/blocks',{method:'POST',body:JSON.stringify({user_id:Number(uid)})});
+  toast(isBlocked?'Utilizatorul a fost deblocat.':'Utilizatorul a fost blocat.');
+  return true;
+}
+document.addEventListener('click', e=>{
+  const t=e.target; if(!(t&&t.closest)) return; let el;
+  if((el=t.closest('[data-session-del]'))){ safe(async()=>{ await api('/api/auth/sessions/'+el.dataset.sessionDel,{method:'DELETE'}); await loadSessions(); toast('Dispozitivul a fost deconectat.'); })(); return; }
+  if(t.closest('#sessionsOthersBtn')){ if(!confirm('Te deconectezi de pe toate celelalte dispozitive? Rămâi conectat doar aici.')) return; safe(async()=>{ const r=await api('/api/auth/sessions/others',{method:'DELETE'}); await loadSessions(); toast(r.removed?`Ai deconectat ${r.removed} ${r.removed===1?'dispozitiv':'dispozitive'}.`:'Nu mai există alte dispozitive conectate.'); })(); return; }
+  if((el=t.closest('[data-unblock]'))){ safe(async()=>{ if(await toggleBlock(el.dataset.unblock,true)) await loadBlocks(); })(); return; }
+  if((el=t.closest('[data-block-toggle]'))){ const uid=el.dataset.blockToggle, was=el.dataset.blocked==='1'; safe(async()=>{ if(await toggleBlock(uid,was)) renderAccountTool('messages',uid); })(); return; }
+  if((el=t.closest('[data-seller-block]'))){ const uid=el.dataset.sellerBlock, was=el.dataset.blocked==='1'; safe(async()=>{ if(await toggleBlock(uid,was)) openSellerProfile(uid); })(); return; }
+});
+document.addEventListener('change', e=>{
+  const t=e.target; if(!t) return;
+  if(t.id==='vacationOn') $('#vacationUntil').disabled=!t.checked;
+  if(t.matches&&t.matches('[data-saved-alert]')){
+    const on=t.checked;
+    safe(async()=>{ try{ await api('/api/saved-searches/'+t.dataset.savedAlert,{method:'PATCH',body:JSON.stringify({alerts:on})}); toast(on?'Alertele sunt pornite pentru această căutare.':'Alertele sunt oprite pentru această căutare.'); }catch(err){ t.checked=!on; throw err; } })();
+  }
+});
 async function exportMyData(){
   const msg=$('#dangerMsg'), btn=$('#exportBtn'); setMsg(msg,''); btn.disabled=true;
   try{
@@ -1946,8 +2030,9 @@ async function openSellerProfile(id){
     const phones=(s.phones||[]).map(p=>`<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(String(p.phone).replace(/[^\d+]/g,''))}">Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}">WhatsApp</a>`:''}</div></div>`).join('');
     box.innerHTML=`<div class="seller-head"><span class="seller-avatar">${nm.charAt(0).toUpperCase()}</span><div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small></div></div>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
+    ${s.vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${s.vacation.until?' până la '+esc(fmtDate(s.vacation.until+'T00:00:00')):''}.</div>`:''}
     ${phones||'<p class="muted">Vânzătorul nu a afișat un număr de telefon.</p>'}
-    <div class="contact-row"><button type="button" class="btn ghost small" data-seller="${s.id}" data-sname="${nm}">Vezi anunțurile</button>${own?'':`<button type="button" class="btn primary small" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`}</div>`;
+    <div class="contact-row"><button type="button" class="btn ghost small" data-seller="${s.id}" data-sname="${nm}">Vezi anunțurile</button>${own?'':`<button type="button" class="btn primary small" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`}${(own||!currentUser)?'':`<button type="button" class="btn ghost small" data-seller-block="${s.id}" data-blocked="${s.blocked_by_me?1:0}">${s.blocked_by_me?'Deblochează':'🚫 Blochează'}</button>`}</div>`;
   }catch(e){ box.innerHTML=`<p>${esc(e.message||'Profilul nu a putut fi încărcat.')}</p>`; }
 }
 /* Contul meu: pe telefon (<=800px) se deschide o singură secțiune o dată; pe desktop rămân independente */
@@ -2007,6 +2092,8 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-seller]'))){ $$('.modal').forEach(m=>m.classList.add('hidden')); openSearch({seller_id:el.dataset.seller, sname:el.dataset.sname}); return; }
   if((el=t.closest('[data-cat]'))){ openSearch({category:el.dataset.cat}); return; }
   if((el=t.closest('[data-search-dism]'))){ openSearch({q:el.dataset.searchDism}); return; }
+  if((el=t.closest('[data-saved-go]'))){ navigate('rezultate?'+el.dataset.savedGo); return; }
+  if((el=t.closest('[data-saved-rm]'))){ safe(async()=>{ await api('/api/saved-searches/'+el.dataset.savedRm,{method:'DELETE'}); await renderSaved(); })(); return; }
   if((el=t.closest('[data-saved-open]'))){ const s=getSaved()[Number(el.dataset.savedOpen)]; if(s) navigate('rezultate?'+s.qs); return; }
   if((el=t.closest('[data-saved-del]'))){ const list=getSaved(); list.splice(Number(el.dataset.savedDel),1); writeJSON('autopiese_saved_searches',list); renderSaved(); return; }
   if((el=t.closest('[data-lightbox-src]'))){
@@ -2190,6 +2277,8 @@ function wire(){
   $('#detailsForm').addEventListener('submit', saveDetails);
   $('#storeForm').addEventListener('submit', saveStore);
   $('#notifForm').addEventListener('submit', saveNotifPrefs);
+  $('#vacationForm').addEventListener('submit', saveVacation);
+  $('#blockForm').addEventListener('submit', addBlock);
   $('#exportBtn').addEventListener('click', exportMyData);
   $('#dangerForm').addEventListener('submit', deleteMyAccount);
   $('#storeLogoFile').addEventListener('change', onStoreLogoPick);
