@@ -1733,3 +1733,19 @@ html.menu-open,html.menu-open body{overflow:hidden}
 /* titlul și textul de sub poze merg pe toată lățimea */
 h1,h2{text-wrap:wrap}
 .ad-main h2,.ad-main .ad-sub,.ad-main p,.detail-desc{max-width:none;text-wrap:wrap}
+
+
+/* ===== Logo-uri magazine în subsol ===== */
+.footer-logos{padding:0 0 22px;margin-bottom:22px;border-bottom:1px solid rgba(148,163,184,.16)}
+.footer-logos h4{margin:0 0 14px;color:#a8c7e8;font-size:13px;font-weight:650;letter-spacing:.04em;text-transform:uppercase}
+.logo-strip{display:flex;flex-wrap:wrap;gap:10px}
+.logo-item{display:flex;align-items:center;justify-content:center;width:132px;height:64px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.logo-item:hover,.logo-item:focus-visible{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.logo-item img{max-width:100%;max-height:100%;object-fit:contain}
+.store-logo-edit{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.store-logo-edit img{max-width:140px;max-height:70px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px}
+@media(max-width:640px){.logo-item{width:calc(50% - 5px);height:56px}}
+
+/* ===== Setări: ștergere cont ===== */
+.btn.danger-btn{background:#c0392b;border-color:#c0392b;color:#fff}
+.btn.danger-btn:hover{background:#a5301f}

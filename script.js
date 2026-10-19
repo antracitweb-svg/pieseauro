@@ -5,7 +5,7 @@ const $$ = s => [...document.querySelectorAll(s)];
 
 const ERR = {
   INVALID_LOGIN:'Email/nickname sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',EMAIL_EXISTS:'Există deja un cont cu acest email.',
-  NICKNAME_EXISTS:'Nickname-ul este deja folosit.',NICKNAME_INVALID:'Nickname-ul trebuie să aibă 3–30 de caractere (litere, cifre, _ . -).',
+  NICKNAME_EXISTS:'Nickname-ul este deja folosit.',COMENZI_ACTIVE:'Ai comenzi în curs. Finalizează sau anulează comenzile înainte de a șterge contul.',ADMIN_NU_SE_STERGE:'Conturile de administrator nu se pot șterge din interfață.',SITE_INVALID:'Adresa site-ului trebuie să înceapă cu http:// sau https://.',LOGO_INVALID:'Logo invalid sau prea mare (maximum ~450 KB după comprimare).',NICKNAME_INVALID:'Nickname-ul trebuie să aibă 3–30 de caractere (litere, cifre, _ . -).',
   DATE_INVALIDE:'Verifică datele introduse.',AUTH_REQUIRED:'Trebuie să te autentifici.',
   EMAIL_NOT_CONFIGURED:'Trimiterea emailurilor nu este configurată încă pe server.',EMAIL_SENDER_NOT_CONFIGURED:'Lipsește expeditorul email (RESEND_FROM).',
   EMAIL_SENDER_INVALID:'Adresa configurată pentru RESEND_FROM nu este validă.',EMAIL_SENDER_NOT_VERIFIED:'Expeditorul email nu este verificat în Resend.',
@@ -1538,7 +1538,84 @@ async function loadSettings(){
   sc.value = u.ship_county || ''; $('#shipCity').value = u.ship_city || ''; $('#shipDetails').value = u.ship_details || '';
   $('#billCompany').value = u.bill_company || ''; $('#billCui').value = u.bill_cui || ''; $('#billRegcom').value = u.bill_regcom || '';
   $('#billAddress').value = u.bill_address || ''; $('#billBank').value = u.bill_bank || ''; $('#billIban').value = u.bill_iban || '';
+  $('#storeName').value = u.store_name || ''; $('#storeSite').value = u.store_site || '';
+  state.storeLogo = undefined; state.storeLogoRemove = false; $('#storeLogoFile').value = '';
+  const pv = $('#storeLogoPreview');
+  if(u.has_logo){ pv.src = '/api/stores/'+u.id+'/logo?v='+Date.now(); pv.classList.remove('hidden'); $('#storeLogoRemove').classList.remove('hidden'); }
+  else { pv.removeAttribute('src'); pv.classList.add('hidden'); $('#storeLogoRemove').classList.add('hidden'); }
+  $('#mailMsg').checked = u.mail_msg !== false; $('#mailOffer').checked = u.mail_offer !== false; $('#mailOrder').checked = u.mail_order !== false;
+  $('#deletePassword').value = ''; $('#deleteConfirm').checked = false;
   renderPhones();
+}
+async function saveNotifPrefs(e){
+  e.preventDefault(); const msg=$('#notifMsg'); setMsg(msg,'');
+  try{ await api('/api/account/notif-prefs',{method:'PUT',body:JSON.stringify({mail_msg:$('#mailMsg').checked,mail_offer:$('#mailOffer').checked,mail_order:$('#mailOrder').checked})}); setMsg(msg,'Preferințele au fost salvate.','ok'); }
+  catch(err){ setMsg(msg,err.message,'error'); }
+}
+async function exportMyData(){
+  const msg=$('#dangerMsg'), btn=$('#exportBtn'); setMsg(msg,''); btn.disabled=true;
+  try{
+    const r=await fetch('/api/account/export',{credentials:'same-origin'});
+    if(!r.ok){ let m='Nu am putut genera exportul.'; try{ const d=await r.json(); if(d&&d.error&&ERR[d.error]) m=ERR[d.error]; }catch{} throw new Error(m); }
+    const url=URL.createObjectURL(await r.blob()), a=document.createElement('a');
+    a.href=url; a.download='autopiese-datele-mele.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+    setMsg(msg,'Fișierul a fost descărcat.','ok');
+  }catch(err){ setMsg(msg,err.message,'error'); }
+  btn.disabled=false;
+}
+async function deleteMyAccount(e){
+  e.preventDefault(); const msg=$('#dangerMsg'); setMsg(msg,'');
+  if(!$('#deletePassword').value){ setMsg(msg,'Introdu parola curentă.','error'); return; }
+  if(!$('#deleteConfirm').checked){ setMsg(msg,'Bifează confirmarea.','error'); return; }
+  if(!confirm('Sigur ștergi contul? Acțiunea este definitivă.')) return;
+  try{
+    await api('/api/account/delete',{method:'POST',body:JSON.stringify({password:$('#deletePassword').value})});
+    currentUser=null; renderHeader(); navigate('home'); toast('Contul a fost șters.'); loadFooterLogos();
+  }catch(err){ setMsg(msg,err.message,'error'); }
+}
+function logoToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error('Sunt acceptate doar JPG, PNG sau WebP.'));
+    if(file.size>10*1024*1024) return reject(new Error('Logo-ul poate avea maximum 10 MB.'));
+    const rd=new FileReader(); rd.onload=()=>{
+      const img=new Image(); img.onload=()=>{
+        const sc=Math.min(1,480/img.naturalWidth,240/img.naturalHeight);
+        const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(img.naturalWidth*sc)); c.height=Math.max(1,Math.round(img.naturalHeight*sc));
+        const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,c.width,c.height);
+        let out=c.toDataURL('image/png');
+        if(out.length>400000) out=c.toDataURL('image/webp',.85);
+        if(out.length>400000||!/^data:image\/(png|webp)/.test(out)){ ctx.globalCompositeOperation='destination-over'; ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); out=c.toDataURL('image/jpeg',.85); }
+        if(out.length>440000) return reject(new Error('Logo-ul este prea complex. Încearcă o imagine mai simplă.'));
+        resolve(out);
+      }; img.onerror=()=>reject(new Error('Imaginea nu a putut fi citită.')); img.src=rd.result;
+    }; rd.onerror=()=>reject(new Error('Fișierul nu a putut fi citit.')); rd.readAsDataURL(file);
+  });
+}
+async function onStoreLogoPick(){
+  const f=$('#storeLogoFile').files[0]; if(!f) return; const msg=$('#storeMsg'); setMsg(msg,'');
+  try{ state.storeLogo=await logoToDataUrl(f); state.storeLogoRemove=false; const pv=$('#storeLogoPreview'); pv.src=state.storeLogo; pv.classList.remove('hidden'); $('#storeLogoRemove').classList.remove('hidden'); }
+  catch(err){ state.storeLogo=undefined; $('#storeLogoFile').value=''; setMsg(msg,err.message,'error'); }
+}
+async function saveStore(e){
+  e.preventDefault(); const msg=$('#storeMsg'); setMsg(msg,'');
+  try{
+    const body={store_name:$('#storeName').value,store_site:$('#storeSite').value};
+    if(state.storeLogo) body.logo=state.storeLogo;
+    if(state.storeLogoRemove) body.remove_logo=true;
+    await api('/api/account/store',{method:'PUT',body:JSON.stringify(body)});
+    await loadSettings(); loadFooterLogos(); setMsg(msg,'Profilul de magazin a fost salvat.','ok');
+  }catch(err){ setMsg(msg,err.message,'error'); }
+}
+/* rândul de logo-uri din subsol (prima pagină rămâne neschimbată) */
+async function loadFooterLogos(){
+  const box=$('#footerLogos'), strip=$('#logoStrip'); if(!box||!strip) return;
+  try{
+    const r=await fetch('/api/stores/logos',{credentials:'same-origin'}); if(!r.ok) return;
+    const list=((await r.json()).stores)||[];
+    if(!list.length){ box.classList.add('hidden'); strip.innerHTML=''; return; }
+    strip.innerHTML=list.map(s=>`<button type="button" class="logo-item" data-seller-profile="${s.id}" title="${esc(s.name)}" aria-label="${esc(s.name)}"><img src="/api/stores/${s.id}/logo" alt="${esc(s.name)}" loading="lazy" decoding="async"></button>`).join('');
+    box.classList.remove('hidden');
+  }catch{}
 }
 async function saveDetails(e){
   e.preventDefault(); const msg = $('#detailsMsg'); setMsg(msg,'');
@@ -1688,7 +1765,7 @@ function renderAdmin(){
   if(adminTab==='offers') body = `<div class="admin-list">${d.offers.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.request_title)}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small></article>`).join('')||'<p>Nu există oferte.</p>'}</div>`;
   if(adminTab==='orders') body = `<div class="admin-list">${d.orders.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title||'Comandă')}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small></article>`).join('')||'<p>Nu există comenzi.</p>'}</div>`;
   if(adminTab==='listings') body = adminListingsHtml();
-  if(adminTab==='users') body = `<div class="admin-list">${d.users.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · ${esc(x.role)} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked']])}</div></article>`).join('')||'<p>Nu există utilizatori.</p>'}</div>`;
+  if(adminTab==='users') body = `<div class="admin-list">${d.users.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · ${esc(x.role)} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked'],...(x.has_logo?[['Șterge logo','remove_logo']]:[])])}</div></article>`).join('')||'<p>Nu există utilizatori.</p>'}</div>`;
   if(adminTab==='requests') body = `<div class="admin-list">${d.requests.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title)}</b><p>${esc(x.user_name||'—')} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`).join('')||'<p>Nu există cereri.</p>'}</div>`;
   if(adminTab==='reports') body = `<div class="admin-list">${d.reports.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${esc(x.reporter_name||'—')} · ${esc(x.status)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions">${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`).join('')||'<p>Nu există raportări.</p>'}</div>`;
   if(adminTab==='activity') body = `<div class="admin-list">${d.activity.map(x=>`<article class="info-card"><b>${esc(x.action)}</b><p>${esc(x.admin_name||'Admin')} · ${new Date(x.created_at).toLocaleString('ro-RO')}</p><small>${esc(x.target_type||'')} #${x.target_id||''} · ${esc(x.details||'')}</small></article>`).join('')||'<p>Nu există activitate.</p>'}</div>`;
@@ -2111,6 +2188,12 @@ function wire(){
   $('#emailChangeForm').addEventListener('submit', requestEmailChange);
   $('#phoneAddForm').addEventListener('submit', addPhone);
   $('#detailsForm').addEventListener('submit', saveDetails);
+  $('#storeForm').addEventListener('submit', saveStore);
+  $('#notifForm').addEventListener('submit', saveNotifPrefs);
+  $('#exportBtn').addEventListener('click', exportMyData);
+  $('#dangerForm').addEventListener('submit', deleteMyAccount);
+  $('#storeLogoFile').addEventListener('change', onStoreLogoPick);
+  $('#storeLogoRemove').addEventListener('click', ()=>{ state.storeLogo=undefined; state.storeLogoRemove=true; $('#storeLogoFile').value=''; $('#storeLogoPreview').classList.add('hidden'); $('#storeLogoRemove').classList.add('hidden'); });
   $('#showPhoneToggle').addEventListener('change', togglePrivacy);
   $('#settingsForgotPassword').addEventListener('click', ()=>{ if(currentUser&&currentUser.email){ $('#forgotEmail').value=currentUser.email; setMsg($('#forgotMessage'),''); $('#forgotModal').classList.remove('hidden'); } });
   window.addEventListener('hashchange', route);
@@ -2345,6 +2428,7 @@ document.addEventListener('submit', e=>{
   renderHeader();
   syncFavorites();
   route();
+  loadFooterLogos();
   loadCatalog().then(()=>{ if(parseHash().name==='rezultate') applyFiltersToUI(); });
 })();
 

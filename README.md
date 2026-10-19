@@ -165,3 +165,15 @@ Toate listele de anunțuri (rezultate, favorite, anunțurile unui vânzător, de
 - `style.css`: blocul „V29” de la final (clase `ar-*`); aspectul din „Anunțurile mele” a fost aliniat la același model.
 - `index.html`: containerele listelor au clasa `ar-list`.
 
+
+## V30 — Profil de magazin și logo-uri în subsol
+- Prima pagină a rămas neschimbată. Logo-urile apar într-un rând deasupra liniilor legale din subsol, pe toate paginile, doar dacă există cel puțin un logo.
+- Se afișează utilizatorii activi cu logo setat și minimum un anunț aprobat (cei cu cele mai multe anunțuri primii, maximum 30). Apăsarea pe logo deschide profilul vânzătorului.
+- **Setări cont → 4. Profil magazin**: nume magazin, site (opțional) și logo (JPG/PNG/WebP, redimensionat în browser la maximum 480×240). Cu `SUPABASE_*` setate, logo-ul merge în Storage, altfel rămâne în baza de date.
+- Coloane noi în `users` (create automat): `store_name`, `store_site`, `store_logo`.
+- Endpointuri noi: `GET /api/stores/logos`, `GET /api/stores/:id/logo`, `PUT /api/account/store`. Admin: butonul „Șterge logo” în lista de utilizatori (`PATCH /api/admin/users/:id` cu `status:"remove_logo"`, înregistrat în jurnal).
+
+## V31 — Notificări email, export date, ștergere cont (Setări cont)
+- **Notificări pe email** (secțiunea 5): mesaje noi, oferte la cereri, comenzi. Coloane noi în `users`: `mail_msg`, `mail_offer`, `mail_order` (implicit activ). Emailul pleacă doar dacă `RESEND_*` e setat, adresa e confirmată și opțiunea e bifată, cel mult unul la 10 minute pentru fiecare tip și utilizator. Notificările din site rămân neschimbate (`notify(uid,text,kind)`).
+- **Descarcă datele mele**: `GET /api/account/export` (JSON, limită 3 pe oră). Conține profil, telefoane, anunțuri (fără poze, doar numărul lor), favorite, cereri, oferte, comenzi, mesaje, notificări, raportări. Parola nu se exportă.
+- **Șterge contul**: `POST /api/account/delete` cu parola curentă. Șterge anunțurile și cererile (care altfel ar rămâne orfane din cauza `ON DELETE SET NULL`) și apoi utilizatorul; ofertele, mesajele, favoritele și sesiunile se șterg în cascadă. Refuzat dacă există comenzi în curs (`new`/`confirmed`/`shipped`) sau dacă utilizatorul e administrator. Comenzile încheiate rămân anonimizate. Pozele din Supabase Storage nu se șterg automat (curățare manuală din bucket).
