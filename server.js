@@ -265,6 +265,9 @@ async function dbReady(){
   "UPDATE listings SET category='Electrică & Electronică Auto' WHERE category='Electrică'",
   "UPDATE listings SET category='Accesorii roți' WHERE category='Roți'",
   "UPDATE listings SET category='Diverse' WHERE category='Altele'",
+  "UPDATE listings SET category='Interioare auto' WHERE category='Interior'",
+  "UPDATE listings SET category='Piese motoare' WHERE category='Motor'",
+  "UPDATE listings SET category='Pompe și injectoare' WHERE category='Alimentare combustibil'",
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS show_phone BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ',
@@ -900,8 +903,9 @@ app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=awa
 const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.images[1:1] AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
 const SELLER_COLS="COALESCE(u.nickname,u.name) seller_name,u.created_at seller_since,(SELECT COUNT(*)::int FROM listings sl WHERE sl.user_id=l.user_id AND sl.status='approved') seller_ads";
 const LISTING_SELECT=`SELECT ${LIST_COLS},${SELLER_COLS} FROM listings l LEFT JOIN users u ON u.id=l.user_id`;
-const CATEGORIES=['Accesorii auto','Accesorii roți','Alimentare combustibil','Aprindere','Cabluri auto','Car audio','Caroserie','Climatizare','Direcție','Diverse','Electrică & Electronică Auto','Evacuare','Faruri stopuri lumini','Filtre auto','Frâne','Instalații GPL','Interior','Motor','Suspensie','Transmisie',
- 'Iluminare','Roți','Electrică','Filtre','Altele'];
+const CATEGORIES=['Accesorii auto','Accesorii roți','Aprindere','Cabluri auto','Car audio','Caroserie','Climatizare','Direcție','Diverse','Electrică & Electronică Auto','Evacuare','Faruri stopuri lumini','Filtre auto','Frâne','Instalații GPL','Interioare auto','Întreținere auto','Jante & Anvelope','Navigație GPS','Pachete revizie','Piese moto','Piese motoare','Pompe și injectoare','Punte și rulmenți','Răcire','Scule auto','Suspensie','Transmisie','Tuning','Turbo','Ulei auto','Xenon',
+ // nume vechi, păstrate doar ca anunțurile existente să rămână editabile (se migrează la pornire)
+ 'Alimentare combustibil','Interior','Motor','Iluminare','Roți','Electrică','Filtre','Altele'];
 const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
 const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèêëáàäãåíìïóòôöõúùûüçñšžčřěýÿ','aaisstteeeeaaaaaiiiooooouuuucnszcreyy')`;
 const flat=c=>`regexp_replace(${fold(c)},'[^a-z0-9]+','','g')`;
