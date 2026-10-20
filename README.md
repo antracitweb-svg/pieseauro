@@ -187,3 +187,28 @@ Toate sunt în **Setări cont** (secțiunile 6–8 noi; „Datele mele” a deve
 - **Alerte pentru căutările salvate**: căutările salvate cu cont logat se păstrează acum pe server (`saved_searches`, maximum 30) și au comutator „🔔 Alerte”. Când un anunț este aprobat (de admin, „Aprobă tot” sau publicare automată), se verifică căutările cu alerte, cu aceleași filtre ca în căutarea publică (`buildListingFilter`, comun), și se creează o notificare în site, plus email dacă `RESEND_*` e setat, adresa e confirmată și e bifat „Alerte pentru căutările salvate” (coloana nouă `users.mail_alert`; limita de un email la 10 minute se aplică și aici). `saved_search_hits` împiedică alerta dublă pentru același anunț. Nu se alertează pentru anunțurile proprii, pentru vânzători în vacanță sau pentru vânzători blocați. Căutările salvate local pe dispozitiv se mută automat pe cont la prima deschidere a paginii (cu alertele oprite); pentru vizitatori fără cont rămân locale, fără alerte. Endpointuri: `GET/POST /api/saved-searches`, `PATCH/DELETE /api/saved-searches/:id`.
 - Export de date (`/api/account/export`): include acum și `blocked_users`, `saved_searches` și setările de vacanță/alerte.
 - Notă de scalare: la fiecare aprobare se rulează o interogare pe fiecare căutare cu alerte (limită 5000). Merge bine la început; dacă numărul de căutări crește mult, se poate muta într-o coadă sau se poate pre-filtra după marcă/categorie.
+
+## V33 — Pagini SEO pe categorie, marcă și model
+Pagini HTML randate pe server (fără JavaScript), indexabile de Google, create automat din anunțurile aprobate.
+- `/piese-auto` – hub cu toate categoriile și mărcile care au anunțuri.
+- `/piese-auto/<categorie>` (ex. `/piese-auto/frane`) – anunțurile din categorie + linkuri către mărcile prezente.
+- `/piese-auto/<marcă>` (ex. `/piese-auto/skoda`) – anunțurile mărcii + linkuri către modele.
+- `/piese-auto/<marcă>/<model>` (ex. `/piese-auto/skoda/superb`) – anunțurile modelului + categoriile prezente.
+- Fiecare pagină are `title`, `meta description`, `canonical`, Open Graph, date structurate (BreadcrumbList + CollectionPage/ItemList), paginare `?p=2` cu `rel=prev/next`, listă de 30 de anunțuri cu linkuri către `/piese/<id>-<slug>`.
+- Apar doar combinațiile cu cel puțin un anunț aprobat (fără vânzători în vacanță și fără „mașini la dezmembrat”); altfel răspunsul este 404 cu `noindex`, deci nu se indexează pagini goale.
+- Slug-urile se potrivesc fără diacritice/majuscule/spații; `LandRover` și `Land Rover` ajung în aceeași pagină.
+- `sitemap.xml` include hubul, categoriile, mărcile și modelele. Previzualizările WhatsApp/Facebook funcționează și pentru aceste pagini.
+- Indexul categoriilor/mărcilor/modelelor stă 5 minute în memorie și se reface imediat după modificări de anunțuri. Nicio tabelă sau coloană nouă.
+- Subsolul site-ului are linkul „Categorii și mărci” către `/piese-auto`.
+
+### Pagini combinate categorie + marcă + model
+- `/piese-auto/<marcă>/<model>/<categorie>` (ex. `/piese-auto/skoda/superb/caroserie`): anunțurile din acea categorie pentru modelul respectiv, cu linkuri către restul categoriilor modelului.
+- Există doar dacă au cel puțin `SEO_MIN_COMBO` anunțuri aprobate (implicit 2, variabilă de mediu opțională); sub prag răspunsul este 404 cu `noindex`, iar combinația nu apare în `sitemap.xml`. Paginile se activează singure când cresc anunțurile.
+- Pagina modelului leagă categoriile care trec pragul direct către aceste pagini; celelalte rămân linkuri către căutarea din aplicație.
+
+## V34 — Admin: evenimente și funcții noi
+Două taburi noi în panoul de admin (`#/admin`), ca administratorul să vadă ce se schimbă pe site, nu doar acțiunile lui.
+- **Evenimente**: jurnal cu ce fac utilizatorii, filtrabil pe tip: anunț nou, anunț editat, marcat vândut, repus la vânzare, import CSV (câte anunțuri au intrat și câte au fost respinse), vacanță pornită/oprită, blocare/deblocare, calificativ nou/modificat (cu comentariul) și cont șters. Ultimele 300 de evenimente, păstrate 180 de zile. Tabel nou `site_events` (creat automat) și funcția `logEvent(...)` din `server.js`; evenimentele se scriu fără să încetinească sau să strice cererea.
+- **Funcții noi**: carduri cu sesiuni active, vânzători în vacanță, blocări, căutări salvate (cu alerte), calificative (medie vânzători/cumpărători) și importuri din ultimele 30 de zile; liste cu vânzătorii în vacanță, blocările recente și calificativele recente. Butonul **Șterge calificativul** elimină un calificativ abuziv și rămâne înregistrat în tabul Activitate (`delete_rating`).
+- Endpointuri noi (doar admin): `GET /api/admin/events?kind=`, `GET /api/admin/features`, `DELETE /api/admin/ratings/:seller|buyer/:id`.
+- Evenimentele apar doar de la această versiune încolo; ce s-a întâmplat înainte nu poate fi recuperat.

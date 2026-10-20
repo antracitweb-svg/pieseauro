@@ -1795,3 +1795,28 @@ h1,h2{text-wrap:wrap}
 .rate-inline{white-space:nowrap}.rate-inline .stars{font-size:13px;letter-spacing:1px}.rate-inline small{color:var(--muted)}
 .rate-line{display:block}.seller-head .rate-line{margin:3px 0 0;font-size:13px}.seller-head .rate-line .stars{font-size:15px}
 .req-offer-head .rate-line{margin:3px 0 0;font-size:13px}
+
+
+/* V33 — pagini SEO /piese-auto (categorie, marcă, model) */
+.footer-col a{color:#1264ac;text-decoration:none;padding:2px 0}.footer-col a:hover{text-decoration:underline}
+.topbar{background:#051120}.topbar-in{display:flex;align-items:center;gap:18px;min-height:64px}
+.topbar .logo{color:#fff;text-decoration:none;font-size:24px;font-weight:900;letter-spacing:-1px}.logo-b{color:var(--cyan)}
+.ssr-nav{margin-left:auto;display:flex;gap:16px}.ssr-nav a{color:#a8c7e8;text-decoration:none;font-weight:700;font-size:14px}
+.ssr-page{padding:28px 0 56px;max-width:860px}
+.ssr-page h1{font-size:clamp(26px,4.4vw,38px);letter-spacing:-1px;line-height:1.1;margin:8px 0 12px}
+.ssr-page h2{font-size:19px;margin:26px 0 10px}
+.crumbs{font-size:13px;color:var(--muted);margin:0}.crumbs a{color:#1264ac;text-decoration:none}
+.ssr-intro{color:var(--muted);line-height:1.6;margin:0 0 8px}
+.ssr-chips{list-style:none;display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:0}
+.ssr-chips a{display:inline-block;background:#edf5ff;color:#18538a;border-radius:999px;padding:7px 13px;font-weight:700;font-size:14px;text-decoration:none}
+.ssr-chips small{color:#6c7f97;font-weight:600;margin-left:3px}
+.ssr-list{list-style:none;padding:0;margin:22px 0 0;border-top:1px solid var(--line)}
+.ssr-item{border-bottom:1px solid var(--line)}
+.ssr-item-link{display:grid;grid-template-columns:96px 1fr auto;gap:14px;align-items:center;padding:14px 0;text-decoration:none;color:var(--ink)}
+.ssr-thumb{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:linear-gradient(135deg,#e9f4ff,#f1edff);display:block}
+.ssr-item-txt{display:flex;flex-direction:column;gap:4px;min-width:0}.ssr-item-txt b{color:#1264ac;font-size:17px;line-height:1.3}.ssr-item-txt small{color:var(--muted)}
+.ssr-item-price{font-weight:900;font-size:18px;white-space:nowrap}
+.ssr-pager{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:20px 0}.ssr-pager a{color:#1264ac;font-weight:800;text-decoration:none}
+.ssr-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.ssr-cta .btn{text-decoration:none;display:inline-block}
+.ssr-foot{padding:18px 0 32px;color:var(--muted);font-size:13px}.ssr-foot a{color:#1264ac}
+@media(max-width:560px){.ssr-item-link{grid-template-columns:72px 1fr}.ssr-thumb{width:72px;height:72px}.ssr-item-price{grid-column:2;font-size:16px}}

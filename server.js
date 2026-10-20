@@ -102,8 +102,9 @@ if(compression)app.use(compression());
 app.use(express.json({limit:'6mb'}));
 app.use(cookieParser());
 // Cache scurt (10 s) pentru căutările publice; se golește la orice modificare de anunțuri/conturi.
+let SEO_IDX=null;
 const LIST_CACHE=new Map(),LIST_CACHE_TTL=10000,LIST_CACHE_MAX=300;
-app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listings|admin\/users|account)/.test(req.path))res.on('finish',()=>LIST_CACHE.clear());next();});
+app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listings|admin\/users|account)/.test(req.path))res.on('finish',()=>{LIST_CACHE.clear();SEO_IDX=null;});next();});
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 /* ===== BOT-GUARD:START — verificare de browser, limitare cereri, blocare scrapere ===== */
 const dns=require('dns').promises;
@@ -173,7 +174,7 @@ app.use(async(req,res,next)=>{
   }
   if(!BOT_CHECK)return next();
   if(req.method==='GET'){
-   if(SOCIAL_RE.test(ua)&&/^\/piese\//.test(p))return next();   // previzualizări WhatsApp/Facebook pentru linkurile de anunț
+   if(SOCIAL_RE.test(ua)&&/^\/piese(-auto)?\//.test(p))return next();   // previzualizări WhatsApp/Facebook pentru linkurile de anunț
    if(await verifiedBot(ip,ua))return next();                     // Google/Bing/Apple/Yandex verificați prin DNS
   }
   if(!ua||BAD_UA_RE.test(ua))return res.status(403).type('text/plain').send('Acces refuzat.');
@@ -220,6 +221,11 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE TABLE IF NOT EXISTS admin_activity (
  id SERIAL PRIMARY KEY, admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL, action TEXT NOT NULL, target_type TEXT, target_id INTEGER, details TEXT DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS site_events (
+ id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, kind TEXT NOT NULL, target_type TEXT, target_id INTEGER, details TEXT DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS site_events_created_idx ON site_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS site_events_kind_idx ON site_events(kind,created_at DESC);
 CREATE TABLE IF NOT EXISTS sessions (
  id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT UNIQUE NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -388,6 +394,8 @@ async function auth(req,res,next){
   next();
  }catch(e){console.error(e);return res.status(401).json({error:'AUTH_REQUIRED'});}
 }
+// Jurnal de evenimente de pe site (vizibil în Admin → Evenimente). Nu blochează și nu strică niciodată cererea.
+function logEvent(uid,kind,type,id,details){if(!pool)return;const tid=id==null?null:Number(id);pool.query('INSERT INTO site_events(user_id,kind,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[uid||null,String(kind).slice(0,40),type||null,Number.isInteger(tid)?tid:null,String(details||'').slice(0,300)]).catch(e=>console.error('site_events',e.message));}
 function admin(req,res,next){if(req.user.role!=='admin')return res.status(403).json({error:'ADMIN_ONLY'});next();}
 function needVerified(req,res,next){if(REQUIRE_VERIFIED&&!req.user.email_verified&&req.user.role!=='admin')return res.status(403).json({error:'EMAIL_NOT_VERIFIED'});next();}
 function requireDb(req,res,next){if(!pool)return res.status(503).json({error:'DATABASE_NOT_CONFIGURED',message:'Configurează DATABASE_URL în Render.'});next();}
@@ -1047,6 +1055,7 @@ app.patch('/api/listings/:id/status',auth,requireDb,async(req,res)=>{
  // Proprietarul poate comuta doar între „publicat” și „vândut”; restul statusurilor (moderare) rămân la admin.
  const r=await pool.query("UPDATE listings SET status=$1 WHERE id=$2 AND user_id=$3 AND status IN ('approved','sold') RETURNING id,status",[to,req.params.id,req.user.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ logEvent(req.user.id,to==='sold'?'listing_sold':'listing_resale','listing',r.rows[0].id,'');
  res.json({listing:r.rows[0]});
 });
 app.delete('/api/listings/:id',auth,requireDb,async(req,res)=>{
@@ -1116,6 +1125,7 @@ app.post('/api/account/delete',requireDb,auth,ah(async(req,res)=>{
     await c.query('DELETE FROM users WHERE id=$1',[req.user.id]);
     await c.query('COMMIT');
   }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
+  logEvent(null,'account_delete','user',req.user.id,(req.user.nickname||req.user.name||'')+' · '+(req.user.email||''));
   res.clearCookie('session',{httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/'});
   res.json({ok:true});
 }));
@@ -1212,6 +1222,7 @@ app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
  const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING *`,
   [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail]);
  if(NEW_LISTING_STATUS==='approved')alertForListings([r.rows[0].id]);
+ logEvent(req.user.id,'listing_create','listing',r.rows[0].id,v.title);
  res.status(201).json({listing:r.rows[0]});
 });
 // Anunțul propriu, cu toate pozele, în orice stare (pentru formularul de editare).
@@ -1243,6 +1254,7 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
  }
  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24 WHERE id=$18 AND user_id=$19 RETURNING id,status',
   [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine]);
+ logEvent(req.user.id,'listing_edit','listing',cur.id,v.title+(status==='pending'&&cur.status!=='pending'?' (retrimis la moderare)':''));
  res.json({listing:r.rows[0],resubmitted:status==='pending'&&cur.status!=='pending'});
 });
 
@@ -1313,6 +1325,38 @@ app.get('/api/admin/offers',auth,admin,requireDb,ah(async(req,res)=>{const r=awa
 app.get('/api/admin/orders',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.title,o.price,o.status,o.created_at,u.name seller_name,b.name buyer_name FROM orders o LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=o.buyer_id ORDER BY o.created_at DESC LIMIT 300');res.json({orders:r.rows});}));
 app.get('/api/admin/activity',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT a.*,u.name admin_name,u.email admin_email FROM admin_activity a LEFT JOIN users u ON u.id=a.admin_id ORDER BY a.created_at DESC LIMIT 500');res.json({activity:r.rows});});
 app.get('/api/admin/reports',auth,admin,requireDb,async(req,res)=>{const r=await pool.query(`SELECT r.*,l.title listing_title,u.name reporter_name FROM reports r LEFT JOIN listings l ON l.id=r.listing_id LEFT JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`);res.json({reports:r.rows});});
+app.get('/api/admin/events',auth,admin,requireDb,ah(async(req,res)=>{
+ const kind=String(req.query.kind||'').slice(0,40);
+ const r=await pool.query(`SELECT e.id,e.kind,e.target_type,e.target_id,e.details,e.created_at,e.user_id,COALESCE(u.nickname,u.name) user_name,u.email user_email FROM site_events e LEFT JOIN users u ON u.id=e.user_id ${kind?'WHERE e.kind=$1':''} ORDER BY e.created_at DESC,e.id DESC LIMIT 300`,kind?[kind]:[]);
+ res.json({events:r.rows});
+}));
+// Rezumat pentru funcțiile noi: vacanță, blocări, calificative, căutări salvate, sesiuni, importuri.
+app.get('/api/admin/features',auth,admin,requireDb,ah(async(req,res)=>{
+ const q=(sql,p)=>pool.query(sql,p).catch(e=>{console.error('admin/features',e.message);return {rows:[]};});
+ const [vac,blk,blkN,sr,br,ss,ses,imp,sc,bc]=await Promise.all([
+  q(`SELECT u.id,COALESCE(u.nickname,u.name) name,u.email,u.vacation_until::text until,(SELECT COUNT(*)::int FROM listings l WHERE l.user_id=u.id AND l.status='approved') ads FROM users u WHERE ${VAC_SQL('u')} ORDER BY u.id DESC LIMIT 200`),
+  q('SELECT b.created_at,b.blocker_id,COALESCE(x.nickname,x.name) blocker,b.blocked_id,COALESCE(y.nickname,y.name) blocked FROM user_blocks b JOIN users x ON x.id=b.blocker_id JOIN users y ON y.id=b.blocked_id ORDER BY b.created_at DESC LIMIT 100'),
+  q('SELECT COUNT(*)::int n FROM user_blocks'),
+  q("SELECT 'seller' kind,r.id,r.stars,r.comment,r.created_at,r.order_id,r.buyer_id rater_id,COALESCE(b.nickname,b.name) rater,r.seller_id rated_id,COALESCE(s.nickname,s.name) rated FROM seller_ratings r JOIN users b ON b.id=r.buyer_id JOIN users s ON s.id=r.seller_id ORDER BY r.created_at DESC LIMIT 100"),
+  q("SELECT 'buyer' kind,r.id,r.stars,r.comment,r.created_at,r.order_id,r.seller_id rater_id,COALESCE(s.nickname,s.name) rater,r.buyer_id rated_id,COALESCE(b.nickname,b.name) rated FROM buyer_ratings r JOIN users b ON b.id=r.buyer_id JOIN users s ON s.id=r.seller_id ORDER BY r.created_at DESC LIMIT 100"),
+  q('SELECT COUNT(*)::int total,COUNT(*) FILTER (WHERE alerts)::int alerts FROM saved_searches'),
+  q('SELECT COUNT(*)::int n,COUNT(DISTINCT user_id)::int users FROM sessions WHERE expires_at>NOW()'),
+  q("SELECT COUNT(*)::int n FROM site_events WHERE kind='import' AND created_at>NOW()-INTERVAL '30 days'"),
+  q('SELECT COUNT(*)::int n,COALESCE(ROUND(AVG(stars),2),0)::float avg FROM seller_ratings'),
+  q('SELECT COUNT(*)::int n,COALESCE(ROUND(AVG(stars),2),0)::float avg FROM buyer_ratings')
+ ]);
+ const ratings=[...sr.rows,...br.rows].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,100);
+ res.json({vacation:vac.rows,blocks:{total:(blkN.rows[0]||{}).n||0,latest:blk.rows},ratings:{seller:sc.rows[0]||{n:0,avg:0},buyer:bc.rows[0]||{n:0,avg:0},latest:ratings},saved:ss.rows[0]||{total:0,alerts:0},sessions:ses.rows[0]||{n:0,users:0},imports30:(imp.rows[0]||{}).n||0});
+}));
+// Șterge un calificativ abuziv (rămâne urma în jurnalul de activitate).
+app.delete('/api/admin/ratings/:kind/:id',auth,admin,requireDb,ah(async(req,res)=>{
+ const tbl={seller:'seller_ratings',buyer:'buyer_ratings'}[req.params.kind];
+ if(!tbl||!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
+ const d=await pool.query(`DELETE FROM ${tbl} WHERE id=$1 RETURNING id,stars`,[Number(req.params.id)]);
+ if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_rating',req.params.kind+'_rating',d.rows[0].id,d.rows[0].stars+' stele']);
+ res.json({ok:true});
+}));
 app.patch('/api/admin/reports/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','reviewed','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE reports SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_report','report',req.params.id,status]);res.json({report:r.rows[0]});});
 app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempts,'rep:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {listing_id,reason,details}=req.body||{};if(!/^\d{1,10}$/.test(String(listing_id))||typeof reason!=='string'||!reason.trim()||reason.length>200)return res.status(400).json({error:'DATE_INVALIDE'});if(!(await pool.query('SELECT 1 FROM listings WHERE id=$1',[listing_id])).rowCount)return res.status(404).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO reports(listing_id,reporter_id,reason,details) VALUES($1,$2,$3,$4) RETURNING *',[listing_id,req.user.id,reason.trim(),String(details||'').slice(0,2000)]);res.status(201).json({report:r.rows[0]});});
 
@@ -1539,6 +1583,7 @@ app.put('/api/orders/:id(\\d+)/rating',auth,requireDb,ah(async(req,res)=>{
   ON CONFLICT(order_id) DO UPDATE SET stars=EXCLUDED.stars,comment=EXCLUDED.comment,updated_at=NOW()`,[o.id,o.seller_id,o.buyer_id,stars,comment]);
  if(!prev)await notify(rated,'Ai primit un calificativ de '+stars+' '+(stars===1?'stea':'stele')+' pentru comanda „'+(o.title||'piesă')+'”.','rating');
  const rt=(await pool.query(`SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM ${tbl} WHERE ${col}=$1`,[rated])).rows[0];
+ logEvent(req.user.id,prev?'rating_edit':'rating','order',o.id,stars+'★ pentru '+(asBuyer?'vânzătorul':'cumpărătorul')+' #'+rated+(comment?' · '+comment.slice(0,120):''));
  res.json({ok:true,stars,comment,rating:{avg:rt.avg,count:rt.n}});
 }));
 // Public: media și ultimele calificative ale unui utilizator, separat ca vânzător și ca cumpărător.
@@ -1618,6 +1663,7 @@ app.post('/api/listings/import',auth,needVerified,requireDb,ah(async(req,res)=>{
   await client.query('COMMIT');
  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
  if(NEW_LISTING_STATUS==='approved'&&ids.length)alertForListings(ids);
+ logEvent(req.user.id,'import','user',req.user.id,ids.length+' anunțuri importate, '+bad.length+' respinse din '+rows.length+' rânduri');
  res.status(201).json({dry:false,total:rows.length,imported:ids.length,invalid:bad.length,errors:bad.slice(0,100),status:NEW_LISTING_STATUS});
 }));
 
@@ -1647,6 +1693,7 @@ app.put('/api/account/vacation',requireDb,auth,ah(async(req,res)=>{
   until=v;
  }
  const r=await pool.query('UPDATE users SET vacation=$1,vacation_until=$2 WHERE id=$3 RETURNING vacation,vacation_until::text vacation_until',[on,until,req.user.id]);
+ logEvent(req.user.id,on?'vacation_on':'vacation_off','user',req.user.id,on?(until?'până la '+until:'fără dată'):'');
  res.json({vacation:r.rows[0].vacation,vacation_until:r.rows[0].vacation_until});
 }));
 /* ===== Utilizatori blocați ===== */
@@ -1667,12 +1714,14 @@ app.post('/api/blocks',auth,requireDb,ah(async(req,res)=>{
  if(!t)return res.status(404).json({error:'NOT_FOUND'});
  if(t.role==='admin')return res.status(400).json({error:'NU_SE_POATE_BLOCA'});
  if(Number((await pool.query('SELECT COUNT(*) n FROM user_blocks WHERE blocker_id=$1',[req.user.id])).rows[0].n)>=200)return res.status(400).json({error:'MAX_BLOCARI'});
- await pool.query('INSERT INTO user_blocks(blocker_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[req.user.id,id]);
+ const ib=await pool.query('INSERT INTO user_blocks(blocker_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[req.user.id,id]);
+ if(ib.rowCount)logEvent(req.user.id,'block','user',id,'');
  res.json({ok:true});
 }));
 app.delete('/api/blocks/:uid',auth,requireDb,ah(async(req,res)=>{
  if(!/^\d{1,10}$/.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
- await pool.query('DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2',[req.user.id,Number(req.params.uid)]);
+ const db=await pool.query('DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2',[req.user.id,Number(req.params.uid)]);
+ if(db.rowCount)logEvent(req.user.id,'unblock','user',Number(req.params.uid),'');
  res.json({ok:true});
 }));
 /* ===== Căutări salvate + alerte pentru anunțuri noi =====
@@ -1736,10 +1785,133 @@ app.delete('/api/saved-searches/:id',auth,requireDb,ah(async(req,res)=>{
 app.get('/robots.txt',(req,res)=>{res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\n\n${['GPTBot','ChatGPT-User','OAI-SearchBot','ClaudeBot','anthropic-ai','Google-Extended','CCBot','PerplexityBot','Bytespider','Amazonbot','Applebot-Extended','Diffbot','ImagesiftBot','Omgilibot','cohere-ai','meta-externalagent'].map(b=>`User-agent: ${b}\nDisallow: /\n`).join('\n')}\nSitemap: ${appBaseUrl(req)}/sitemap.xml\n`);});
 app.get('/sitemap.xml',async(req,res)=>{
  const base=appBaseUrl(req); const urls=[base+'/'];
+ if(pool){try{const ix=await getSeoIndex();urls.push(base+'/piese-auto');for(const c of ix.catBySlug.values())urls.push(`${base}/piese-auto/${c.slug}`);for(const m of ix.makeBySlug.values()){urls.push(`${base}/piese-auto/${m.slug}`);for(const d of m.models.values()){urls.push(`${base}/piese-auto/${m.slug}/${d.slug}`);for(const c of d.cats.values())if(c.n>=SEO_MIN_COMBO)urls.push(`${base}/piese-auto/${m.slug}/${d.slug}/${c.slug}`);}}}catch(e){console.error(e);}}
  if(pool){try{const r=await pool.query("SELECT l.id,l.title,l.created_at FROM listings l WHERE l.status='approved' AND "+NOT_VAC_LISTING+" ORDER BY l.created_at DESC LIMIT 5000");urls.push(...r.rows.map(x=>`${base}/piese/${x.id}-${slugify(x.title)}`));}catch(e){console.error(e);}}
  res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map(u=>`<url><loc>${escapeXml(u)}</loc></url>`).join('')+'</urlset>');
 });
 function escapeXml(s){return String(s).replace(/[<>&'"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]));}
+/* ===== SEO: pagini pe categorie, marcă și model (/piese-auto/...) ===== */
+const SEO_PAGE_SIZE=30, SEO_IDX_TTL=5*60*1000, SEO_MIN_COMBO=Math.max(1,Math.floor(Number(process.env.SEO_MIN_COMBO))||2);
+const seoKey=s=>norm(s).replace(/\s+/g,'');
+function seoPlural(n,one,many){return n===1?`1 ${one}`:`${new Intl.NumberFormat('ro-RO').format(n)} ${many}`;}
+// Index în memorie: categorii, mărci și modele care au cel puțin un anunț aprobat (se reface la 5 minute sau după modificări).
+async function getSeoIndex(){
+ if(SEO_IDX&&Date.now()-SEO_IDX.at<SEO_IDX_TTL)return SEO_IDX;
+ const r=await pool.query(`SELECT l.category,l.make,l.model,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} GROUP BY l.category,l.make,l.model`);
+ const cats=new Map(),makes=new Map();
+ const bump=(map,key,name,n)=>{let e=map.get(key);if(!e){e={key,n:0,names:new Map()};map.set(key,e);}e.n+=n;e.names.set(name,(e.names.get(name)||0)+n);return e;};
+ for(const row of r.rows){
+  const cat=String(row.category||'').trim(),mk=String(row.make||'').trim(),md=String(row.model||'').trim();
+  if(cat&&CATEGORIES.includes(cat))bump(cats,seoKey(cat),cat,row.n);
+  if(mk){const m=bump(makes,seoKey(mk),mk,row.n);m.models=m.models||new Map();if(md){const me=bump(m.models,seoKey(md),md,row.n);if(cat&&CATEGORIES.includes(cat)){me.cats=me.cats||new Map();bump(me.cats,seoKey(cat),cat,row.n);}}}
+ }
+ const best=e=>[...e.names.entries()].sort((a,b)=>b[1]-a[1])[0][0];
+ const fin=map=>{const out=new Map();for(const e of map.values()){e.name=best(e);e.slug=slugify(e.name);if(e.slug)out.set(e.slug,e);}return out;};
+ const catBySlug=fin(cats),makeBySlug=fin(makes);
+ for(const m of makeBySlug.values()){m.models=m.models?fin(m.models):new Map();for(const d of m.models.values())d.cats=d.cats?fin(d.cats):new Map();}
+ SEO_IDX={at:Date.now(),catBySlug,makeBySlug};
+ return SEO_IDX;
+}
+
+function seoShell(req,{title,desc,canonical,robots,ld,body,prev,next}){
+ const ldTags=(ld||[]).map(o=>`<script type="application/ld+json">${JSON.stringify(o).replace(/</g,'\\u003c')}</script>`).join('');
+ const links=(prev?`<link rel="prev" href="${escapeHtml(prev)}">`:'')+(next?`<link rel="next" href="${escapeHtml(next)}">`:'');
+ return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(desc)}">${robots?`<meta name="robots" content="${robots}">`:''}<link rel="canonical" href="${escapeHtml(canonical)}">${links}<meta property="og:type" content="website"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(desc)}"><meta property="og:url" content="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css">${ldTags}</head><body class="ssr-body"><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Piese</span></a><nav class="ssr-nav"><a href="/piese-auto">Categorii</a><a href="/#/rezultate">Caută piese</a></nav></div></header><main class="container ssr-page">${body}</main><footer class="ssr-foot container"><a href="/">AutoPiese</a> · <a href="/piese-auto">Piese auto pe categorii și mărci</a></footer></body></html>`;
+}
+const seoCrumbs=(items)=>`<nav class="crumbs" aria-label="Navigare">${items.map((c,i)=>i===items.length-1?`<span>${escapeHtml(c[0])}</span>`:`<a href="${escapeHtml(c[1])}">${escapeHtml(c[0])}</a>`).join(' › ')}</nav>`;
+const seoCrumbLd=(base,items)=>({'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:items.map((c,i)=>({'@type':'ListItem',position:i+1,name:c[0],item:base+c[1]}))});
+const seoChips=(arr)=>arr.length?`<ul class="ssr-chips">${arr.map(([label,href,n])=>`<li><a href="${escapeHtml(href)}">${escapeHtml(label)} <small>${n}</small></a></li>`).join('')}</ul>`:'';
+function seoRow(x){
+ const price=Number(x.price||0)>0?new Intl.NumberFormat('ro-RO').format(Number(x.price))+' lei':'La cerere';
+ const img=Array.isArray(x.images)&&/^https?:\/\//.test(x.images[0]||'')?`<img class="ssr-thumb" src="${escapeHtml(x.images[0])}" alt="${escapeHtml(x.title)}" loading="lazy" width="96" height="96">`:'<span class="ssr-thumb ssr-thumb-empty" aria-hidden="true"></span>';
+ const meta=[x.make,x.model,x.year,x.condition,x.county].filter(Boolean).join(' · ');
+ return `<li class="ssr-item"><a class="ssr-item-link" href="/piese/${x.id}-${slugify(x.title)}">${img}<span class="ssr-item-txt"><b>${escapeHtml(x.title)}</b><small>${escapeHtml(meta)}</small></span><span class="ssr-item-price">${price}</span></a></li>`;
+}
+// Randează o pagină de listare (categorie / marcă / model) cu paginare, linkuri interne și date structurate.
+async function seoListingPage(req,res,o){
+ const page=Math.min(500,Math.max(1,Math.floor(Number(req.query.p))||1)), offset=(page-1)*SEO_PAGE_SIZE;
+ const {where,vals}=buildListingFilter(o.filter);
+ const [cnt,rows,agg]=await Promise.all([
+  pool.query(`SELECT COUNT(*)::int n FROM listings l WHERE ${where.join(' AND ')}`,vals),
+  pool.query(`SELECT l.id,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.images[1:1] AS images FROM listings l WHERE ${where.join(' AND ')} ORDER BY l.created_at DESC, l.id DESC LIMIT ${SEO_PAGE_SIZE} OFFSET ${offset}`,vals),
+  pool.query(`SELECT MIN(NULLIF(l.price,0)) pmin,MAX(l.price) pmax,COUNT(DISTINCT l.county)::int counties FROM listings l WHERE ${where.join(' AND ')}`,vals)
+ ]);
+ const total=cnt.rows[0].n; if(!total||(page>1&&!rows.rowCount))return seoNotFound(req,res);
+ const base=appBaseUrl(req), pages=Math.ceil(total/SEO_PAGE_SIZE);
+ const url=p=>base+o.path+(p>1?`?p=${p}`:'');
+ const a=agg.rows[0], pmin=Number(a.pmin||0), pmax=Number(a.pmax||0), fmt=n=>new Intl.NumberFormat('ro-RO').format(n);
+ const intro=`${o.intro} Găsești ${seoPlural(total,'anunț','anunțuri')} de la vânzători din ${a.counties>1?seoPlural(a.counties,'județ','județe'):'România'}${pmin?`, cu prețuri între ${fmt(pmin)} și ${fmt(pmax)} lei`:''}. Contactezi direct vânzătorul, fără comision.`;
+ const title=`${o.h1}${page>1?` – pagina ${page}`:''} | AutoPiese`;
+ const desc=`${o.h1}: ${seoPlural(total,'anunț','anunțuri')}${pmin?` de la ${fmt(pmin)} lei`:''}. Piese noi și second hand, contact direct cu vânzătorul pe AutoPiese.`.slice(0,158);
+ const pager=pages>1?`<nav class="ssr-pager" aria-label="Pagini">${page>1?`<a rel="prev" href="${escapeHtml(o.path+(page>2?`?p=${page-1}`:''))}">‹ Înapoi</a>`:'<span></span>'}<span>Pagina ${page} din ${pages}</span>${page<pages?`<a rel="next" href="${escapeHtml(o.path+`?p=${page+1}`)}">Înainte ›</a>`:'<span></span>'}</nav>`:'';
+ const ld=[seoCrumbLd(base,o.crumbs),{'@context':'https://schema.org','@type':'CollectionPage',name:o.h1,url:url(page),description:desc,mainEntity:{'@type':'ItemList',numberOfItems:total,itemListElement:rows.rows.map((x,i)=>({'@type':'ListItem',position:offset+i+1,url:`${base}/piese/${x.id}-${slugify(x.title)}`,name:x.title}))}}];
+ const body=`${seoCrumbs(o.crumbs)}<h1>${escapeHtml(o.h1)}</h1><p class="ssr-intro">${escapeHtml(intro)}</p>${o.extra||''}<ul class="ssr-list">${rows.rows.map(seoRow).join('')}</ul>${pager}<p class="ssr-cta"><a class="btn primary" href="${escapeHtml(o.spa)}">Filtrează și caută în rezultate</a> <a class="btn ghost" href="/#/cerere-noua">Cere oferte pentru piesa ta</a></p>`;
+ res.set('Cache-Control','public, max-age=300').type('html').send(seoShell(req,{title,desc,canonical:url(page),ld,body,prev:page>1?url(page-1):'',next:page<pages?url(page+1):''}));
+}
+function seoNotFound(req,res){
+ const body=`<h1>Nu am găsit anunțuri aici</h1><p class="ssr-intro">Momentan nu există anunțuri active pentru această pagină. Încearcă o altă categorie sau marcă.</p><p class="ssr-cta"><a class="btn primary" href="/piese-auto">Vezi toate categoriile</a></p>`;
+ res.status(404).set('Cache-Control','no-store').type('html').send(seoShell(req,{title:'Pagină indisponibilă | AutoPiese',desc:'Pagina nu mai are anunțuri active.',canonical:appBaseUrl(req)+'/piese-auto',robots:'noindex,follow',body}));
+}
+const topN=(map,n)=>[...map.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name,'ro')).slice(0,n);
+
+// Hub: toate categoriile și mărcile cu anunțuri.
+app.get('/piese-auto',ah(async(req,res,next)=>{
+ if(!pool)return next();
+ const ix=await getSeoIndex(),base=appBaseUrl(req);
+ if(!ix.catBySlug.size&&!ix.makeBySlug.size)return seoNotFound(req,res);
+ const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto']];
+ const body=`${seoCrumbs(crumbs)}<h1>Piese auto second hand și noi</h1><p class="ssr-intro">Răsfoiește anunțurile pe categorie de piese sau pe marca mașinii tale.</p><h2>Categorii</h2>${seoChips(topN(ix.catBySlug,60).map(e=>[e.name,`/piese-auto/${e.slug}`,e.n]))}<h2>Mărci auto</h2>${seoChips(topN(ix.makeBySlug,300).map(e=>[e.name,`/piese-auto/${e.slug}`,e.n]))}`;
+ res.set('Cache-Control','public, max-age=300').type('html').send(seoShell(req,{title:'Piese auto pe categorii și mărci | AutoPiese',desc:'Piese auto noi și second hand, pe categorii și mărci. Contact direct cu vânzătorul.',canonical:base+'/piese-auto',ld:[seoCrumbLd(base,crumbs)],body}));
+}));
+// Categorie sau marcă (categoria are prioritate la același slug).
+app.get('/piese-auto/:slug',ah(async(req,res,next)=>{
+ if(!pool)return next();
+ const slug=String(req.params.slug||'').toLowerCase(); if(!/^[a-z0-9-]{1,120}$/.test(slug))return next();
+ const ix=await getSeoIndex();
+ const cat=ix.catBySlug.get(slug);
+ if(cat){
+  const byMake=new Map();
+  const r=await pool.query(`SELECT l.make,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${flat('l.category')}=$1 AND COALESCE(l.make,'')<>'' GROUP BY l.make`,[cat.key]);
+  const mkByKey=new Map([...ix.makeBySlug.values()].map(m=>[m.key,m]));
+  for(const row of r.rows){const m=mkByKey.get(seoKey(row.make));if(m)byMake.set(m.slug,{name:m.name,slug:m.slug,n:(byMake.get(m.slug)?.n||0)+row.n});}
+  const makes=topN(byMake,24);
+  const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[cat.name,`/piese-auto/${cat.slug}`]];
+  const extra=makes.length?`<h2>${escapeHtml(cat.name)} după marcă</h2>${seoChips(makes.map(m=>[m.name,`/piese-auto/${m.slug}`,m.n]))}`:'';
+  return seoListingPage(req,res,{filter:{category:cat.name},path:`/piese-auto/${cat.slug}`,spa:`/#/rezultate?category=${encodeURIComponent(cat.name)}`,h1:`${cat.name} – piese auto second hand și noi`,intro:`Anunțuri pentru ${cat.name.toLowerCase()} de la vânzători din toată țara.`,crumbs,extra});
+ }
+ const mk=ix.makeBySlug.get(slug);
+ if(!mk)return seoNotFound(req,res);
+ const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`]];
+ const extra=mk.models.size?`<h2>Modele ${escapeHtml(mk.name)}</h2>${seoChips(topN(mk.models,60).map(m=>[`${mk.name} ${m.name}`,`/piese-auto/${mk.slug}/${m.slug}`,m.n]))}`:'';
+ return seoListingPage(req,res,{filter:{make:mk.name},path:`/piese-auto/${mk.slug}`,spa:`/#/rezultate?make=${encodeURIComponent(mk.name)}`,h1:`Piese auto ${mk.name} – second hand și noi`,intro:`Piese pentru mașini ${mk.name}: caroserie, motor, suspensie, frâne și altele.`,crumbs,extra});
+}));
+// Model: /piese-auto/skoda/superb
+app.get('/piese-auto/:make/:model',ah(async(req,res,next)=>{
+ if(!pool)return next();
+ const ms=String(req.params.make||'').toLowerCase(),ds=String(req.params.model||'').toLowerCase();
+ if(!/^[a-z0-9-]{1,120}$/.test(ms)||!/^[a-z0-9-]{1,120}$/.test(ds))return next();
+ const ix=await getSeoIndex(),mk=ix.makeBySlug.get(ms),md=mk&&mk.models.get(ds);
+ if(!md)return seoNotFound(req,res);
+ const r=await pool.query(`SELECT l.category,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${flat('l.make')}=$1 AND ${flat('l.model')}=$2 AND COALESCE(l.category,'')<>'' GROUP BY l.category ORDER BY n DESC`,[mk.key,md.key]);
+ const full=`${mk.name} ${md.name}`;
+ const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`],[md.name,`/piese-auto/${mk.slug}/${md.slug}`]];
+ const extra=r.rows.length?`<h2>Categorii de piese pentru ${escapeHtml(full)}</h2>${seoChips(r.rows.map(x=>{const cs=slugify(x.category),ce=md.cats.get(cs);return [x.category,ce&&ce.n>=SEO_MIN_COMBO?`/piese-auto/${mk.slug}/${md.slug}/${cs}`:`/#/rezultate?make=${encodeURIComponent(mk.name)}&model=${encodeURIComponent(md.name)}&category=${encodeURIComponent(x.category)}`,x.n];}))}`:'';
+ return seoListingPage(req,res,{filter:{make:mk.name,model:md.name},path:`/piese-auto/${mk.slug}/${md.slug}`,spa:`/#/rezultate?make=${encodeURIComponent(mk.name)}&model=${encodeURIComponent(md.name)}`,h1:`Piese auto ${full} – second hand și noi`,intro:`Piese pentru ${full}, de la parcuri de dezmembrări, firme și persoane fizice.`,crumbs,extra});
+}));
+
+// Categorie + marcă + model: /piese-auto/skoda/superb/caroserie (doar cu cel puțin SEO_MIN_COMBO anunțuri)
+app.get('/piese-auto/:make/:model/:cat',ah(async(req,res,next)=>{
+ if(!pool)return next();
+ const ms=String(req.params.make||'').toLowerCase(),ds=String(req.params.model||'').toLowerCase(),cs=String(req.params.cat||'').toLowerCase();
+ if(![ms,ds,cs].every(v=>/^[a-z0-9-]{1,120}$/.test(v)))return next();
+ const ix=await getSeoIndex(),mk=ix.makeBySlug.get(ms),md=mk&&mk.models.get(ds),ce=md&&md.cats.get(cs);
+ if(!ce||ce.n<SEO_MIN_COMBO)return seoNotFound(req,res);
+ const full=`${mk.name} ${md.name}`, base=`/piese-auto/${mk.slug}/${md.slug}`;
+ const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`],[md.name,base],[ce.name,`${base}/${ce.slug}`]];
+ const others=topN(md.cats,30).filter(c=>c.slug!==ce.slug&&c.n>=SEO_MIN_COMBO).map(c=>[`${c.name} ${full}`,`${base}/${c.slug}`,c.n]);
+ const extra=`<p class="ssr-intro"><a href="${escapeHtml(base)}">Toate piesele pentru ${escapeHtml(full)}</a> · <a href="${escapeHtml('/piese-auto/'+ce.slug)}">${escapeHtml(ce.name)} pentru alte mărci</a></p>${others.length?`<h2>Alte piese pentru ${escapeHtml(full)}</h2>${seoChips(others)}`:''}`;
+ return seoListingPage(req,res,{filter:{make:mk.name,model:md.name,category:ce.name},path:`${base}/${ce.slug}`,spa:`/#/rezultate?make=${encodeURIComponent(mk.name)}&model=${encodeURIComponent(md.name)}&category=${encodeURIComponent(ce.name)}`,h1:`${ce.name} ${full} – second hand și noi`,intro:`${ce.name} pentru ${full}, de la parcuri de dezmembrări, firme și persoane fizice.`,crumbs,extra});
+}));
 app.get('/piese/:idSlug',async(req,res,next)=>{
  if(!pool)return next();
  const id=Number(String(req.params.idSlug).split('-')[0]); if(!Number.isInteger(id)||id<=0)return next();
@@ -1771,6 +1943,7 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
     const ping=()=>fetch(selfUrl.replace(/\/$/,'')+'/api/health',{signal:AbortSignal.timeout(15000)}).catch(()=>{});
     setInterval(ping,10*60*1000).unref(); setTimeout(ping,60*1000).unref();
   }
+  if(pool)setInterval(()=>pool.query("DELETE FROM site_events WHERE created_at<NOW()-INTERVAL '180 days'").catch(()=>{}),6*3600*1000).unref();
   if(pool)setInterval(()=>pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'").catch(()=>{}),30*60*1000).unref();
   if(pool){purgeStats();setInterval(purgeStats,60*60*1000).unref();}
   if(pool)setInterval(()=>pool.query('DELETE FROM sessions WHERE expires_at < NOW()').catch(e=>console.error('session cleanup',e.message)),60*60*1000).unref();
