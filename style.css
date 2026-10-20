@@ -1764,3 +1764,34 @@ h1,h2{text-wrap:wrap}
 .nav-badge:empty,.cnt:empty{display:none}
 .cnt{display:inline-block;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:#c62828;color:#fff;font:800 12px/22px Inter,system-ui,sans-serif;font-style:normal;text-align:center;vertical-align:middle;margin-left:6px}
 .account-sections details button .cnt{margin-left:auto;margin-right:10px}
+
+
+/* ===== Calificative (stele) ===== */
+.stars{display:inline-block;font-size:17px;letter-spacing:2px;line-height:1;vertical-align:middle;background:linear-gradient(90deg,#d99a1b var(--p,0%),#d5dae2 var(--p,0%));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.rate-line{margin:4px 0 10px;font-size:14px}
+.rate-stars{display:flex;gap:6px;margin:6px 0 10px}
+.rate-stars button{border:0;background:none;font-size:38px;line-height:1;color:#d5dae2;cursor:pointer;padding:2px 3px;transition:transform .12s ease,color .12s ease}
+.rate-stars button.on{color:#d99a1b}
+.rate-stars button:active{transform:scale(.88)}
+.rate-list{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;max-height:260px;overflow:auto}
+.rate-item{padding:10px 0;border-bottom:1px solid #edf1f5;font-size:14px}
+.rate-item:last-child{border-bottom:0}
+.rate-item small{color:var(--muted);margin-left:6px}
+.rate-item p{margin:6px 0 0;line-height:1.45}
+
+/* ===== Import CSV ===== */
+.mine-tool-wide{grid-column:1 / -1}
+.csv-actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.csv-pick{display:inline-flex;align-items:center;cursor:pointer}
+.csv-help{margin:6px 0 12px;font-size:13px;line-height:1.55}
+.csv-help summary{cursor:pointer;font-weight:800;color:#18538a}
+.csv-status{margin:10px 0;font-weight:700}
+.csv-status.ok{color:#1c6d42}
+.csv-status.bad{color:#b42332}
+.csv-errors{max-height:260px;overflow:auto;margin-bottom:12px;font-size:13px}
+.csv-errors div{padding:7px 0;border-bottom:1px solid #edf1f5;line-height:1.4}
+.csv-errors b{color:#b42332}
+
+.rate-inline{white-space:nowrap}.rate-inline .stars{font-size:13px;letter-spacing:1px}.rate-inline small{color:var(--muted)}
+.rate-line{display:block}.seller-head .rate-line{margin:3px 0 0;font-size:13px}.seller-head .rate-line .stars{font-size:15px}
+.req-offer-head .rate-line{margin:3px 0 0;font-size:13px}

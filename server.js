@@ -321,6 +321,10 @@ async function dbReady(){
   'CREATE TABLE IF NOT EXISTS login_attempts (key TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
   'CREATE INDEX IF NOT EXISTS login_attempts_key_idx ON login_attempts(key,at)',
   'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS kind TEXT',
+  'CREATE TABLE IF NOT EXISTS seller_ratings (id SERIAL PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, stars SMALLINT NOT NULL CHECK(stars BETWEEN 1 AND 5), comment TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ)',
+  'CREATE INDEX IF NOT EXISTS seller_ratings_seller_idx ON seller_ratings(seller_id)',
+  'CREATE TABLE IF NOT EXISTS buyer_ratings (id SERIAL PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, stars SMALLINT NOT NULL CHECK(stars BETWEEN 1 AND 5), comment TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ)',
+  'CREATE INDEX IF NOT EXISTS buyer_ratings_buyer_idx ON buyer_ratings(buyer_id)',
   'CREATE INDEX IF NOT EXISTS listings_status_created_idx ON listings(status,created_at DESC)',
   'CREATE INDEX IF NOT EXISTS listings_type_idx ON listings(type)',
   'CREATE INDEX IF NOT EXISTS listings_user_idx ON listings(user_id)',
@@ -902,7 +906,11 @@ app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
 const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.images[1:1] AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
-const SELLER_COLS="COALESCE(u.nickname,u.name) seller_name,u.created_at seller_since,(SELECT COUNT(*)::int FROM listings sl WHERE sl.user_id=l.user_id AND sl.status='approved') seller_ads";
+// Media calificativelor: ca vânzător (de la cumpărători) și ca cumpărător (de la vânzători).
+const RATE_SQL=(tbl,col,uid,al)=>`(SELECT ROUND(AVG(stars),1)::float FROM ${tbl} WHERE ${col}=${uid}) ${al}_avg,(SELECT COUNT(*)::int FROM ${tbl} WHERE ${col}=${uid}) ${al}_n`;
+const SELLER_RATE=(uid,al)=>RATE_SQL('seller_ratings','seller_id',uid,al);
+const BUYER_RATE=(uid,al)=>RATE_SQL('buyer_ratings','buyer_id',uid,al);
+const SELLER_COLS="COALESCE(u.nickname,u.name) seller_name,u.created_at seller_since,(SELECT COUNT(*)::int FROM listings sl WHERE sl.user_id=l.user_id AND sl.status='approved') seller_ads,"+SELLER_RATE('l.user_id','seller_rating');
 const LISTING_SELECT=`SELECT ${LIST_COLS},${SELLER_COLS} FROM listings l LEFT JOIN users u ON u.id=l.user_id`;
 const CATEGORIES=['Accesorii auto','Accesorii roți','Aprindere','Cabluri auto','Car audio','Caroserie','Climatizare','Direcție','Diverse','Electrică & Electronică Auto','Evacuare','Faruri stopuri lumini','Filtre auto','Frâne','Instalații GPL','Interioare auto','Întreținere auto','Jante & Anvelope','Navigație GPS','Pachete revizie','Piese moto','Piese motoare','Pompe și injectoare','Punte și rulmenți','Răcire','Scule auto','Suspensie','Transmisie','Tuning','Turbo','Ulei auto','Xenon',
  // nume vechi, păstrate doar ca anunțurile existente să rămână editabile (se migrează la pornire)
@@ -1062,7 +1070,7 @@ app.post('/api/listings/:id/bump',auth,requireDb,async(req,res)=>{
  res.json({listing:r.rows[0]});
 });
 app.get('/api/sellers',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
+ const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
  res.json({sellers:r.rows});
 });
 /* ===== Notificări email, export date, ștergere cont ===== */
@@ -1151,7 +1159,9 @@ app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const phones=u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[id])).rows:[];
  const isCompany=s.dism||(s.seller_type&&s.seller_type!=='Persoană fizică');
  const me=await optUserId(req); const blocked=me&&me!==id?(await blockState(me,id)).byMe:false;
- res.json({seller:{id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked}});
+ const rt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM seller_ratings WHERE seller_id=$1',[id])).rows[0];
+ const bt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM buyer_ratings WHERE buyer_id=$1',[id])).rows[0];
+ res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked}});
 }));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 function parseListing(x){
@@ -1237,7 +1247,7 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
 });
 
 app.get('/api/requests',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,COALESCE(u.nickname,u.name) user_name FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
  res.json({requests:r.rows});
 });
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
@@ -1247,7 +1257,7 @@ app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
 app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
  const q=await pool.query('SELECT id,title,make,model,year,variant,engine,vin,kind,county,city,ship_address,description,extra_parts,status,created_at,images FROM part_requests WHERE id=$1 AND user_id=$2',[req.params.id,req.user.id]);
  if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});
- const o=await pool.query("SELECT o.id,o.price,o.message,o.images,o.status,o.created_at,o.updated_at,o.seller_id,COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,u.phone user_phone FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
+ const o=await pool.query("SELECT o.id,o.price,o.message,o.images,o.status,o.created_at,o.updated_at,o.seller_id,COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,u.phone user_phone,"+SELLER_RATE('o.seller_id','seller_rating')+" FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
  const ids=[...new Set(o.rows.filter(x=>x.status!=='rejected'&&x.seller_id).map(x=>x.seller_id))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  const offers=o.rows.map(x=>{
@@ -1258,7 +1268,7 @@ app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
  res.json({request:q.rows[0],offers});
 }));
 app.get('/api/requests/:id(\\d+)',requireDb,ah(async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images,COALESCE(u.nickname,u.name) user_name FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.id=$1 AND r.status='open'",[req.params.id]);
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.id=$1 AND r.status='open'",[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  res.json({request:r.rows[0]});
 }));
@@ -1345,7 +1355,7 @@ app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res
 }));
 app.get('/api/offers/mine',auth,requireDb,ah(async(req,res)=>{
  const one=/^\d{1,10}$/.test(String(req.query.id||''))?Number(req.query.id):0;
- const r=await pool.query("SELECT o.id,o.price,o.message,o.status,o.created_at,o.updated_at,"+(one?'o.images':'o.images[1:1]')+" images,"+(one?'q.images':'q.images[1:1]')+" req_images,q.id request_id,q.title request_title,q.user_id buyer_id,q.status request_status,q.make,q.model,q.year,q.variant,q.engine,q.kind,q.county,q.city,q.description,q.extra_parts,CASE WHEN o.status='accepted' THEN q.vin END vin,CASE WHEN o.status='accepted' THEN q.ship_address END ship_address,COALESCE(u.nickname,u.name) buyer_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=q.user_id WHERE o.seller_id=$1"+(one?' AND o.id=$2':'')+" ORDER BY o.created_at DESC LIMIT 200",one?[req.user.id,one]:[req.user.id]);
+ const r=await pool.query("SELECT o.id,o.price,o.message,o.status,o.created_at,o.updated_at,"+(one?'o.images':'o.images[1:1]')+" images,"+(one?'q.images':'q.images[1:1]')+" req_images,q.id request_id,q.title request_title,q.user_id buyer_id,q.status request_status,q.make,q.model,q.year,q.variant,q.engine,q.kind,q.county,q.city,q.description,q.extra_parts,CASE WHEN o.status='accepted' THEN q.vin END vin,CASE WHEN o.status='accepted' THEN q.ship_address END ship_address,COALESCE(u.nickname,u.name) buyer_name,"+BUYER_RATE('q.user_id','buyer_rating')+" FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=q.user_id WHERE o.seller_id=$1"+(one?' AND o.id=$2':'')+" ORDER BY o.created_at DESC LIMIT 200",one?[req.user.id,one]:[req.user.id]);
  const ids=[...new Set(r.rows.filter(x=>x.status==='accepted').map(x=>x.buyer_id))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  res.json({offers:r.rows.map(x=>({...x,phones:x.status==='accepted'?ph.filter(p=>p.user_id===x.buyer_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp})):[]}))});
@@ -1375,7 +1385,7 @@ app.post('/api/offers/:id/reject',auth,requireDb,ah(async(req,res)=>{
  res.json({ok:true});
 }));
 app.get('/api/offers/received',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,o.seller_id,q.id request_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
+ const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,o.seller_id,q.id request_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name,'+SELLER_RATE('o.seller_id','seller_rating')+' FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
  res.json({offers:r.rows});
 }));
 app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
@@ -1484,7 +1494,7 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  res.status(201).json({ok:true,order_id:r.rows[0].id});
 }));
 app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) other_name FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
+ const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) other_name,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
  const ids=[...new Set(r.rows.map(x=>x.other_id).filter(Boolean))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  res.json({orders:r.rows.map(x=>({...x,phones:ph.filter(p=>p.user_id===x.other_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp}))}))});
@@ -1507,6 +1517,109 @@ app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
  res.json({notifications:r.rows});
 }));
 app.post('/api/notifications/read',auth,requireDb,ah(async(req,res)=>{await pool.query('UPDATE notifications SET is_read=TRUE WHERE user_id=$1',[req.user.id]);res.json({ok:true});}));
+
+/* ===== Calificative pentru vânzători ===== */
+// Doar cumpărătorul unei comenzi FINALIZATE poate da (sau modifica) calificativul, o singură dată pe comandă.
+app.put('/api/orders/:id(\\d+)/rating',auth,requireDb,ah(async(req,res)=>{
+ if(!throttle(authAttempts,'rate:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+ const b=req.body||{}, stars=Number(b.stars);
+ if(!Number.isInteger(stars)||stars<1||stars>5)return res.status(400).json({error:'CALIFICATIV_INVALID'});
+ const comment=clip(b.comment,500);
+ if(comment&&/(https?:\/\/|www\.|\S+@\S+\.\S+)/i.test(comment))return res.status(400).json({error:'LINK_INTERZIS'});
+ const o=(await pool.query('SELECT id,buyer_id,seller_id,status,title FROM orders WHERE id=$1',[req.params.id])).rows[0];
+ if(!o||!o.buyer_id||!o.seller_id)return res.status(404).json({error:'NOT_FOUND'});
+ const asBuyer=o.buyer_id===req.user.id, asSeller=o.seller_id===req.user.id;
+ if(!asBuyer&&!asSeller)return res.status(404).json({error:'NOT_FOUND'});
+ if(asBuyer&&asSeller)return res.status(403).json({error:'INTERZIS'});
+ if(o.status!=='completed')return res.status(409).json({error:'COMANDA_NEFINALIZATA'});
+ // cumpărătorul califică vânzătorul (seller_ratings), vânzătorul califică cumpărătorul (buyer_ratings)
+ const tbl=asBuyer?'seller_ratings':'buyer_ratings', rated=asBuyer?o.seller_id:o.buyer_id, col=asBuyer?'seller_id':'buyer_id';
+ const prev=(await pool.query(`SELECT 1 FROM ${tbl} WHERE order_id=$1`,[o.id])).rowCount;
+ await pool.query(`INSERT INTO ${tbl}(order_id,seller_id,buyer_id,stars,comment) VALUES($1,$2,$3,$4,$5)
+  ON CONFLICT(order_id) DO UPDATE SET stars=EXCLUDED.stars,comment=EXCLUDED.comment,updated_at=NOW()`,[o.id,o.seller_id,o.buyer_id,stars,comment]);
+ if(!prev)await notify(rated,'Ai primit un calificativ de '+stars+' '+(stars===1?'stea':'stele')+' pentru comanda „'+(o.title||'piesă')+'”.','rating');
+ const rt=(await pool.query(`SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM ${tbl} WHERE ${col}=$1`,[rated])).rows[0];
+ res.json({ok:true,stars,comment,rating:{avg:rt.avg,count:rt.n}});
+}));
+// Public: media și ultimele calificative ale unui utilizator, separat ca vânzător și ca cumpărător.
+app.get('/api/sellers/:id(\\d+)/ratings',requireDb,ah(async(req,res)=>{
+ const id=Number(req.params.id);
+ const pack=async(tbl,rated,rater)=>{
+  const sum=(await pool.query(`SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM ${tbl} WHERE ${rated}=$1`,[id])).rows[0];
+  const list=(await pool.query(`SELECT r.stars,r.comment,r.created_at,COALESCE(NULLIF(u.nickname,''),split_part(u.name,' ',1),'Utilizator') who FROM ${tbl} r LEFT JOIN users u ON u.id=r.${rater} WHERE r.${rated}=$1 ORDER BY r.created_at DESC LIMIT 20`,[id])).rows;
+  return {avg:sum.avg,count:sum.n,ratings:list};
+ };
+ res.set('Cache-Control','no-store');
+ res.json({seller:await pack('seller_ratings','seller_id','buyer_id'),buyer:await pack('buyer_ratings','buyer_id','seller_id')});
+}));
+
+/* ===== Import CSV (parcuri de dezmembrări) ===== */
+const IMPORT_MAX_ROWS=300;
+const IMPORT_COUNTIES=['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
+const impKey=v=>String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const IMP_CAT=new Map(CATEGORIES.map(c=>[impKey(c),c])), IMP_COUNTY=new Map(IMPORT_COUNTIES.map(c=>[impKey(c),c]));
+const impYes=v=>/^(1|da|yes|true|y|x|adevarat)$/.test(impKey(v));
+const impNum=v=>{let t=String(v==null?'':v).toLowerCase().replace(/lei|ron|eur|€|\s/g,'');if(t==='')return 0;if(t.includes('.')&&t.includes(','))t=t.replace(/\./g,'').replace(',','.');else if(t.includes(','))t=t.replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');const n=Number(t);return Number.isFinite(n)?n:NaN;};
+const IMP_ERR={DATE_INVALIDE:'Date invalide (titlu, marcă, model sau județ)',PRET_NEREALIST:'Preț prea mic (pune 0 pentru „La cerere”)',LINK_INTERZIS:'Linkurile și adresele de email nu sunt permise în text',AN_INVALID:'An invalid (4 cifre, între 1950 și anul viitor)',STARE_INVALIDA:'Stare invalidă (Nouă sau Second-hand)'};
+function normImportRow(r){
+ const g=k=>r&&r[k]!=null?String(r[k]).trim():'';
+ const t=impKey(g('type'));
+ const type=(t===''||t.startsWith('piesa'))?'piesa':(t.startsWith('dezmembr')?'dezmembrari':null);
+ if(!type)return {err:'Tip necunoscut (folosește „piesa” sau „dezmembrari”)'};
+ if(g('title').length<3)return {err:'Titlu lipsă sau prea scurt'};
+ if(g('title').length>150)return {err:'Titlu prea lung (maximum 150 de caractere)'};
+ if(!g('make'))return {err:'Marca lipsește'};
+ if(!g('model'))return {err:'Modelul lipsește'};
+ const ck0=impKey(g('county')), county=IMP_COUNTY.get(ck0)||([...IMP_COUNTY].find(([k])=>ck0.startsWith(k+' '))||[])[1];
+ if(!g('county'))return {err:'Județul lipsește'};
+ if(!county)return {err:'Județ necunoscut: '+g('county').slice(0,30)};
+ const cat=g('category')?IMP_CAT.get(impKey(g('category'))):'Diverse';
+ if(!cat)return {err:'Categorie necunoscută: '+g('category').slice(0,40)};
+ const price=impNum(g('price')); if(Number.isNaN(price))return {err:'Preț invalid'};
+ let condition=g('condition'); const ck=impKey(condition);
+ if(ck===''||/^(second hand|sh|folosit|folosita|uzat|uzata|used)$/.test(ck))condition='Second-hand';
+ else if(/^(noua|nou|new)$/.test(ck))condition='Nouă'; else return {err:'Stare invalidă (Nouă sau Second-hand)'};
+ let seller_type=g('seller_type'); if(seller_type){const st=SELLER_TYPES.find(x=>impKey(x)===impKey(seller_type)); if(!st)return {err:'Tip vânzător necunoscut'}; seller_type=st;} else seller_type='Parc dezmembrări';
+ const km=g('km')===''?null:Number(String(g('km')).replace(/[^\d]/g,''));
+ if(g('km')!==''&&!Number.isFinite(km))return {err:'Kilometri invalizi'};
+ return {x:{type,title:g('title'),price,condition,make:g('make'),model:g('model'),year:g('year'),category:cat,subcategory:g('subcategory'),county,
+  quantity:g('quantity')===''?1:Math.max(1,Math.round(Number(g('quantity'))||1)),oem:g('oem'),engine:g('engine'),fuel:g('fuel'),km,vin:g('vin'),parts_avail:g('parts_avail'),
+  delivery:impYes(g('delivery')),negotiable:impYes(g('negotiable')),description:g('description'),seller_type,images:[]}};
+}
+// Rândurile vin deja separate în coloane de pe telefon/PC. {dry:true} doar verifică și nu salvează nimic.
+app.post('/api/listings/import',auth,needVerified,requireDb,ah(async(req,res)=>{
+ const b=req.body||{}, dry=!!b.dry, rows=b.rows;
+ if(!Array.isArray(rows)||!rows.length)return res.status(400).json({error:'CSV_GOL'});
+ if(rows.length>IMPORT_MAX_ROWS)return res.status(400).json({error:'PREA_MULTE_RANDURI'});
+ if(!throttle(authAttempts,(dry?'impd:':'imp:')+req.user.id,dry?40:10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+ const existing=await pool.query("SELECT lower(title) t,lower(COALESCE(oem,'')) o FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);
+ const seen=new Set(existing.rows.map(x=>x.t+'|'+x.o));
+ let room=Infinity;
+ if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);room=Math.max(0,ACTIVE_LISTINGS_LIMIT-act.rows[0].n);}
+ const ok=[], bad=[];
+ rows.forEach((raw,i)=>{
+  const line=i+2, title=String((raw&&raw.title)||'').slice(0,80);
+  const n=normImportRow(raw); if(n.err){bad.push({line,title,error:n.err});return;}
+  const p=parseListing(n.x); if(p.error){bad.push({line,title,error:IMP_ERR[p.error]||'Date invalide'});return;}
+  const key=p.v.title.toLowerCase()+'|'+String(p.v.oem||'').toLowerCase();
+  if(seen.has(key)){bad.push({line,title,error:'Duplicat (există deja un anunț cu același titlu și cod OEM)',skipped:true});return;}
+  if(ok.length>=room){bad.push({line,title,error:'Limita de '+ACTIVE_LISTINGS_LIMIT+' de anunțuri active a fost atinsă'});return;}
+  seen.add(key); ok.push({line,v:p.v});
+ });
+ if(dry)return res.json({dry:true,total:rows.length,valid:ok.length,invalid:bad.length,errors:bad.slice(0,100)});
+ const ids=[], client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  for(const {v} of ok){
+   const r=await client.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING id`,
+    [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail]);
+   ids.push(r.rows[0].id);
+  }
+  await client.query('COMMIT');
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+ if(NEW_LISTING_STATUS==='approved'&&ids.length)alertForListings(ids);
+ res.status(201).json({dry:false,total:rows.length,imported:ids.length,invalid:bad.length,errors:bad.slice(0,100),status:NEW_LISTING_STATUS});
+}));
 
 /* ===== Contoare pentru insigne (meniu, mesaje, comenzi, oferte, alerte, anunțuri care expiră) ===== */
 app.get('/api/counts',auth,requireDb,ah(async(req,res)=>{
