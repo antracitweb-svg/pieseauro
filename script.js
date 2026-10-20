@@ -147,8 +147,28 @@ async function api(url, opt={}){
     const e = new Error(ERR[d.error] || d.message || 'A apărut o eroare.');
     e.code = d.error; e.status = r.status; throw e;
   }
+  if(currentUser && !/^\/api\/counts/.test(url) && (/^\/api\/(messages|notifications|orders|offers|requests|listings\/mine)/.test(url) || (opt.method && opt.method!=='GET'))) scheduleCounts();
   return d;
 }
+
+/* ---------- Contoare / insigne (total în meniu, număr pe fiecare buton) ---------- */
+let counts = null, countsTimer = null, countsBusy = false;
+function scheduleCounts(){ clearTimeout(countsTimer); countsTimer = setTimeout(refreshCounts, 700); }
+function badgeText(n){ n = Number(n)||0; return n<=0 ? '' : (n>99 ? '99+' : String(n)); }
+function renderCounts(){
+  const c = counts || {};
+  const map = { total:c.total, expire:c.expire, messages:c.messages, orders_seller:c.orders_seller, orders_buyer:c.orders_buyer, offers_received:c.offers_received, alerts:c.alerts };
+  const mb = document.getElementById('menuBadge'); if(mb) mb.textContent = badgeText(c.total);
+  document.querySelectorAll('[data-cnt]').forEach(el=>{ el.textContent = badgeText(map[el.dataset.cnt]); });
+}
+async function refreshCounts(){
+  if(!currentUser){ counts = null; renderCounts(); return; }
+  if(countsBusy) return; countsBusy = true;
+  try{ counts = await api('/api/counts'); }catch{ /* păstrăm ultimele valori */ }
+  countsBusy = false; renderCounts();
+}
+setInterval(()=>{ if(currentUser && !document.hidden) refreshCounts(); }, 60000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && currentUser) refreshCounts(); });
 
 /* ---------- navigare ---------- */
 function parseHash(){
@@ -227,6 +247,7 @@ function renderHeader(){
   const ad = $('#accountAdmin'); if(ad) ad.classList.toggle('hidden', !isAdmin);
   $('#favCount').textContent = favorites.length;
   renderVerifyBanner();
+  refreshCounts();
 }
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;

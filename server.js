@@ -320,6 +320,7 @@ async function dbReady(){
  migrations.push(
   'CREATE TABLE IF NOT EXISTS login_attempts (key TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
   'CREATE INDEX IF NOT EXISTS login_attempts_key_idx ON login_attempts(key,at)',
+  'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS kind TEXT',
   'CREATE INDEX IF NOT EXISTS listings_status_created_idx ON listings(status,created_at DESC)',
   'CREATE INDEX IF NOT EXISTS listings_type_idx ON listings(type)',
   'CREATE INDEX IF NOT EXISTS listings_user_idx ON listings(user_id)',
@@ -1324,7 +1325,7 @@ async function mailNotify(uid,kind,text){
     await sendMail(u.email,'AutoPiese: '+t.slice(0,80),t+(base?'\n\nVezi detalii: '+base+'/#/account-tool':'')+'\n\nPoți opri aceste emailuri din Setări cont → Notificări pe email.');
   }catch(e){console.error('mailNotify',e.message);}
 }
-const notify=(uid,text,kind)=>{if(!uid)return null;if(kind)mailNotify(uid,kind,text);return pool.query('INSERT INTO notifications(user_id,text) VALUES($1,$2)',[uid,String(text).slice(0,300)]).catch(()=>{});};
+const notify=(uid,text,kind)=>{if(!uid)return null;if(kind)mailNotify(uid,kind,text);return pool.query('INSERT INTO notifications(user_id,text,kind) VALUES($1,$2,$3)',[uid,String(text).slice(0,300),kind||null]).catch(()=>{});};
 app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
  if(!throttle(authAttempts,'offer:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_OFERTE'});
@@ -1506,6 +1507,20 @@ app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
  res.json({notifications:r.rows});
 }));
 app.post('/api/notifications/read',auth,requireDb,ah(async(req,res)=>{await pool.query('UPDATE notifications SET is_read=TRUE WHERE user_id=$1',[req.user.id]);res.json({ok:true});}));
+
+/* ===== Contoare pentru insigne (meniu, mesaje, comenzi, oferte, alerte, anunțuri care expiră) ===== */
+app.get('/api/counts',auth,requireDb,ah(async(req,res)=>{
+ const r=(await pool.query(`SELECT
+  (SELECT COUNT(*)::int FROM messages m WHERE m.recipient_id=$1 AND NOT m.arch_r AND NOT m.is_read AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=m.sender_id)) AS messages,
+  (SELECT COUNT(*)::int FROM orders WHERE seller_id=$1 AND status='new') AS orders_seller,
+  (SELECT COUNT(*)::int FROM orders WHERE buyer_id=$1 AND status IN ('confirmed','shipped')) AS orders_buyer,
+  (SELECT COUNT(*)::int FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE q.user_id=$1 AND q.status='open' AND o.status='pending') AS offers_received,
+  (SELECT COUNT(*)::int FROM notifications WHERE user_id=$1 AND NOT is_read AND kind='alert') AS alerts,
+  (SELECT COUNT(*)::int FROM listings WHERE user_id=$1 AND status='approved' AND created_at < NOW() - INTERVAL '30 days') AS expire`,[req.user.id])).rows[0];
+ const total=r.messages+r.orders_seller+r.orders_buyer+r.offers_received+r.alerts+r.expire;
+ res.set('Cache-Control','no-store');
+ res.json({...r,total});
+}));
 
 /* ===== Mod vacanță ===== */
 app.put('/api/account/vacation',requireDb,auth,ah(async(req,res)=>{
