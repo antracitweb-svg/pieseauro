@@ -2102,3 +2102,28 @@ h1,h2{text-wrap:wrap}
 @media(min-width:3000px){
   html{zoom:2}
 }
+
+
+/* V37: notificări, numere pe secțiuni, tooltip-uri, carusel poze cereri/oferte */
+.acc-user{position:relative;flex-wrap:wrap}
+.acc-notif{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid #d4b483;border-radius:999px;background:#fffaf0;color:#0e0f12;font-size:13px;font-weight:700;cursor:pointer}
+.acc-notif .cnt{margin:0}
+.acc-notif[aria-expanded="true"]{background:#0e0f12;color:#e9d3a8;border-color:#0e0f12}
+.notif-summary{margin:8px 0 12px;padding:6px;border:1px solid #e6dcc6;border-radius:14px;background:#fffefb;box-shadow:0 6px 18px rgba(14,15,18,.08)}
+.notif-summary.hidden{display:none}
+.notif-row{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:0;border-radius:10px;background:transparent;text-align:left;font-size:15px;color:#14110c;cursor:pointer}
+.notif-row:hover,.notif-row:active{background:#f6efe0}
+.notif-row .nr-txt{flex:1}.notif-row i{color:#b8935a;font-style:normal;font-size:20px}
+.notif-row b{display:inline-block;min-width:22px;padding:1px 7px;border-radius:999px;background:#c62828;color:#fff;font-size:13px;text-align:center;margin-right:4px}
+.notif-empty{padding:12px;margin:0}
+.cnt.sec-cnt{margin-left:8px}
+.cnt:empty{display:none}
+.ui-tip{position:fixed;z-index:10000;max-width:240px;padding:6px 11px;border-radius:8px;background:#0e0f12;color:#e9d3a8;font-size:12.5px;font-weight:600;line-height:1.3;letter-spacing:.01em;box-shadow:0 6px 18px rgba(0,0,0,.28);border:1px solid rgba(212,180,131,.35);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .14s ease,transform .14s ease;left:0;top:0;-webkit-user-select:none;user-select:none}
+.ui-tip.on{opacity:1;transform:none}
+button[data-tip],a[data-tip],.icon-btn,.ad-ico,.ar-btn,.mr-btn,.mine-act,.ad-nav,.menu-btn{-webkit-touch-callout:none}
+.req-gal{margin:8px 0 12px;border:1px solid #e6e0d4}
+.req-gal .detail-gallery.ad-slider{display:flex;gap:0;margin:0;padding:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;aspect-ratio:4/3;max-height:min(60vh,420px);background:#f3f1ec}
+.req-gal .detail-gallery.ad-slider::-webkit-scrollbar{display:none}
+.req-gal .detail-gallery.ad-slider .detail-gallery-item,.req-gal .detail-gallery.ad-slider .detail-gallery-item:first-child{flex:0 0 100%;width:100%;height:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;scroll-snap-align:center;scroll-snap-stop:always;cursor:zoom-in;grid-column:auto}
+.req-gal .detail-gallery.ad-slider .detail-gallery-item img{width:100%;height:100%;object-fit:contain;background:transparent}
+.adm-main-img{touch-action:pan-y}

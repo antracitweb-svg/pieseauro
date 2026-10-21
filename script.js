@@ -172,9 +172,10 @@ function scheduleCounts(){ clearTimeout(countsTimer); countsTimer = setTimeout(r
 function badgeText(n){ n = Number(n)||0; return n<=0 ? '' : (n>99 ? '99+' : String(n)); }
 function renderCounts(){
   const c = counts || {};
-  const map = { total:c.total, expire:c.expire, messages:c.messages, orders_seller:c.orders_seller, orders_buyer:c.orders_buyer, offers_received:c.offers_received, alerts:c.alerts };
+  const map = { total:c.total, expire:c.expire, messages:c.messages, orders_seller:c.orders_seller, orders_buyer:c.orders_buyer, offers_received:c.offers_received, alerts:c.alerts, sec_seller:(c.expire||0)+(c.orders_seller||0), sec_buyer:(c.offers_received||0)+(c.orders_buyer||0), sec_msgs:(c.messages||0)+(c.alerts||0) };
   const mb = document.getElementById('menuBadge'); if(mb) mb.textContent = badgeText(c.total);
   document.querySelectorAll('[data-cnt]').forEach(el=>{ el.textContent = badgeText(map[el.dataset.cnt]); });
+  renderNotifSummary();
 }
 async function refreshCounts(){
   if(!currentUser){ counts = null; renderCounts(); return; }
@@ -1555,7 +1556,8 @@ async function handleImgBox(e){
 }
 function imgGalleryHtml(images, alt){
   const list=(Array.isArray(images)?images:[]).filter(Boolean); if(!list.length) return '';
-  return `<div class="detail-gallery req-gallery">${list.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(alt)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(alt)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>`;
+  const n=list.length;
+  return `<div class="ad-gal req-gal"><div class="detail-gallery ad-slider req-slider" data-slider>${list.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(alt)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(alt)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>${n>1?`<button type="button" class="ad-nav prev" data-ad-slide="-1" aria-label="Poza anterioară">‹</button><button type="button" class="ad-nav next" data-ad-slide="1" aria-label="Poza următoare">›</button><span class="ad-count">1 / ${n}</span><div class="ad-dots" aria-hidden="true">${list.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}</div>`;
 }
 
 /* ---------- preselecție mașină pentru cereri ---------- */
@@ -1988,7 +1990,7 @@ async function openAdminListing(id){
   const x = (await api('/api/admin/listings/'+id)).listing, n = Number(x.image_count)||0;
   const st = STATUS_LABEL[x.status]||[x.status,''];
   const row = (l,v)=> v||v===0 ? `<div><small>${l}</small><b>${esc(v)}</b></div>` : '';
-  const imgs = n ? `<div class="adm-gallery"><div class="adm-main-img"><img id="admMainImg" alt="" src="/api/admin/listings/${x.id}/img/0"></div>${n>1?`<div class="adm-thumbs">${Array.from({length:n},(_,i)=>`<button type="button" class="${i?'':'on'}" data-adm-img="${i}"><img loading="lazy" alt="" src="/api/admin/listings/${x.id}/img/${i}"></button>`).join('')}</div>`:''}</div>` : '<p class="muted">Anunțul nu are poze.</p>';
+  const imgs = n ? `<div class="adm-gallery"><div class="adm-main-img" id="admMainBox"><img id="admMainImg" alt="" src="/api/admin/listings/${x.id}/img/0"></div>${n>1?`<div class="adm-thumbs">${Array.from({length:n},(_,i)=>`<button type="button" class="${i?'':'on'}" data-adm-img="${i}"><img loading="lazy" alt="" src="/api/admin/listings/${x.id}/img/${i}"></button>`).join('')}</div>`:''}</div>` : '<p class="muted">Anunțul nu are poze.</p>';
   box.innerHTML = `<h3 class="adm-title">#${x.id} · ${esc(x.title)}</h3><p><span class="badge ${st[1]}">${esc(st[0])}</span> <b class="adm-price">${money(x.price)}</b>${x.negotiable?' · negociabil':''}</p>${imgs}
     <div class="adm-grid">${row('Tip',x.type)}${row('Stare',x.condition)}${row('Marcă',x.make)}${row('Model',x.model)}${row('An',x.year)}${row('Motor',x.engine)}${row('Combustibil',x.fuel)}${row('Categorie',x.category)}${row('OEM',x.oem)}${row('Cantitate',x.quantity)}${row('Județ',x.county)}${row('Livrare',x.delivery?'Da':'Nu')}${row('Vizualizări',x.views)}${row('Publicat',x.created_at?new Date(x.created_at).toLocaleString('ro-RO'):'')}</div>
     ${x.description?`<div class="adm-desc"><small>Descriere</small><p>${esc(x.description).replace(/\n/g,'<br>')}</p></div>`:''}
@@ -2333,6 +2335,8 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-ev-filter]'))){ adminEvKind=el.dataset.evFilter; renderAdmin(); return; }
   if((el=t.closest('[data-adm-filter]'))){ adminFilter=el.dataset.admFilter; renderAdmin(); return; }
   if((el=t.closest('[data-adm-img]'))){ const m=$('#admMainImg'); if(m) m.src=el.querySelector('img').src.replace(/\/img\/\d+$/,'/img/'+el.dataset.admImg); $$('#adminListingBody [data-adm-img]').forEach(b=>b.classList.toggle('on',b===el)); return; }
+  if((el=t.closest('#notifBtn'))){ toggleNotifSummary(); return; }
+  if((el=t.closest('[data-notif-go]'))){ const b=$('#notifSummary'); if(b) b.classList.add('hidden'); const nb=$('#notifBtn'); if(nb) nb.setAttribute('aria-expanded','false'); accountAction(el.dataset.notifGo); return; }
   if((el=t.closest('[data-admin-open]'))){ safe(openAdminListing)(el.dataset.adminOpen); return; }
   if((el=t.closest('[data-action]'))){ doAction(el.dataset.action); return; }
   if((el=t.closest('[data-account]'))){ accountAction(el.dataset.account); return; }
@@ -2949,3 +2953,96 @@ document.addEventListener('scroll',e=>{
   $$('.ad-dots i',box).forEach((d,k)=>d.classList.toggle('on',k===i));
   const c=box.querySelector('.ad-count'); if(c) c.textContent=(i+1)+' / '+sl.children.length;
 },true);
+
+
+/* ---------- rezumat notificări (Contul meu) ---------- */
+const NOTIF_ROWS=[['messages','✉','mesaje necitite','messages'],['orders_seller','📦','comenzi noi din oferte','orders-seller'],['orders_buyer','🧾','comenzi în curs','orders'],['offers_received','💬','oferte primite la cereri','offers-received'],['alerts','🔔','alerte din căutări salvate','notifications'],['expire','⏳','anunțuri care expiră curând','listings']];
+function toggleNotifSummary(){
+  const b=$('#notifSummary'), btn=$('#notifBtn'); if(!b) return;
+  const open=b.classList.toggle('hidden')===false;
+  if(btn) btn.setAttribute('aria-expanded',open?'true':'false');
+  renderNotifSummary();
+}
+function renderNotifSummary(){
+  const b=$('#notifSummary'); if(!b||b.classList.contains('hidden')) return;
+  const c=counts||{};
+  const rows=NOTIF_ROWS.filter(r=>Number(c[r[0]])>0);
+  b.innerHTML=rows.length?rows.map(r=>`<button type="button" class="notif-row" data-notif-go="${r[3]}"><span class="nr-ico">${r[1]}</span><span class="nr-txt"><b>${Number(c[r[0]])}</b> ${r[2]}</span><i>›</i></button>`).join(''):'<p class="muted notif-empty">Nu ai noutăți. Totul este la zi ✓</p>';
+}
+
+/* ---------- glisare poze: lightbox + poza principală admin ---------- */
+function addSwipe(el, onSwipe){
+  let x0=0,y0=0,t0=0,on=false;
+  el.addEventListener('touchstart',e=>{ if(e.touches.length!==1){ on=false; return; } on=true; x0=e.touches[0].clientX; y0=e.touches[0].clientY; t0=Date.now(); },{passive:true});
+  el.addEventListener('touchend',e=>{
+    if(!on) return; on=false;
+    const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0;
+    if(Math.abs(dx)>45 && Math.abs(dx)>Math.abs(dy)*1.3 && Date.now()-t0<800) onSwipe(dx<0?1:-1);
+  },{passive:true});
+}
+(function(){
+  const lb=document.getElementById('imageLightbox'); if(lb) addSwipe(lb,d=>moveLightbox(d));
+  document.addEventListener('touchstart',e=>{
+    const box=e.target.closest&&e.target.closest('#admMainBox'); if(!box||box._sw) return; box._sw=1;
+    addSwipe(box,d=>{
+      const btns=$$('#adminListingBody [data-adm-img]'); if(btns.length<2) return;
+      let i=btns.findIndex(b=>b.classList.contains('on')); if(i<0) i=0;
+      btns[(i+d+btns.length)%btns.length].click();
+    });
+  },{passive:true,capture:true});
+})();
+
+/* ---------- tooltip-uri pe pictograme ---------- */
+(function(){
+  const tip=document.createElement('div'); tip.id='uiTip'; tip.setAttribute('role','tooltip'); tip.className='ui-tip'; document.body.appendChild(tip);
+  let timer=null, hideT=null, cur=null, lastTouch=0, suppressClick=0;
+  function target(n){
+    const el=n&&n.closest&&n.closest('button,a,[role="button"],[data-tip]'); if(!el) return null;
+    if(!(el.dataset.tip||el.getAttribute('aria-label')||el.getAttribute('title'))) return null;
+    if(!el.dataset.tip){
+      const txt=(el.textContent||'').replace(/\s+/g,' ').trim();
+      if(txt.length>6) return null;
+    }
+    return el;
+  }
+  function label(el){
+    if(!el.dataset.tip) el.dataset.tip=el.getAttribute('title')||el.getAttribute('aria-label')||'';
+    if(el.hasAttribute('title')){ el.removeAttribute('title'); if(!el.getAttribute('aria-label')) el.setAttribute('aria-label',el.dataset.tip); }
+    return el.dataset.tip;
+  }
+  function show(el){
+    const t=label(el); if(!t) return; cur=el; tip.textContent=t; tip.classList.add('on'); tip.style.left='0px'; tip.style.top='0px';
+    const r=el.getBoundingClientRect(), w=tip.offsetWidth, h=tip.offsetHeight;
+    let x=r.left+r.width/2-w/2; x=Math.max(6,Math.min(x,innerWidth-w-6));
+    let y=r.top-h-8; if(y<6) y=r.bottom+8;
+    tip.style.left=Math.round(x)+'px'; tip.style.top=Math.round(y)+'px';
+  }
+  function hide(){ clearTimeout(timer); clearTimeout(hideT); timer=null; cur=null; tip.classList.remove('on'); }
+  document.addEventListener('mouseover',e=>{
+    if(Date.now()-lastTouch<900) return;
+    const el=target(e.target); if(!el||el===cur) return;
+    hide(); label(el); timer=setTimeout(()=>show(el),500);
+  });
+  document.addEventListener('mouseout',e=>{ const el=target(e.target); if(el && !el.contains(e.relatedTarget)) hide(); });
+  document.addEventListener('mousedown',hide);
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') hide(); },true);
+  document.addEventListener('scroll',hide,true);
+  document.addEventListener('focusin',e=>{ const el=target(e.target); if(el && el.matches(':focus-visible')){ hide(); show(el); } });
+  document.addEventListener('focusout',hide);
+  /* telefon: apăsare lungă ~0,5 s */
+  document.addEventListener('touchstart',e=>{
+    lastTouch=Date.now(); hide();
+    const el=target(e.target); if(!el||e.touches.length!==1) return; label(el);
+    timer=setTimeout(()=>{ show(el); suppressClick=Date.now(); hideT=setTimeout(hide,2000); },500);
+  },{passive:true});
+  const release=()=>{ lastTouch=Date.now(); if(tip.classList.contains('on')){ clearTimeout(hideT); hideT=setTimeout(hide,700); } else { clearTimeout(timer); timer=null; } };
+  document.addEventListener('touchend',release,{passive:true});
+  document.addEventListener('touchcancel',release,{passive:true});
+  document.addEventListener('touchmove',()=>{ if(!tip.classList.contains('on')) hide(); },{passive:true});
+  document.addEventListener('contextmenu',e=>{ if(Date.now()-lastTouch<1500 && target(e.target)) e.preventDefault(); });
+  /* după apăsarea lungă nu se execută acțiunea butonului */
+  document.addEventListener('click',e=>{
+    if(suppressClick && Date.now()-suppressClick<1200 && target(e.target)){ e.stopImmediatePropagation(); e.preventDefault(); suppressClick=0; }
+    hide();
+  },true);
+})();

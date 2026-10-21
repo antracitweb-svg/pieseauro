@@ -222,3 +222,9 @@ Două taburi noi în panoul de admin (`#/admin`), ca administratorul să vadă c
 - **Întrebări pe oferte** și **B2B** sunt deocamdată ecrane simple (trimit către Mesaje / Import CSV / Actualizare prețuri).
 - Statistici cont: tabelele (14 zile / 6 luni / 12 luni) sunt compacte (font 12px, coloane înguste), ca să încapă mai multe rânduri și luni pe telefon.
 - „Anunțurile mele”: cardul începe imediat sub „Înapoi”, iar rândurile sunt compacte (poză 80×80, titlu 14px, butoane cu iconițe SVG, vizualizări / buc. / preț pe un rând).
+
+## V37 – Notificări, tooltip-uri, glisare poze
+- Buton „Notificări” în Contul meu (cu număr roșu) care deschide un rezumat cu link către fiecare secțiune.
+- Numere și pe titlurile secțiunilor (Vânzător / Cumpărător / Mesagerie), nu doar pe butoane.
+- Tooltip-uri pe pictograme: mouse (~0,5 s), tastatură (focus), telefon (apăsare lungă).
+- Poze glisabile stânga/dreapta pe telefon: anunțuri, lightbox, cereri, oferte, poza principală din admin.
