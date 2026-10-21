@@ -2043,3 +2043,13 @@ h1,h2{text-wrap:wrap}
 @media(min-width:2200px){
   #detailModal .modal-card.wide{zoom:1.7;max-height:52vh}
 }
+
+/* V37b: caseta de opțiuni rămâne sus (ca înainte), iar bara cu telefon + coș plutește peste poză ca pe PieseAuto */
+@media(max-width:820px){
+  .ad-owner [data-edit-listing],.ad-owner [data-sold-listing]{display:inline-block}
+  .ad-owner{margin:10px 14px 12px}
+  .ad-callbar{background:rgba(20,17,12,.38);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);border-top:0;box-shadow:none;margin-top:0;position:sticky;bottom:0}
+  .ad-callbar .btn,.ad-callbar .btn.primary,.ad-callbar .btn.ghost{background:#fff;border:2px solid #14110c;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+}
+/* V37c: datele anunțului în caseta proprietarului (vizibile doar lui) */
+.ad-owner .ad-owner-dates{flex:0 0 100%;margin:2px 0 0;font-size:14px;line-height:1.55;color:#14110c}

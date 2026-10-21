@@ -344,6 +344,9 @@ async function dbReady(){
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS phone_clicks INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS added_at TIMESTAMPTZ',
+  'UPDATE listings SET added_at=created_at WHERE added_at IS NULL',
+  'ALTER TABLE listings ALTER COLUMN added_at SET DEFAULT NOW()',
   'CREATE INDEX IF NOT EXISTS listings_user_status_idx ON listings(user_id,status)',
   'ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ',
   "ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
@@ -927,7 +930,7 @@ const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
 const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèêëáàäãåíìïóòôöõúùûüçñšžčřěýÿ','aaisstteeeeaaaaaiiiooooouuuucnszcreyy')`;
 const flat=c=>`regexp_replace(${fold(c)},'[^a-z0-9]+','','g')`;
 app.get('/api/listings/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query(`SELECT ${LIST_COLS} FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
+ const r=await pool.query(`SELECT ${LIST_COLS},l.added_at FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
  res.json({listings:r.rows});
 });
 app.get('/api/favorites',auth,requireDb,async(req,res)=>{

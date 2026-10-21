@@ -66,6 +66,20 @@ function writeJSON(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }
 function esc(s=''){ return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function money(n){ return Number(n)>0 ? new Intl.NumberFormat('ro-RO').format(Number(n))+' lei' : 'La cerere'; }
 function fmtDate(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('ro-RO'); }
+function fmtDateTime(iso){
+  const d=new Date(iso); if(isNaN(d)) return '';
+  return d.toLocaleDateString('ro-RO',{day:'numeric',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'});
+}
+function fmtAgo(iso){
+  const d=new Date(iso); if(isNaN(d)) return '';
+  const m=Math.floor((Date.now()-d.getTime())/60000);
+  if(m<1) return 'chiar acum';
+  if(m<60) return 'acum '+(m===1?'un minut':m+' minute');
+  const h=Math.floor(m/60); if(h<24) return 'acum '+(h===1?'o oră':h+' ore');
+  const z=Math.floor(h/24); if(z<30) return 'acum '+(z===1?'o zi':z+' zile');
+  const l=Math.floor(z/30); if(l<12) return 'acum '+(l===1?'o lună':l+' luni');
+  const a=Math.floor(l/12); return 'acum '+(a===1?'un an':a+' ani');
+}
 function fmtUpdated(iso){
   const d=new Date(iso); if(isNaN(d)) return '';
   const now=new Date(), y=new Date(now); y.setDate(now.getDate()-1);
@@ -1003,12 +1017,8 @@ function detailHtml(x, phones, canContact){
   const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
   const spec = [['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
   const phone1 = (phones||[]).slice(0,1);
-  const isOwn0 = !!(currentUser && x.user_id && currentUser.id===x.user_id);
-  const ownSt0 = x.status || ((state.loaded.find(l=>l.id===x.id)||{}).status) || '';
   let callbar = '';
-  if(isOwn0){
-    callbar = `<div class="ad-callbar own">${ownSt0!=='blocked'?`<button type="button" class="btn ghost" data-edit-listing="${x.id}">✎ Editează</button>`:''}${(ownSt0==='approved'||ownSt0==='sold')?`<button type="button" class="btn primary" data-sold-listing="${x.id}" data-to="${ownSt0==='sold'?'approved':'sold'}">${ownSt0==='sold'?'↺ Repune la vânzare':'✓ Marchează vândut'}</button>`:''}</div>`;
-  } else if(canContact){
+  if(canContact){
     const ph = phone1.length ? `<a class="btn primary ad-call" data-track-phone="${Number(x.id)}" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}"><span class="ad-call-ico" aria-hidden="true">📞${phone1[0].is_whatsapp?'<i>WA</i>':''}</span><span>${esc(fmtPhone(phone1[0].phone))}</span></a>` : '';
     const cart = `<button type="button" class="btn ghost ad-cartbtn" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button>`;
     callbar = `<div class="ad-callbar">${ph}${x.seller_vacation?'':cart}</div>`;
@@ -1020,11 +1030,11 @@ function detailHtml(x, phones, canContact){
   const isOwner = !!(currentUser && x.user_id && currentUser.id===x.user_id);
   const ownSt = x.status || ((state.loaded.find(l=>l.id===x.id)||{}).status) || '';
   const ownLbl = (STATUS_LABEL[ownSt]||[''])[0];
-  const ownerBox = isOwner ? `<div class="ad-owner"><div class="ad-owner-btns">${ownSt!=='blocked'?`<button type="button" class="btn ghost small" data-edit-listing="${x.id}">✎ Editează</button>`:''}${(ownSt==='approved'||ownSt==='sold')?`<button type="button" class="btn ghost small" data-sold-listing="${x.id}" data-to="${ownSt==='sold'?'approved':'sold'}">${ownSt==='sold'?'↺ Repune la vânzare':'✓ Marchează vândut'}</button>`:''}<button type="button" class="btn danger small" data-del-listing="${x.id}">🗑 Șterge</button></div><p class="ad-owner-info">${[ownLbl?esc(ownLbl):'',esc(fmtDate(x.created_at)),x.views!=null?(Number(x.views)||0)+' vizualizări':''].filter(Boolean).join(' · ')}</p></div>` : '';
+  const ownerBox = isOwner ? `<div class="ad-owner"><div class="ad-owner-btns">${ownSt!=='blocked'?`<button type="button" class="btn ghost small" data-edit-listing="${x.id}">✎ Editează</button>`:''}${(ownSt==='approved'||ownSt==='sold')?`<button type="button" class="btn ghost small" data-sold-listing="${x.id}" data-to="${ownSt==='sold'?'approved':'sold'}">${ownSt==='sold'?'↺ Repune la vânzare':'✓ Marchează vândut'}</button>`:''}<button type="button" class="btn danger small" data-del-listing="${x.id}">🗑 Șterge</button></div><p class="ad-owner-info">${[ownLbl?esc(ownLbl):'',x.views!=null?(Number(x.views)||0)+' vizualizări':''].filter(Boolean).join(' · ')}</p><p class="ad-owner-dates">Data adăugării: ${esc(fmtDateTime(x.added_at||x.created_at))}<br>Data ultimei actualizări: ${esc(fmtDateTime(x.created_at))} (${esc(fmtAgo(x.created_at))})</p></div>` : '';
   return `<div class="ad">
   <div class="ad-main">
     <nav class="ad-crumbs" aria-label="Navigare anunț">${crumbs}</nav>
-    ${gallery}${ownerBox}
+    ${ownerBox}${gallery}
     ${x.seller_vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${x.seller_vacation_until?' până la '+esc(fmtDate(x.seller_vacation_until+'T00:00:00')):''}. Poți trimite mesaje, dar comenzile sunt oprite până se întoarce.</div>`:''}
     <div class="ad-titlerow"><h2>${esc(x.title)}</h2><div class="ad-ico-col"><button type="button" class="ad-ico${fav?' on':''}" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'}</button><button type="button" class="ad-ico" data-copy-link="${x.id}" aria-label="Distribuie anunțul">⤴</button></div></div>
     <div class="ad-price-m">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
