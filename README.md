@@ -221,3 +221,5 @@ Două taburi noi în panoul de admin (`#/admin`), ca administratorul să vadă c
 - **Generator de anunțuri**: doar în browser (titlu + descriere de copiat), fără endpoint nou.
 - **Calificative**: folosește `GET /api/sellers/:id/ratings` pentru utilizatorul logat.
 - **Întrebări pe oferte** și **B2B** sunt deocamdată ecrane simple (trimit către Mesaje / Import CSV / Actualizare prețuri).
+- Statistici cont: tabelele (14 zile / 6 luni / 12 luni) sunt compacte (font 12px, coloane înguste), ca să încapă mai multe rânduri și luni pe telefon.
+- „Anunțurile mele”: cardul începe imediat sub „Înapoi”, iar rândurile sunt compacte (poză 80×80, titlu 14px, butoane cu iconițe SVG, vizualizări / buc. / preț pe un rând).

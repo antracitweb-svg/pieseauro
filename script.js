@@ -2488,14 +2488,23 @@ async function enterMine(){
   mine.items = r.listings || []; state.loaded = mine.items; mine.sel.clear(); mine.page = 1;
   renderMine();
 }
+const MI={
+  promo:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h3l5 4V6L6 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1c2.9.9 5 3.5 5 6.7s-2.1 5.8-5 6.7v2.1c4-.9 7-4.5 7-8.8s-3-7.9-7-8.8z"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>',
+  ok:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5V2L7 6.5 12 11V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8z"/></svg>',
+  del:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C7 5 2.7 8.1 1 12.5 2.7 16.9 7 20 12 20s9.3-3.1 11-7.5C21.3 8.1 17 5 12 5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>'
+};
 function mineRow(x){
   const img = Array.isArray(x.images) && x.images[0];
   const st = STATUS_LABEL[x.status] || [x.status,''];
   const del = x.status==='deleted', locked = x.status==='blocked';
   const showBadge = x.status!=='approved';
   const btns = del
-    ? `<button type="button" class="mine-act" data-m-restore="${x.id}" title="Restaurează" aria-label="Restaurează">↺</button><button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge definitiv" aria-label="Șterge definitiv">🗑</button>`
-    : `<button type="button" class="mine-act" data-m-promo="${x.id}" title="Promovează" aria-label="Promovează">📢</button><button type="button" class="mine-act" data-m-bump="${x.id}" title="Reactualizează" aria-label="Reactualizează">↑</button>${locked?'':`<button type="button" class="mine-act" data-m-edit="${x.id}" title="Editează" aria-label="Editează">✎</button>`}${x.status==='approved'||x.status==='sold'?`<button type="button" class="mine-act" data-m-sold="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}" aria-label="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}">${x.status==='sold'?'⟲':'✓'}</button>`:''}<button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge" aria-label="Șterge">🗑</button>`;
+    ? `<button type="button" class="mine-act" data-m-restore="${x.id}" title="Restaurează" aria-label="Restaurează">${MI.back}</button><button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge definitiv" aria-label="Șterge definitiv">${MI.del}</button>`
+    : `<button type="button" class="mine-act" data-m-promo="${x.id}" title="Promovează" aria-label="Promovează">${MI.promo}</button><button type="button" class="mine-act" data-m-bump="${x.id}" title="Reactualizează" aria-label="Reactualizează">${MI.up}</button>${locked?'':`<button type="button" class="mine-act" data-m-edit="${x.id}" title="Editează" aria-label="Editează">${MI.edit}</button>`}${x.status==='approved'||x.status==='sold'?`<button type="button" class="mine-act" data-m-sold="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}" aria-label="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}">${x.status==='sold'?MI.back:MI.ok}</button>`:''}<button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge" aria-label="Șterge">${MI.del}</button>`;
   return `<article class="mine-row">
     <label class="mine-check"><input type="checkbox" data-m-check="${x.id}" ${mine.sel.has(x.id)?'checked':''} aria-label="Selectează anunțul"></label>
     <button type="button" class="mine-thumb" data-m-open="${x.id}" aria-label="Deschide anunțul">${img?`<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`:'<span>📷</span>'}</button>
@@ -2504,7 +2513,7 @@ function mineRow(x){
       ${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:''}
       <div class="mine-acts">${btns}</div>
     </div>
-    <div class="mine-meta"><span>👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${esc(money(x.price))}</b></div>
+    <div class="mine-meta"><span class="mine-views">${MI.eye} ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${esc(money(x.price))}</b></div>
   </article>`;
 }
 function renderMine(){
