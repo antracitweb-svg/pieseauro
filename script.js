@@ -271,7 +271,12 @@ function renderAccountTool(view, withId, refId){
     credits:{title:'Credite',text:'Soldul și creditele contului vor apărea aici când funcția de creditare este activată.',action:null,label:null},
     transactions:{title:'Tranzacții',text:'Comenzile tale, ca cumpărător și ca vânzător.',action:null,label:null},
     invoices:{title:'Facturi',text:'Facturile emise pentru contul tău.',action:null,label:null},
-    stats:{title:'Statistici',text:'Statistici pe cont (pe zile și luni) și pe fiecare anunț.',action:null,label:null}
+    stats:{title:'Statistici',text:'Statistici pe cont (pe zile și luni) și pe fiecare anunț.',action:null,label:null},
+    'offer-questions':{title:'Întrebări pe oferte',text:'Întrebările cumpărătorilor despre ofertele tale.',action:null,label:null},
+    'bulk-price':{title:'Actualizare prețuri',text:'Modifici dintr-o dată prețurile anunțurilor tale active.',action:null,label:null},
+    generator:{title:'Generator de anunțuri',text:'Completezi câteva date și primești titlul și descrierea gata de folosit.',action:null,label:null},
+    b2b:{title:'B2B',text:'Instrumente pentru parcuri de dezmembrări, service-uri și magazine cu stoc mare.',action:null,label:null},
+    ratings:{title:'Calificativele mele',text:'Calificativele primite ca vânzător și ca cumpărător.',action:null,label:null}
   };
   currentToolView=view;
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
@@ -281,6 +286,99 @@ function renderAccountTool(view, withId, refId){
   if(content){
     content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
     if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices','stats'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
+    if(['offer-questions','bulk-price','generator','b2b','ratings'].includes(view)) safe(()=>renderUtilTool(view,content))();
+  }
+}
+
+
+/* ---------- Utile: actualizare prețuri, generator, B2B, calificative, întrebări pe oferte ---------- */
+function copyText(txt,okMsg){
+  const done=()=>toast(okMsg||'Copiat.');
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,()=>toast('Nu am putut copia. Selectează textul manual.')); return; }
+  const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch{ toast('Nu am putut copia. Selectează textul manual.'); } ta.remove();
+}
+const lei=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei';
+async function renderUtilTool(view, box){
+  if(view==='offer-questions'){
+    box.innerHTML=`<div class="info-card account-tool-card"><p>Întrebările cumpărătorilor despre ofertele tale vor apărea aici. Până atunci, discuțiile cu cumpărătorii se poartă în Mesaje.</p><button class="btn primary" data-go="mesagerie">Deschide Mesaje</button></div>`;
+    return;
+  }
+  if(view==='b2b'){
+    box.innerHTML=`<div class="info-card account-tool-card util-form"><p>Pentru parcuri de dezmembrări, service-uri și magazine care au multe piese: publici și ții la zi stocul rapid.</p>
+      <button type="button" class="btn primary" data-csv-import>⇪ Import CSV (anunțuri în masă)</button>
+      <button type="button" class="btn ghost" data-go="account-tool?view=bulk-price">Actualizare prețuri în masă</button>
+      <button type="button" class="btn ghost" data-go="account-tool?view=generator">Generator de anunțuri</button></div>`;
+    return;
+  }
+  if(view==='ratings'){
+    box.innerHTML='<div class="info-card"><p class="muted">Se încarcă…</p></div>';
+    const r=await api('/api/sellers/'+currentUser.id+'/ratings');
+    const stars=n=>'★'.repeat(n)+'☆'.repeat(5-n);
+    const block=(t,p)=>`<div class="info-card tool-item"><b>${t}</b><p>${p.count?`<span class="stars">★</span> ${esc(String(p.avg))} din 5 · ${p.count} ${p.count===1?'calificativ':'calificative'}`:'Încă nu ai calificative.'}</p></div>`+
+      p.ratings.map(x=>`<div class="info-card tool-item"><b>${stars(x.stars)}</b><p>${esc(x.comment||'Fără comentariu')}</p><p class="muted">${esc(x.who)} · ${fmtDate(x.created_at)}</p></div>`).join('');
+    box.innerHTML='<div class="tool-list">'+block('Ca vânzător',r.seller)+block('Ca cumpărător',r.buyer)+'</div>';
+    return;
+  }
+  if(view==='bulk-price'){
+    box.innerHTML=`<div class="info-card clean-form util-form">
+      <p class="form-note">Modifici prețul anunțurilor active (publicate sau în așteptare). Anunțurile fără preț („La cerere”) nu se schimbă. Prețul final rămâne între 5 și 10.000.000 lei, rotunjit la leu întreg. Vezi mai întâi o previzualizare.</p>
+      <label>Operație<select id="bpDir"><option value="up">Creștere de preț</option><option value="down">Scădere de preț</option></select></label>
+      <label>Valoare<input id="bpVal" type="number" inputmode="decimal" min="0" step="any" placeholder="ex. 10"></label>
+      <label>Tip valoare<select id="bpMode"><option value="percent">Procent (%)</option><option value="amount">Sumă fixă (lei)</option></select></label>
+      <label>Se aplică la<select id="bpCond"><option value="">Toate anunțurile</option><option value="Nouă">Doar piese noi</option><option value="Second-hand">Doar second-hand</option></select></label>
+      <div class="row"><button type="button" class="btn ghost" id="bpPreview">Previzualizare</button><button type="button" class="btn primary hidden" id="bpApply">Aplică modificarea</button></div>
+      <div class="util-out" id="bpOut" aria-live="polite"></div></div>`;
+    const out=$('#bpOut',box), apply=$('#bpApply',box);
+    const body=prev=>({preview:prev||undefined,direction:$('#bpDir',box).value,mode:$('#bpMode',box).value,value:Number($('#bpVal',box).value),condition:$('#bpCond',box).value});
+    ['input','change'].forEach(ev=>box.addEventListener(ev,()=>{ apply.classList.add('hidden'); }));
+    $('#bpPreview',box).addEventListener('click',safe(async()=>{
+      const b=body(true); if(!(b.value>0)){ out.innerHTML='<p class="error-message">Introdu o valoare mai mare ca 0.</p>'; apply.classList.add('hidden'); return; }
+      const r=await api('/api/listings/bulk-price',{method:'POST',body:JSON.stringify(b)});
+      if(!r.count){ out.innerHTML=`<p class="muted">Niciun anunț nu s-ar modifica (${r.total} anunțuri cu preț verificate).</p>`; apply.classList.add('hidden'); return; }
+      out.innerHTML=`<p><b>${r.count}</b> din ${r.total} anunțuri își schimbă prețul. Exemple:</p>`+r.sample.map(x=>`<div class="util-sample"><span>${esc(x.title)}</span><b>${lei(x.old)} → ${lei(x.next)}</b></div>`).join('');
+      apply.textContent=`Aplică pe ${r.count} anunțuri`; apply.classList.remove('hidden');
+    }));
+    apply.addEventListener('click',safe(async()=>{
+      const b=body(false); if(!confirm('Modifici prețurile acestor anunțuri? Acțiunea nu se poate anula automat.')) return;
+      apply.disabled=true;
+      try{ const r=await api('/api/listings/bulk-price',{method:'POST',body:JSON.stringify(b)});
+        out.innerHTML=`<p class="ok-message">Gata: ${r.updated} prețuri actualizate.</p>`; apply.classList.add('hidden'); toast(r.updated+' prețuri actualizate.'); }
+      finally{ apply.disabled=false; }
+    }));
+    return;
+  }
+  if(view==='generator'){
+    box.innerHTML=`<div class="info-card clean-form util-form">
+      <label>Piesa<input id="gnPart" maxlength="60" placeholder="ex. Far dreapta"></label>
+      <label>Marca<input id="gnMake" maxlength="40" placeholder="ex. BMW"></label>
+      <label>Model<input id="gnModel" maxlength="40" placeholder="ex. Seria 3 E90"></label>
+      <label>An (opțional)<input id="gnYear" maxlength="9" placeholder="ex. 2008"></label>
+      <label>Motorizare (opțional)<input id="gnEngine" maxlength="40" placeholder="ex. 2.0 diesel"></label>
+      <label>Cod OEM (opțional)<input id="gnOem" maxlength="40" placeholder="ex. 63117161959"></label>
+      <label>Stare<select id="gnCond"><option>Second-hand</option><option>Nouă</option></select></label>
+      <label>Alte detalii (opțional)<textarea id="gnNotes" maxlength="300" placeholder="ex. mică zgârietură pe carcasă, funcționează perfect"></textarea></label>
+      <div class="row"><button type="button" class="btn primary" id="gnGo">Generează</button></div>
+      <div class="util-out" id="gnOut"></div></div>`;
+    $('#gnGo',box).addEventListener('click',()=>{
+      const v=id=>$('#'+id,box).value.trim(), part=v('gnPart'), make=v('gnMake'), model=v('gnModel');
+      const out=$('#gnOut',box);
+      if(!part||!make||!model){ out.innerHTML='<p class="error-message">Completează piesa, marca și modelul.</p>'; return; }
+      const year=v('gnYear'), engine=v('gnEngine'), oem=v('gnOem'), cond=$('#gnCond',box).value, notes=v('gnNotes');
+      const title=[part,make,model,year].filter(Boolean).join(' ').slice(0,150);
+      const desc=[
+        `${part} pentru ${make} ${model}${year?`, an ${year}`:''}${engine?`, motorizare ${engine}`:''}.`,
+        `Stare: ${cond}.`,
+        oem?`Cod OEM: ${oem}.`:'',
+        notes?notes.replace(/\s+/g,' '):'',
+        'Verifică compatibilitatea cu seria de șasiu sau cu codul OEM înainte de comandă. Trimit poze suplimentare la cerere.'
+      ].filter(Boolean).join('\n');
+      out.innerHTML=`<label>Titlu<input id="gnTitle" readonly value="${esc(title)}"></label><label>Descriere<textarea id="gnDesc" rows="7" readonly>${esc(desc)}</textarea></label>
+        <div class="row"><button type="button" class="btn ghost" id="gnCopyT">Copiază titlul</button><button type="button" class="btn ghost" id="gnCopyD">Copiază descrierea</button><button type="button" class="btn primary" data-go="vinde">Adaugă anunț</button></div>`;
+      $('#gnCopyT',out).addEventListener('click',()=>copyText(title,'Titlu copiat.'));
+      $('#gnCopyD',out).addEventListener('click',()=>copyText(desc,'Descriere copiată.'));
+    });
+    return;
   }
 }
 
@@ -1877,7 +1975,7 @@ async function loadAdmin(){
   }catch(e){ $('#adminContent').innerHTML = `<p>${esc(e.message)}</p>`; }
 }
 function adminBtns(kind, id, items){ return items.map(([label,status])=>`<button class="btn ghost small" data-admin="${kind}" data-id="${id}" data-status="${status}">${label}</button>`).join(''); }
-const EV_LABEL = {listing_create:['📝','Anunț nou'],listing_edit:['✏️','Anunț editat'],listing_sold:['✅','Marcat vândut'],listing_resale:['♻️','Repus la vânzare'],import:['📥','Import CSV'],vacation_on:['🌴','Vacanță pornită'],vacation_off:['🏠','Vacanță oprită'],block:['🚫','Utilizator blocat'],unblock:['↩️','Blocare ridicată'],rating:['⭐','Calificativ nou'],rating_edit:['⭐','Calificativ modificat'],account_delete:['🗑️','Cont șters']};
+const EV_LABEL = {listing_create:['📝','Anunț nou'],listing_edit:['✏️','Anunț editat'],listing_sold:['✅','Marcat vândut'],listing_resale:['♻️','Repus la vânzare'],import:['📥','Import CSV'],price_bulk:['💰','Prețuri actualizate'],vacation_on:['🌴','Vacanță pornită'],vacation_off:['🏠','Vacanță oprită'],block:['🚫','Utilizator blocat'],unblock:['↩️','Blocare ridicată'],rating:['⭐','Calificativ nou'],rating_edit:['⭐','Calificativ modificat'],account_delete:['🗑️','Cont șters']};
 const evWhen = d => new Date(d).toLocaleString('ro-RO');
 function adminEventsHtml(){
   const all = adminData.events || [];
@@ -2070,7 +2168,7 @@ function accountAction(a){
   else if(a==='requests') navigate('requests?t=mine');
   else if(a==='saved') navigate('saved');
   else if(a==='messages') navigate('mesagerie');
-  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices','stats'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
+  else if(['offers','orders-seller','offers-received','orders','messages','notifications','credits','transactions','invoices','stats','offer-questions','bulk-price','generator','b2b','ratings'].includes(a)) navigate('account-tool?view='+encodeURIComponent(a));
 }
 
 
@@ -2676,7 +2774,7 @@ async function csvCheck(){
 }
 document.addEventListener('click', e=>{
   const t=e.target; let el;
-  if(t.closest && t.closest('#csvImportBtn')){
+  if(t.closest && t.closest('#csvImportBtn,[data-csv-import]')){
     csvState.rows=[]; csvState.valid=0; $('#csvFile').value=''; $('#csvStatus').textContent=''; $('#csvStatus').className='csv-status'; $('#csvErrors').innerHTML=''; $('#csvGo').classList.add('hidden');
     $('#csvModal').classList.remove('hidden'); return;
   }

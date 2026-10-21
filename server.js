@@ -1632,6 +1632,23 @@ function normImportRow(r){
   delivery:impYes(g('delivery')),negotiable:impYes(g('negotiable')),description:g('description'),seller_type,images:[]}};
 }
 // Rândurile vin deja separate în coloane de pe telefon/PC. {dry:true} doar verifică și nu salvează nimic.
+// Utile → Actualizare prețuri: crește/scade în masă prețurile anunțurilor active (publicate sau în așteptare) ale utilizatorului.
+// Cu preview:true doar calculează și arată o previzualizare. Anunțurile fără preț („La cerere”) nu se ating; prețul rămâne între 5 și 10.000.000 lei.
+app.post('/api/listings/bulk-price',auth,needVerified,requireDb,ah(async(req,res)=>{
+ if(!throttle(authAttempts,'bulkprice:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+ const b=req.body||{};
+ const mode=b.mode==='amount'?'amount':'percent', dir=b.direction==='down'?-1:1, val=Number(b.value);
+ if(!Number.isFinite(val)||val<=0||(mode==='percent'&&val>90)||(mode==='amount'&&val>1000000))return res.status(400).json({error:'DATE_INVALIDE'});
+ const cond=['Nouă','Second-hand'].includes(b.condition)?b.condition:null;
+ const rows=(await pool.query("SELECT id,title,price FROM listings WHERE user_id=$1 AND status IN ('approved','pending') AND price>0 AND ($2::text IS NULL OR condition=$2) ORDER BY created_at DESC LIMIT 2000",[req.user.id,cond])).rows;
+ const calc=p=>Math.min(10000000,Math.max(5,Math.round(mode==='percent'?p*(1+dir*val/100):p+dir*val)));
+ const changes=rows.map(r=>({id:r.id,title:r.title,old:Number(r.price),next:calc(Number(r.price))})).filter(c=>c.next!==c.old);
+ if(b.preview)return res.json({count:changes.length,total:rows.length,sample:changes.slice(0,5).map(c=>({title:c.title,old:c.old,next:c.next}))});
+ if(!changes.length)return res.json({updated:0});
+ await pool.query('UPDATE listings l SET price=v.p FROM UNNEST($1::int[],$2::numeric[]) AS v(id,p) WHERE l.id=v.id AND l.user_id=$3',[changes.map(c=>c.id),changes.map(c=>c.next),req.user.id]);
+ logEvent(req.user.id,'price_bulk','user',req.user.id,changes.length+' prețuri '+(dir>0?'majorate':'reduse')+' cu '+val+(mode==='percent'?'%':' lei'));
+ res.json({updated:changes.length});
+}));
 app.post('/api/listings/import',auth,needVerified,requireDb,ah(async(req,res)=>{
  const b=req.body||{}, dry=!!b.dry, rows=b.rows;
  if(!Array.isArray(rows)||!rows.length)return res.status(400).json({error:'CSV_GOL'});

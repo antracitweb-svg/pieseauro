@@ -212,3 +212,12 @@ Două taburi noi în panoul de admin (`#/admin`), ca administratorul să vadă c
 - **Funcții noi**: carduri cu sesiuni active, vânzători în vacanță, blocări, căutări salvate (cu alerte), calificative (medie vânzători/cumpărători) și importuri din ultimele 30 de zile; liste cu vânzătorii în vacanță, blocările recente și calificativele recente. Butonul **Șterge calificativul** elimină un calificativ abuziv și rămâne înregistrat în tabul Activitate (`delete_rating`).
 - Endpointuri noi (doar admin): `GET /api/admin/events?kind=`, `GET /api/admin/features`, `DELETE /api/admin/ratings/:seller|buyer/:id`.
 - Evenimentele apar doar de la această versiune încolo; ce s-a întâmplat înainte nu poate fi recuperat.
+
+
+## V36 — Meniul „Contul meu” reorganizat + instrumente Utile
+- Secțiuni: Vânzător (Anunțurile mele, Oferte la cereri, Comenzi din oferte, Întrebări pe oferte), Cumpărător (+ Căutări salvate), Mesagerie, **Utile**, Financiar, **Calificative**, Setări.
+- **Utile**: Import CSV (mutat din „Anunțurile mele”), Actualizare prețuri, Generator de anunțuri, Statistici cont, B2B.
+- **Actualizare prețuri**: `POST /api/listings/bulk-price` `{direction:'up'|'down', mode:'percent'|'amount', value, condition?, preview?}`. Doar anunțurile proprii active (publicate sau în așteptare) și cu preț; rezultatul rămâne între 5 și 10.000.000 lei; cu `preview:true` nu scrie nimic.
+- **Generator de anunțuri**: doar în browser (titlu + descriere de copiat), fără endpoint nou.
+- **Calificative**: folosește `GET /api/sellers/:id/ratings` pentru utilizatorul logat.
+- **Întrebări pe oferte** și **B2B** sunt deocamdată ecrane simple (trimit către Mesaje / Import CSV / Actualizare prețuri).

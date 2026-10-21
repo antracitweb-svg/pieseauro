@@ -1820,3 +1820,16 @@ h1,h2{text-wrap:wrap}
 .ssr-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.ssr-cta .btn{text-decoration:none;display:inline-block}
 .ssr-foot{padding:18px 0 32px;color:var(--muted);font-size:13px}.ssr-foot a{color:#1264ac}
 @media(max-width:560px){.ssr-item-link{grid-template-columns:72px 1fr}.ssr-thumb{width:72px;height:72px}.ssr-item-price{grid-column:2;font-size:16px}}
+
+/* ===== Utile: actualizare prețuri / generator / B2B ===== */
+.util-form{display:grid;gap:12px}
+.util-form label{display:grid;gap:6px;font-weight:700;font-size:14px}
+.util-form input,.util-form select,.util-form textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-weight:400;background:#fff;color:var(--ink)}
+.util-form textarea{min-height:110px;resize:vertical}
+.util-form .row{display:flex;gap:10px;flex-wrap:wrap}
+.util-form .btn{justify-content:center}
+.util-out{display:grid;gap:10px}
+.util-sample{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.util-sample span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.util-sample b{white-space:nowrap}
+.stars{color:#e8a317}
