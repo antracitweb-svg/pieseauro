@@ -2053,3 +2053,7 @@ h1,h2{text-wrap:wrap}
 }
 /* V37c: datele anunțului în caseta proprietarului (vizibile doar lui) */
 .ad-owner .ad-owner-dates{flex:0 0 100%;margin:2px 0 0;font-size:14px;line-height:1.55;color:#14110c}
+/* V38b: butoanele Promovează / Actualizează (UP) în caseta proprietarului */
+.ad-owner .btn.ad-promo{background:var(--gold,#b8935a);border:1px solid var(--gold,#b8935a);color:#fff}
+.ad-owner .btn.ad-promo:hover{background:var(--gold2,#8f6d38);border-color:var(--gold2,#8f6d38)}
+@media(max-width:820px){.ad-owner-btns{gap:8px}.ad-owner .btn,.ad-owner .btn.small{min-height:40px;font-size:14px}}
