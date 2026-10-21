@@ -22,7 +22,6 @@ Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și con
 | `APP_URL` | recomandat | adresa publică, folosită în linkurile din emailuri |
 | `RESEND_API_KEY`, `RESEND_FROM` | pentru emailuri | recuperare parolă, schimbare email (sender verificat în Resend) |
 | `REQUIRE_VERIFIED_EMAIL` | nu | `true` = doar conturile cu email confirmat pot publica anunțuri, cereri, oferte și mesaje (merge doar dacă `RESEND_*` e configurat, altfel e ignorat) |
-| `VEHICLE_CATALOG_URL` | nu | sursa catalogului de vehicule (setată deja în `render.yaml`) |
 
 Fără `RESEND_*`, „Ai uitat parola?” răspunde că emailul nu este configurat.
 

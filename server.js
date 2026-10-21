@@ -57,12 +57,15 @@ let catalogRetryAt = 0;
 // requiring another service. Entries expire automatically.
 const authAttempts = new Map();
 const recoveryAttempts = new Map();
+// Cheile modificate se scriu periodic în Postgres (vezi flushRateState), ca limitările să supraviețuiască repornirilor.
+const RL_DIRTY=new Map();
+function markDirty(map,key){let s=RL_DIRTY.get(map);if(!s)RL_DIRTY.set(map,s=new Set());s.add(key);}
 function throttle(map,key,limit,windowMs){
  const now=Date.now();
  const old=map.get(key)||[];
  const fresh=old.filter(t=>now-t<windowMs);
  if(fresh.length>=limit){ map.set(key,fresh); return false; }
- fresh.push(now); map.set(key,fresh); return true;
+ fresh.push(now); map.set(key,fresh); markDirty(map,key); return true;
 }
 setInterval(()=>{const now=Date.now();for(const m of [authAttempts,recoveryAttempts])for(const [k,v] of m){if(!v.length||now-v[v.length-1]>15*60*1000)m.delete(k);}},10*60*1000).unref();
 function clientIp(req){return String(req.ip||req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();}
@@ -99,20 +102,37 @@ app.use(helmet({
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
 if(compression)app.use(compression());
-app.use(express.json({limit:'6mb'}));
+// Limită mare (6 MB) doar pe rutele care primesc poze/CSV; restul primesc maximum 256 KB.
+const JSON_SMALL=express.json({limit:'256kb'}),JSON_BIG=express.json({limit:'6mb'});
+const BIG_JSON_RE=/^\/api\/(listings(\/(\d+|import))?|requests(\/\d+\/offers)?|offers\/\d+|account\/store)\/?$/;
+app.use((req,res,next)=>(['POST','PUT','PATCH'].includes(req.method)&&BIG_JSON_RE.test(req.path))?JSON_BIG(req,res,next):JSON_SMALL(req,res,next));
 app.use(cookieParser());
+// Protecție CSRF suplimentară (pe lângă sameSite=lax): cererile care modifică date și vin cu un Origin străin sunt respinse.
+// Cererile fără Origin (scripturi, unele clienți vechi) trec; browserele trimit Origin la orice POST/PUT/PATCH/DELETE.
+app.use((req,res,next)=>{
+ if(req.method==='GET'||req.method==='HEAD'||req.method==='OPTIONS')return next();
+ const o=req.headers.origin;if(!o)return next();
+ try{
+  const allowed=new Set([String(req.headers.host||'').toLowerCase()]);
+  for(const u of [process.env.APP_URL,process.env.RENDER_EXTERNAL_URL]){try{if(u)allowed.add(new URL(u).host.toLowerCase());}catch{}}
+  if(allowed.has(new URL(o).host.toLowerCase()))return next();
+ }catch{}
+ return res.status(403).json({error:'ORIGIN_INVALID'});
+});
 // Cache scurt (10 s) pentru căutările publice; se golește la orice modificare de anunțuri/conturi.
 let SEO_IDX=null;
 const LIST_CACHE=new Map(),LIST_CACHE_TTL=10000,LIST_CACHE_MAX=300;
-app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listings|admin\/users|account)/.test(req.path))res.on('finish',()=>{LIST_CACHE.clear();SEO_IDX=null;});next();});
+app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listings|admin\/users|account|orders)/.test(req.path))res.on('finish',()=>{LIST_CACHE.clear();SEO_IDX=null;});next();});
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 /* ===== BOT-GUARD:START — verificare de browser, limitare cereri, blocare scrapere ===== */
 const dns=require('dns').promises;
 const BOT_CHECK=IS_PROD&&String(process.env.BOT_CHECK||'true').toLowerCase()!=='false';
 const BOT_BITS=Math.min(20,Math.max(10,Number(process.env.BOT_DIFFICULTY)||15));
-const BOT_BASE=process.env.BOT_SECRET||((DB_URL||process.env.ADMIN_PASSWORD)?DB_URL+'|'+(process.env.ADMIN_PASSWORD||''):'');
-// Fără BOT_SECRET/DATABASE_URL, cheia e aleatoare (verificările se refac la fiecare repornire).
-const BOT_SECRET=BOT_BASE?crypto.createHash('sha256').update('bot|'+BOT_BASE).digest('hex'):crypto.randomBytes(32).toString('hex');
+// BOT_SECRET este obligatoriu în producție (când BOT_CHECK e activ). Nu mai derivăm cheia din DATABASE_URL/ADMIN_PASSWORD.
+if(BOT_CHECK&&!process.env.BOT_SECRET){console.error('EROARE FATALĂ: BOT_SECRET lipsește. Setează-l (min. 32 caractere aleatoare) sau pune BOT_CHECK=false.');process.exit(1);}
+if(BOT_CHECK&&String(process.env.BOT_SECRET).length<32){console.error('EROARE FATALĂ: BOT_SECRET este prea scurt (minimum 32 de caractere).');process.exit(1);}
+// În dezvoltare (fără BOT_CHECK) cheia e aleatoare la fiecare pornire.
+const BOT_SECRET=process.env.BOT_SECRET?crypto.createHash('sha256').update('bot|'+process.env.BOT_SECRET).digest('hex'):crypto.randomBytes(32).toString('hex');
 const botHmac=v=>crypto.createHmac('sha256',BOT_SECRET).update(v).digest('base64url');
 const uaHash=req=>crypto.createHash('sha256').update(String(req.headers['user-agent']||'')).digest('base64url').slice(0,16);
 const safeEq=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
@@ -134,6 +154,52 @@ async function verifiedBot(ip,ua){
  goodBotCache.set(ip,{ok,until:Date.now()+24*3600*1000});return ok;
 }
 setInterval(()=>{const now=Date.now();for(const m of [apiHits,dataHits,botAttempts])for(const [k,v] of m){if(!v.length||now-v[v.length-1]>10*60*1000)m.delete(k);}for(const [k,t] of usedChal)if(t<now)usedChal.delete(k);},5*60*1000).unref();
+/* ===== Persistență limitări: scriere periodică în Postgres (tabel rate_state), citire la pornire ===== */
+// Se salvează doar hărțile de securitate cu volum mic (auth, recuperare, bot-check, challenge-uri folosite).
+// apiHits/dataHits au fereastră de 60 s, deci nu merită persistate.
+const RL_NAMES=new Map([[authAttempts,'auth'],[recoveryAttempts,'recovery'],[botAttempts,'bot'],[usedChal,'chal']]);
+const RL_BY_NAME=new Map([...RL_NAMES].map(([m,n])=>[n,m]));
+let rlFlushing=false;
+async function flushRateState(){
+ if(!pool||rlFlushing||!RL_DIRTY.size)return;
+ rlFlushing=true;
+ try{
+  const jobs=[...RL_DIRTY];RL_DIRTY.clear();
+  const now=Date.now(),up=[[],[],[],[]],del=new Map();
+  for(const [m,keys] of jobs){
+   const name=RL_NAMES.get(m);if(!name)continue;
+   for(const k of keys){
+    if(k.length>200)continue;
+    const v=m.get(k);
+    if(v===undefined||(Array.isArray(v)&&!v.length)){(del.get(name)||del.set(name,[]).get(name)).push(k);continue;}
+    up[0].push(name);up[1].push(k);
+    if(Array.isArray(v)){up[2].push(v.join(','));up[3].push(now+2*3600*1000);}
+    else{up[2].push(String(v));up[3].push(Number(v)+60*1000);}
+   }
+  }
+  for(let i=0;i<up[0].length;i+=500){
+   await pool.query('INSERT INTO rate_state(map,key,data,exp) SELECT * FROM unnest($1::text[],$2::text[],$3::text[],$4::bigint[]) ON CONFLICT (map,key) DO UPDATE SET data=EXCLUDED.data,exp=EXCLUDED.exp',up.map(a=>a.slice(i,i+500)));
+  }
+  for(const [name,keys] of del)await pool.query('DELETE FROM rate_state WHERE map=$1 AND key=ANY($2::text[])',[name,keys]);
+ }catch(e){console.error('rate_state flush',e.message);}
+ finally{rlFlushing=false;}
+}
+async function loadRateState(){
+ if(!pool)return;
+ try{
+  const now=Date.now();
+  await pool.query('DELETE FROM rate_state WHERE exp<$1',[now]);
+  const r=await pool.query('SELECT map,key,data FROM rate_state');
+  let n=0;
+  for(const row of r.rows){
+   const m=RL_BY_NAME.get(row.map);if(!m)continue;
+   if(row.map==='chal'){m.set(row.key,Number(row.data));n++;continue;}
+   const ts=row.data.split(',').map(Number).filter(t=>t>now-3600*1000&&t<=now);
+   if(ts.length){m.set(row.key,ts);n++;}
+  }
+  console.log('Limitări restaurate din baza de date:',n);
+ }catch(e){console.error('rate_state load',e.message);}
+}
 const BOT_JS=`(function(){var el=document.querySelector('script[data-c]');if(!el)return;var chal=el.getAttribute('data-c'),bits=Number(el.getAttribute('data-b'))||15,msg=document.getElementById('bc-msg'),enc=new TextEncoder();
 function zb(h){var n=0;for(var i=0;i<h.length;i++){if(h[i]===0){n+=8;continue;}n+=Math.clz32(h[i])-24;break;}return n;}
 function fail(t){msg.textContent=t;msg.className='bc-err';}
@@ -156,7 +222,7 @@ app.post('/api/botcheck',(req,res)=>{
  const age=Date.now()-Number(d.t);
  if(!(age>=0&&age<5*60*1000)||d.u!==uaHash(req)||usedChal.has(d.n))return res.status(400).json({error:'BOT_CHECK'});
  if(zeroBits(crypto.createHash('sha256').update(chal+':'+counter).digest())<Number(d.b))return res.status(400).json({error:'BOT_CHECK'});
- usedChal.set(d.n,Date.now()+10*60*1000);
+ usedChal.set(d.n,Date.now()+10*60*1000);markDirty(usedChal,d.n);
  const exp=Date.now()+12*3600*1000,u=uaHash(req);
  res.cookie('bv',exp+'.'+u+'.'+botHmac(exp+'.'+u),safeCookieOptions(12*3600*1000));
  res.json({ok:true});
@@ -326,6 +392,8 @@ async function dbReady(){
  migrations.push(
   'CREATE TABLE IF NOT EXISTS login_attempts (key TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
   'CREATE INDEX IF NOT EXISTS login_attempts_key_idx ON login_attempts(key,at)',
+  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE',
+  'CREATE TABLE IF NOT EXISTS rate_state (map TEXT NOT NULL, key TEXT NOT NULL, data TEXT NOT NULL, exp BIGINT NOT NULL, PRIMARY KEY(map,key))',
   'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS kind TEXT',
   'CREATE TABLE IF NOT EXISTS seller_ratings (id SERIAL PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, stars SMALLINT NOT NULL CHECK(stars BETWEEN 1 AND 5), comment TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ)',
   'CREATE INDEX IF NOT EXISTS seller_ratings_seller_idx ON seller_ratings(seller_id)',
@@ -364,7 +432,7 @@ async function dbReady(){
  await pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
  await pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'");
  if(adminPass&&(adminPass.length<12||weakPassword(adminPass,{email:adminEmail})))console.warn('ATENȚIE: ADMIN_PASSWORD este slabă. Folosește minimum 12 caractere și schimb-o după prima autentificare.');
- if(adminEmail&&adminPass){const r=await pool.query('SELECT id FROM users WHERE email=$1',[adminEmail.toLowerCase()]);if(!r.rowCount){const hash=await bcrypt.hash(adminPass,12);await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'admin')",['Administrator',adminEmail.toLowerCase(),hash]);}else{await pool.query("UPDATE users SET role='admin' WHERE email=$1 AND role<>'admin'",[adminEmail.toLowerCase()]);}}
+ if(adminEmail&&adminPass){const r=await pool.query('SELECT id FROM users WHERE email=$1',[adminEmail.toLowerCase()]);if(!r.rowCount&&IS_PROD&&(adminPass.length<12||weakPassword(adminPass,{email:adminEmail}))){console.error('ADMIN_PASSWORD este prea slabă (minimum 12 caractere, fără parole comune): contul de administrator NU a fost creat. Setează o parolă puternică în Render și repornește.');}else if(!r.rowCount){const hash=await bcrypt.hash(adminPass,12);await pool.query("INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,'admin')",['Administrator',adminEmail.toLowerCase(),hash]);}else{await pool.query("UPDATE users SET role='admin' WHERE email=$1 AND role<>'admin'",[adminEmail.toLowerCase()]);}}
  await pool.query("INSERT INTO user_phones(user_id,phone,verified) SELECT id,phone,email_verified FROM users WHERE phone IS NOT NULL AND phone<>'' AND NOT EXISTS (SELECT 1 FROM user_phones p WHERE p.user_id=users.id AND p.phone=users.phone)");
  return true;
 }
@@ -388,12 +456,12 @@ async function auth(req,res,next){
  try{
   const token=req.cookies.session;
   if(!token)return res.status(401).json({error:'AUTH_REQUIRED'});
-  const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status,u.email_verified FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(token)]);
+  const r=await pool.query('SELECT s.id session_id,s.expires_at,s.last_seen_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status,u.email_verified FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(token)]);
   if(!r.rowCount)return res.status(401).json({error:'AUTH_REQUIRED'});
   const u=r.rows[0];
   if(u.status!=='active')return res.status(403).json({error:'ACCOUNT_BLOCKED'});
   req.sessionId=u.session_id; req.user=u;
-  await pool.query('UPDATE sessions SET last_seen_at=NOW() WHERE id=$1',[u.session_id]);
+  if(!u.last_seen_at||Date.now()-new Date(u.last_seen_at).getTime()>60000)pool.query('UPDATE sessions SET last_seen_at=NOW() WHERE id=$1',[u.session_id]).catch(e=>console.error('last_seen',e.message));
   next();
  }catch(e){console.error(e);return res.status(401).json({error:'AUTH_REQUIRED'});}
 }
@@ -527,7 +595,7 @@ async function ensureVehicleDb(){
  }catch(e){console.error('Vehicle DB sync failed:',e.message);}
 }
 
-app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'local',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':'local',auth:'secure-revocable-session-cookie'}));
+app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'local',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':'local'}));
 app.get('/api/catalog/makes',async(req,res)=>{
  const c=await getVehicleRows(); const seen=new Map();
  for(const x of c){const k=vkey(x.make);if(k&&!seen.has(k))seen.set(k,x.make);}
@@ -721,12 +789,13 @@ app.post('/api/auth/resend-verification',auth,requireDb,async(req,res)=>{
 });
 
 app.post('/api/auth/reset-password',requireDb,async(req,res)=>{
+ const token=String((req.body||{}).token||'').trim();
+ const password=String((req.body||{}).password||'');
+ if(!token||token.length>200||password.length<8||password.length>72)return res.status(400).json({error:'DATE_INVALIDE'});
+ if(weakPassword(password))return res.status(400).json({error:'PAROLA_SLABA'});
+ if(!throttle(recoveryAttempts,'reset:'+clientIp(req),10,15*60*1000))return res.status(429).json({error:'RECOVERY_RATE_LIMIT'});
  const client=await pool.connect();
  try{
-  const token=String((req.body||{}).token||'').trim();
-  const password=String((req.body||{}).password||'');
-  if(!token||password.length<8||password.length>72)return res.status(400).json({error:'DATE_INVALIDE'});
-  if(weakPassword(password))return res.status(400).json({error:'PAROLA_SLABA'});
   await client.query('BEGIN');
   const r=await client.query('SELECT id,user_id FROM password_resets WHERE token_hash=$1 AND expires_at>NOW() AND used_at IS NULL LIMIT 1 FOR UPDATE',[hashToken(token)]);
   if(!r.rowCount){await client.query('ROLLBACK');return res.status(400).json({error:'RESET_EXPIRED'});}
@@ -877,13 +946,15 @@ app.post('/api/auth/login',requireDb,async(req,res)=>{
   const id=normalizeIdentifier(identifier);
   if(!id||!String(password||''))return res.status(400).json({error:'DATE_INVALIDE'});
   const key=`${clientIp(req)}:${id.toLowerCase()}`;
+  // Limită pe IP, indiferent de identificator: fiecare încercare costă un bcrypt (CPU).
+  if(!throttle(authAttempts,'loginip:'+clientIp(req),40,15*60*1000))return res.status(429).json({error:'LOGIN_RATE_LIMIT'});
   if(!throttle(authAttempts,key,8,15*60*1000)||!throttle(authAttempts,'acct:'+id.toLowerCase(),40,15*60*1000)||await loginBlocked('ip:'+key,'acct:'+id.toLowerCase()))return res.status(429).json({error:'LOGIN_RATE_LIMIT'});
   const r=await pool.query("SELECT * FROM users WHERE LOWER(email)=LOWER($1) OR LOWER(COALESCE(nickname,''))=LOWER($1) LIMIT 1",[id]);
   // Comparăm mereu cu un hash (și pentru conturi inexistente) ca să nu se poată afla ce emailuri există după timpul de răspuns.
   const okPass=await bcrypt.compare(String(password).slice(0,72),r.rowCount?r.rows[0].password_hash:DUMMY_HASH);
   if(!r.rowCount||!okPass){await loginFailed('ip:'+key,'acct:'+id.toLowerCase());return res.status(401).json({error:'INVALID_LOGIN'});}
   if(r.rows[0].status!=='active')return res.status(403).json({error:'ACCOUNT_BLOCKED'});
-  authAttempts.delete(key);
+  authAttempts.delete(key);markDirty(authAttempts,key);
   pool.query('DELETE FROM login_attempts WHERE key=$1',['ip:'+key]).catch(()=>{});
   const u=r.rows[0]; const session=await createSession(u,req,remember!==false);
   res.cookie('session',session.token,safeCookieOptions(session.maxAge));
@@ -1536,7 +1607,17 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!county||(l.delivery&&(!city||!addr)))return res.status(400).json({error:'ADRESA_LIPSA'});
  const dup=await pool.query("SELECT 1 FROM orders WHERE buyer_id=$1 AND listing_id=$2 AND status='new' LIMIT 1",[req.user.id,l.id]);
  if(dup.rowCount)return res.status(409).json({error:'COMANDA_EXISTA'});
- const r=await pool.query('INSERT INTO orders(buyer_id,seller_id,listing_id,title,price,quantity,ship_county,ship_city,ship_address,note) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',[req.user.id,l.user_id,l.id,l.title,(Number(l.price)||0)*qty,qty,county,city,addr,note]);
+ // Stocul se rezervă atomic la comandă (UPDATE condiționat): doi cumpărători nu pot lua aceeași bucată.
+ const c=await pool.connect();
+ let r;
+ try{
+  await c.query('BEGIN');
+  const up=await c.query("UPDATE listings SET quantity=COALESCE(quantity,1)-$2 WHERE id=$1 AND status='approved' AND COALESCE(quantity,1)>=$2 RETURNING quantity",[l.id,qty]);
+  if(!up.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'CANTITATE_INVALIDA'});}
+  if(Number(up.rows[0].quantity)<=0)await c.query("UPDATE listings SET status='sold' WHERE id=$1 AND status='approved'",[l.id]);
+  r=await c.query('INSERT INTO orders(buyer_id,seller_id,listing_id,title,price,quantity,ship_county,ship_city,ship_address,note,stock_reserved) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE) RETURNING id',[req.user.id,l.user_id,l.id,l.title,(Number(l.price)||0)*qty,qty,county,city,addr,note]);
+  await c.query('COMMIT');
+ }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
  await notify(l.user_id,'Comandă nouă pentru „'+l.title+'” ('+qty+' buc.). Vezi „Comenzi primite”.','order');
  res.status(201).json({ok:true,order_id:r.rows[0].id});
 }));
@@ -1549,12 +1630,25 @@ app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
 app.patch('/api/orders/:id/status',auth,requireDb,ah(async(req,res)=>{
  const to=String((req.body||{}).status||'');
  if(!['confirmed','shipped','completed','cancelled'].includes(to))return res.status(400).json({error:'STATUS_INVALIDE'});
- const o=(await pool.query('SELECT id,buyer_id,seller_id,title,status FROM orders WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[req.params.id,req.user.id])).rows[0];
+ const o=(await pool.query('SELECT id,buyer_id,seller_id,title,status,listing_id,quantity,stock_reserved FROM orders WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[req.params.id,req.user.id])).rows[0];
  if(!o)return res.status(404).json({error:'NOT_FOUND'});
  const seller=o.seller_id===req.user.id;
  if(!seller&&!(to==='cancelled'&&o.status==='new'))return res.status(403).json({error:'INTERZIS'});
  if(['cancelled','completed'].includes(o.status))return res.status(409).json({error:'COMANDA_INCHISA'});
- await pool.query('UPDATE orders SET status=$1 WHERE id=$2',[to,o.id]);
+ // Tranziții permise (aceleași ca butoanele din interfață): „finalizată” doar după „expediată”.
+ const NEXT={new:['confirmed','shipped','cancelled'],confirmed:['shipped','cancelled'],shipped:['completed','cancelled']};
+ if(!(NEXT[o.status]||[]).includes(to))return res.status(409).json({error:'STATUS_INVALIDE'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const u=await c.query('UPDATE orders SET status=$1'+(to==='cancelled'?',stock_reserved=FALSE':'')+' WHERE id=$2 AND status=$3 RETURNING id',[to,o.id,o.status]);
+  if(!u.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'COMANDA_INCHISA'});}
+  if(to==='cancelled'&&o.stock_reserved&&o.listing_id){
+   // Stocul rezervat se întoarce; un anunț „vândut” automat (stoc 0) revine la „publicat”.
+   await c.query("UPDATE listings SET quantity=COALESCE(quantity,0)+$2,status=CASE WHEN status='sold' AND COALESCE(quantity,0)<=0 THEN 'approved' ELSE status END WHERE id=$1",[o.listing_id,Number(o.quantity)||1]);
+  }
+  await c.query('COMMIT');
+ }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
  const L={confirmed:'confirmată',shipped:'expediată',completed:'finalizată',cancelled:'anulată'};
  await notify(seller?o.buyer_id:o.seller_id,'Comanda pentru „'+(o.title||'piesă')+'” a fost '+L[to]+'.','order');
  res.json({ok:true,status:to});
@@ -1955,6 +2049,7 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
 (async()=>{
  try{
   if(pool)await dbReady();
+  if(pool)await loadRateState();
   const server=app.listen(PORT,()=>console.log(`AutoPiese V26 running on ${PORT}`));
   if(pool){ensureVehicleDb();setInterval(ensureVehicleDb,12*3600*1000).unref();}
   /* anti-adormire: se apeleaza singur pe adresa publica, ca Render sa vada trafic (dezactivare: KEEP_AWAKE=0) */
@@ -1965,9 +2060,10 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
   }
   if(pool)setInterval(()=>pool.query("DELETE FROM site_events WHERE created_at<NOW()-INTERVAL '180 days'").catch(()=>{}),6*3600*1000).unref();
   if(pool)setInterval(()=>pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'").catch(()=>{}),30*60*1000).unref();
+  if(pool){setInterval(flushRateState,10*1000).unref();setInterval(()=>pool.query('DELETE FROM rate_state WHERE exp<$1',[Date.now()]).catch(()=>{}),30*60*1000).unref();}
   if(pool){purgeStats();setInterval(purgeStats,60*60*1000).unref();}
   if(pool)setInterval(()=>pool.query('DELETE FROM sessions WHERE expires_at < NOW()').catch(e=>console.error('session cleanup',e.message)),60*60*1000).unref();
-  const stop=()=>{server.close(()=>{(pool?pool.end():Promise.resolve()).finally(()=>process.exit(0));});setTimeout(()=>process.exit(0),8000).unref();};
+  const stop=()=>{server.close(()=>{(pool?flushRateState().catch(()=>{}).then(()=>pool.end()):Promise.resolve()).finally(()=>process.exit(0));});setTimeout(()=>process.exit(0),8000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
  }catch(e){console.error(e);process.exit(1);}
 })();
