@@ -1012,14 +1012,16 @@ function contactHtml(phones, who, sellerId, own, listingId){
     return `<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(tel)}"${tr}>Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}"${tr}>WhatsApp</a>`:''}</div></div>`;
   }).join('')+msgBtn;
 }
+let detailPhones = [];
 function detailHtml(x, phones, canContact){
   const fav = favorites.includes(x.id);
   const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
   const spec = [['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
   const phone1 = (phones||[]).slice(0,1);
+  detailPhones = (phones||[]).slice(0,4);
   let callbar = '';
   if(canContact){
-    const ph = phone1.length ? `<a class="btn primary ad-call" data-track-phone="${Number(x.id)}" href="tel:${esc(String(phone1[0].phone).replace(/[^\d+]/g,''))}"><span class="ad-call-ico" aria-hidden="true">📞${phone1[0].is_whatsapp?'<i>WA</i>':''}</span><span>${esc(fmtPhone(phone1[0].phone))}</span></a>` : '';
+    const ph = phone1.length ? `<button type="button" class="btn primary ad-call" data-phones-open="${Number(x.id)}"><span class="ad-call-ico" aria-hidden="true">📞${phone1[0].is_whatsapp?'<i>WA</i>':''}</span><span>${esc(fmtPhone(phone1[0].phone))}</span></button>` : '';
     const cart = `<button type="button" class="btn ghost ad-cartbtn" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button>`;
     callbar = `<div class="ad-callbar">${ph}${x.seller_vacation?'':cart}</div>`;
   }
@@ -1030,7 +1032,16 @@ function detailHtml(x, phones, canContact){
   const isOwner = !!(currentUser && x.user_id && currentUser.id===x.user_id);
   const ownSt = x.status || ((state.loaded.find(l=>l.id===x.id)||{}).status) || '';
   const ownLbl = (STATUS_LABEL[ownSt]||[''])[0];
-  const ownerBox = isOwner ? `<div class="ad-owner"><div class="ad-owner-btns">${ownSt!=='blocked'?`<button type="button" class="btn ghost small" data-edit-listing="${x.id}">✎ Editează</button>`:''}${ownSt==='approved'?`<button type="button" class="btn small ad-promo" data-d-promo="${x.id}">📣 Promovează</button><button type="button" class="btn ghost small" data-d-bump="${x.id}">↑ Actualizează (UP)</button>`:''}${(ownSt==='approved'||ownSt==='sold')?`<button type="button" class="btn ghost small" data-sold-listing="${x.id}" data-to="${ownSt==='sold'?'approved':'sold'}">${ownSt==='sold'?'↺ Repune la vânzare':'✓ Marchează vândut'}</button>`:''}<button type="button" class="btn danger small" data-del-listing="${x.id}">🗑 Șterge</button></div><p class="ad-owner-info">${[ownLbl?esc(ownLbl):'',x.views!=null?(Number(x.views)||0)+' vizualizări':''].filter(Boolean).join(' · ')}</p><p class="ad-owner-dates">Data adăugării: ${esc(fmtDateTime(x.added_at||x.created_at))}<br>Data ultimei actualizări: ${esc(fmtDateTime(x.created_at))} (${esc(fmtAgo(x.created_at))})</p></div>` : '';
+  const ownBtns = [];
+  if(isOwner){
+    if(ownSt==='approved') ownBtns.push(`<button type="button" class="btn small ad-promo" data-d-promo="${x.id}">📣 Promovează</button>`);
+    if(ownSt!=='blocked') ownBtns.push(`<button type="button" class="btn ghost small" data-edit-listing="${x.id}">✎ Editează</button>`);
+    if(ownSt==='approved') ownBtns.push(`<button type="button" class="btn ghost small" data-d-bump="${x.id}">↑ Actualizează (UP)</button>`);
+    if(ownSt==='approved'||ownSt==='sold') ownBtns.push(`<button type="button" class="btn ghost small" data-sold-listing="${x.id}" data-to="${ownSt==='sold'?'approved':'sold'}">${ownSt==='sold'?'↺ Repune la vânzare':'✓ Marchează vândut'}</button>`);
+    ownBtns.push(`<button type="button" class="btn danger small" data-del-listing="${x.id}">🗑 Șterge</button>`);
+  }
+  const ownPer = ownBtns.length<=3 ? Math.max(ownBtns.length,1) : Math.ceil(ownBtns.length/2);
+  const ownerBox = isOwner ? `<div class="ad-owner"><div class="ad-owner-btns" style="--per:${ownPer}">${ownBtns.join('')}</div><p class="ad-owner-info">${[ownLbl?esc(ownLbl):'',x.views!=null?(Number(x.views)||0)+' vizualizări':''].filter(Boolean).join(' · ')}</p><p class="ad-owner-dates">Data adăugării: ${esc(fmtDateTime(x.added_at||x.created_at))}<br>Data ultimei actualizări: ${esc(fmtDateTime(x.created_at))} (${esc(fmtAgo(x.created_at))})</p></div>` : '';
   return `<div class="ad">
   <div class="ad-main">
     <nav class="ad-crumbs" aria-label="Navigare anunț">${crumbs}</nav>
@@ -2234,6 +2245,13 @@ document.addEventListener('click', e=>{
   const t = e.target;
   if(t.classList && t.classList.contains('modal')){ closeModal(t); return; }
   let el;
+  if((el=t.closest('[data-phones-open]'))){
+    e.stopPropagation();
+    const lid=Number(el.dataset.phonesOpen), pm=$('#phonesModal'), pc=$('#phonesContent');
+    pc.innerHTML=`<div class="eyebrow">CONTACT</div><h2>Contactează vânzătorul</h2>${contactHtml(detailPhones,'Vânzătorul',null,false,lid)}`;
+    pm.classList.remove('hidden');
+    return;
+  }
   if((el=t.closest('[data-fav]'))){ e.stopPropagation(); toggleFavorite(Number(el.dataset.fav)); return; }
   if((el=t.closest('[data-cart]'))){ e.stopPropagation(); toggleCart(Number(el.dataset.cart),el); return; }
   if((el=t.closest('[data-cart-del]'))){ toggleCart(Number(el.dataset.cartDel)); renderAccountTool('cart'); return; }
@@ -2338,7 +2356,7 @@ document.addEventListener('keydown', e=>{
     if(e.key==='ArrowLeft'){ e.preventDefault(); moveLightbox(-1); return; }
     if(e.key==='ArrowRight'){ e.preventDefault(); moveLightbox(1); return; }
   }
-  if(e.key==='Escape'){ const m=$$('.modal').find(x=>!x.classList.contains('hidden')); if(m) closeModal(m); }
+  if(e.key==='Escape'){ const m=$$('.modal').filter(x=>!x.classList.contains('hidden')).pop(); if(m) closeModal(m); }
   if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.listing[data-open],.ar-row[data-open]')){ e.preventDefault(); openDetail(Number(e.target.dataset.open)); }
   if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.ar-row[data-open-request]')){ e.preventDefault(); openRequestModal(Number(e.target.dataset.openRequest), e.target.dataset.mode||'public'); }
 });

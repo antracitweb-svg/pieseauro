@@ -995,7 +995,7 @@ app.get('/api/listings/:id',requireDb,async(req,res)=>{
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const x=r.rows[0]; let phones=[];
  if(req.query.noview!=='1'){const me=await optUserId(req);if(!me||me!==x.user_id){pool.query('UPDATE listings SET views=views+1 WHERE id=$1',[x.id]).catch(()=>{});bumpStat(x.id,'views');x.views=(Number(x.views)||0)+1;}}
- if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id LIMIT 1',[x.user_id])).rows;
+ if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id LIMIT 4',[x.user_id])).rows;
  delete x.seller_show_phone;
  res.json({listing:x,phones});
 });
