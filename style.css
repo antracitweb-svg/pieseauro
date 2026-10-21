@@ -2078,3 +2078,27 @@ h1,h2{text-wrap:wrap}
 .ar-price,.mine-price,.mr-price{font-family:var(--font-serif);font-weight:700;color:#14110c}
 .ar-price small,.mr-price small{font-family:var(--font-sans)}
 .crumbs a,.footer-col a,.footer-col button,.sf-hint a,.ref-link{color:var(--gold2,#8f6d38)}
+
+
+/* ===== V38.3: antet mai ușor de atins pe telefon, "Garaj" nu mai e tăiat, ecrane mari/TV, antet aliniat ===== */
+@media(max-width:800px){
+  .header .icon-btn{min-height:36px;min-width:34px}
+  .header .menu-btn{min-width:36px;width:36px;min-height:36px;height:36px}
+  .header .garage-btn{min-height:32px}
+}
+@media(max-width:480px){
+  .header .garage-btn:not(.on){max-width:none}
+  .header .garage-btn:not(.on) #garageLabel{font-size:0}
+  .header .garage-btn:not(.on) #garageLabel::after{content:"Garaj";font-size:11.5px}
+}
+@media(min-width:1100px){
+  .header .container.nav{width:min(1280px,calc(100% - 96px))}
+}
+/* televizoare / monitoare 4K care raportează lățime CSS foarte mare: scalăm totul proporțional */
+@media(min-width:2200px){
+  html{zoom:1.5}
+  #detailModal .modal-card.wide{zoom:1}
+}
+@media(min-width:3000px){
+  html{zoom:2}
+}
