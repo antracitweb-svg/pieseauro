@@ -129,8 +129,8 @@ const dns=require('dns').promises;
 const BOT_CHECK=IS_PROD&&String(process.env.BOT_CHECK||'true').toLowerCase()!=='false';
 const BOT_BITS=Math.min(20,Math.max(10,Number(process.env.BOT_DIFFICULTY)||15));
 // BOT_SECRET este obligatoriu în producție (când BOT_CHECK e activ). Nu mai derivăm cheia din DATABASE_URL/ADMIN_PASSWORD.
-if(BOT_CHECK&&!process.env.BOT_SECRET){console.error('EROARE FATALĂ: BOT_SECRET lipsește. Setează-l (min. 32 caractere aleatoare) sau pune BOT_CHECK=false.');process.exit(1);}
-if(BOT_CHECK&&String(process.env.BOT_SECRET).length<32){console.error('EROARE FATALĂ: BOT_SECRET este prea scurt (minimum 32 de caractere).');process.exit(1);}
+if(BOT_CHECK&&!process.env.BOT_SECRET){console.warn('ATENȚIE: BOT_SECRET lipsește. Folosesc o cheie temporară generată la pornire (verificările anti-bot se reiau după fiecare repornire). Setează BOT_SECRET în Render (min. 32 caractere aleatoare).');}
+if(BOT_CHECK&&process.env.BOT_SECRET&&String(process.env.BOT_SECRET).length<32){console.warn('ATENȚIE: BOT_SECRET este prea scurt (recomandat minimum 32 de caractere).');}
 // În dezvoltare (fără BOT_CHECK) cheia e aleatoare la fiecare pornire.
 const BOT_SECRET=process.env.BOT_SECRET?crypto.createHash('sha256').update('bot|'+process.env.BOT_SECRET).digest('hex'):crypto.randomBytes(32).toString('hex');
 const botHmac=v=>crypto.createHmac('sha256',BOT_SECRET).update(v).digest('base64url');
