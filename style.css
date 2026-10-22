@@ -2325,3 +2325,15 @@ button[data-tip],a[data-tip],.icon-btn,.ad-ico,.ar-btn,.mr-btn,.mine-act,.ad-nav
   #requestModal .close{z-index:5}
   .ad.rq .ad-owner{margin-bottom:12px}
 }
+
+
+/* V39.3: iPhone/iPad – o singură apăsare e suficientă */
+/* iOS consideră „clicabile” doar elementele cu cursor:pointer când click-ul e prins pe document */
+.ar-row,.listing,.cat,[data-open],[data-open-request],[data-offer-open],[data-go],[data-action],[role="link"]{cursor:pointer}
+html{-webkit-tap-highlight-color:rgba(184,147,90,.18)}
+button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulation}
+/* pe ecrane tactile nu există „hover”: fără indiciul care apare la hover (altfel prima apăsare doar îl arată, a doua deschide) */
+@media(hover:none){
+  .image-zoom-hint{display:none!important}
+  .listing:hover,.listing:hover .listing-image img,.listing-fav:hover{transform:none}
+}

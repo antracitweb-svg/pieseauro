@@ -3134,7 +3134,7 @@ function addSwipe(el, onSwipe){
   document.addEventListener('touchstart',e=>{
     lastTouch=Date.now(); hide();
     const el=target(e.target); if(!el||e.touches.length!==1) return; label(el);
-    timer=setTimeout(()=>{ show(el); suppressClick=Date.now(); hideT=setTimeout(hide,2000); },500);
+    timer=setTimeout(()=>{ show(el); suppressClick=Date.now(); hideT=setTimeout(hide,2000); },750);
   },{passive:true});
   const release=()=>{ lastTouch=Date.now(); if(tip.classList.contains('on')){ clearTimeout(hideT); hideT=setTimeout(hide,700); } else { clearTimeout(timer); timer=null; } };
   document.addEventListener('touchend',release,{passive:true});
