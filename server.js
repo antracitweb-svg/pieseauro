@@ -405,6 +405,8 @@ async function dbReady(){
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_reason TEXT',
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS buyer_seen_status TEXT',
+  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS awb TEXT',
+  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_note TEXT',
   'CREATE TABLE IF NOT EXISTS rate_state (map TEXT NOT NULL, key TEXT NOT NULL, data TEXT NOT NULL, exp BIGINT NOT NULL, PRIMARY KEY(map,key))',
   'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS kind TEXT',
   'CREATE TABLE IF NOT EXISTS seller_ratings (id SERIAL PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, stars SMALLINT NOT NULL CHECK(stars BETWEEN 1 AND 5), comment TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ)',
@@ -1673,7 +1675,7 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
 app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
  // Cumpărătorul a deschis „Comenzile mele”: marcăm starea curentă ca văzută (insigna dispare până la următoarea schimbare de status).
  if(req.query.seen==='buyer')await pool.query('UPDATE orders SET buyer_seen_status=status WHERE buyer_id=$1 AND buyer_seen_status IS DISTINCT FROM status',[req.user.id]);
- const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.recipient_name,o.recipient_phone,o.status_reason,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) other_has_avatar,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
+ const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.recipient_name,o.recipient_phone,o.status_reason,o.awb,CASE WHEN o.seller_id=$1 THEN o.seller_note END seller_note,CASE WHEN l.images[1] ~ '^https?://' THEN l.images[1] END thumb,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) other_has_avatar,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id LEFT JOIN listings l ON l.id=o.listing_id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
  const ids=[...new Set(r.rows.map(x=>x.other_id).filter(Boolean))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  res.json({orders:r.rows.map(x=>({...x,phones:ph.filter(p=>p.user_id===x.other_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp}))}))});
@@ -1708,6 +1710,25 @@ app.patch('/api/orders/:id/status',auth,requireDb,ah(async(req,res)=>{
  const L={confirmed:'confirmată',shipped:'expediată',completed:'finalizată',suspended:'suspendată',cancelled:'anulată'};
  await notify(seller?o.buyer_id:o.seller_id,'Comanda pentru „'+(o.title||'piesă')+'” a fost '+L[to]+(seller?' de vânzător':'')+'.'+(reason&&['suspended','cancelled','completed'].includes(to)?' Mesaj: '+reason:''),'order');
  res.json({ok:true,status:to});
+}));
+app.patch('/api/orders/:id(\\d+)/details',auth,requireDb,ah(async(req,res)=>{
+ const o=(await pool.query('SELECT id,buyer_id,seller_id,title,awb FROM orders WHERE id=$1 AND seller_id=$2',[req.params.id,req.user.id])).rows[0];
+ if(!o)return res.status(404).json({error:'NOT_FOUND'});
+ const b=req.body||{}, sets=[], vals=[o.id];
+ let newAwb=null;
+ if(Object.prototype.hasOwnProperty.call(b,'awb')){
+  const awb=(clip(b.awb,40)||'').replace(/\s+/g,'');
+  if(awb&&!/^[A-Za-z0-9._-]{3,40}$/.test(awb))return res.status(400).json({error:'AWB_INVALID'});
+  vals.push(awb||null);sets.push('awb=$'+vals.length);
+  if(awb&&awb!==o.awb)newAwb=awb;
+ }
+ if(Object.prototype.hasOwnProperty.call(b,'seller_note')){
+  vals.push(clip(b.seller_note,1000)||null);sets.push('seller_note=$'+vals.length);
+ }
+ if(!sets.length)return res.status(400).json({error:'NIMIC_DE_SALVAT'});
+ await pool.query('UPDATE orders SET '+sets.join(',')+' WHERE id=$1',vals);
+ if(newAwb&&o.buyer_id)await notify(o.buyer_id,'Comanda pentru „'+(o.title||'piesă')+'” are AWB: '+newAwb+'.','order');
+ res.json({ok:true});
 }));
 app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
  const r=await pool.query('SELECT id,text,is_read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.id]);

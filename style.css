@@ -2389,3 +2389,38 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 
 /* Insigna de pe butonul de meniu: rămâne în interiorul antetului (nu mai e tăiată sus) */
 .header .nav-badge{top:-3px;right:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;font:800 10px/18px Inter,system-ui,sans-serif;box-shadow:0 0 0 2px #0e0f12}
+
+/* ===== Comenzi: listă + detaliu — refolosește stilul site-ului (ar-row, acc-tabs, util-form, btn) ===== */
+.ord-wrap,.ord-detail{display:block;margin-top:6px}
+.ord-search{margin-bottom:6px}
+.ord-tabs{overflow-x:auto;scrollbar-width:none;margin:10px 0 4px;flex-wrap:nowrap}
+.ord-tabs::-webkit-scrollbar{display:none}
+.ord-tab{flex:0 0 auto;white-space:nowrap;font-size:15px;padding:12px 14px 10px}
+.ord-tab em{font-style:normal;font-size:12px;font-weight:600;color:var(--muted);margin-left:2px}
+.ord-count{margin:16px 0 4px;font-weight:700;font-size:14px;color:var(--muted)}
+.ord-list .ar-row{padding:18px 2px 14px;gap:8px 14px}
+.ord-st{font-weight:700}
+.ord-st.ok{color:#1c6d42}.ord-st.wait{color:#8f6d38}.ord-st.go{color:#8f6d38}.ord-st.bad{color:#a62a36}
+.ord-empty{padding:34px 0;text-align:center}
+.ord-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.ord-head h3{margin:0;font-size:19px;line-height:1.3}
+.ord-print{flex:0 0 auto;width:40px;height:36px;font-size:18px}
+.ord-status-box{margin:16px 0 4px;font-size:16px}
+.ord-reason{margin:8px 0 0;font-size:14px;font-weight:400;color:var(--ink)}
+.ord-prod{display:flex;gap:14px;align-items:flex-start;margin:18px 0}
+.ord-big{width:96px;height:96px;flex:0 0 96px}
+.ord-link{font-size:16px;font-weight:600;text-align:left;text-decoration:none;color:#14110c;padding:0;min-height:0}
+.ord-qty{margin-top:8px;color:var(--muted);font-size:14px}
+.ord-totals{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 0}
+.ord-totals div{display:flex;justify-content:space-between;gap:12px;font-size:16px}
+.ord-totals b{font-family:var(--font-serif);font-size:18px;color:#14110c}
+.ord-sec{margin:30px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);font:800 13px/1.2 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--gold2,#8f6d38)}
+.ord-party{display:grid;gap:6px;justify-items:start;margin-bottom:12px}
+.ord-party-name{font-family:var(--font-serif);font-size:19px;font-weight:700;color:#14110c}
+.ord-kv{margin:14px 0}
+.ord-kv small{display:block;color:var(--muted);font-size:13px;margin-bottom:2px}
+.ord-kv span{font-size:15px;overflow-wrap:anywhere}
+.ord-hint{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+.ord-detail .util-form{margin-top:0}
+.ord-awb{grid-template-columns:1fr auto;align-items:start}
+.ord-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}

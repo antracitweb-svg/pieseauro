@@ -4,6 +4,7 @@ const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
 const ERR = {
+  AWB_INVALID:'AWB-ul poate conține doar litere, cifre și . _ - (3–40 caractere).',NIMIC_DE_SALVAT:'Nu ai modificat nimic.',
   INVALID_LOGIN:'Email/nickname sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',EMAIL_EXISTS:'Există deja un cont cu acest email.',
   NICKNAME_EXISTS:'Nickname-ul este deja folosit.',COMENZI_ACTIVE:'Ai comenzi în curs. Finalizează sau anulează comenzile înainte de a șterge contul.',ADMIN_NU_SE_STERGE:'Conturile de administrator nu se pot șterge din interfață.',SITE_INVALID:'Adresa site-ului trebuie să înceapă cu http:// sau https://.',LOGO_INVALID:'Logo invalid sau prea mare (maximum ~450 KB după comprimare).',NICKNAME_INVALID:'Nickname-ul trebuie să aibă 3–30 de caractere (litere, cifre, _ . -).',
   DATE_INVALIDE:'Verifică datele introduse.',AUTH_REQUIRED:'Trebuie să te autentifici.',
@@ -339,16 +340,19 @@ function renderAccountTool(view, withId, refId){
     'bulk-price':{title:'Actualizare prețuri',text:'Modifici dintr-o dată prețurile anunțurilor tale active.',action:null,label:null},
     generator:{title:'Generator de anunțuri',text:'Completezi câteva date și primești titlul și descrierea gata de folosit.',action:null,label:null},
     b2b:{title:'B2B',text:'Instrumente pentru parcuri de dezmembrări, service-uri și magazine cu stoc mare.',action:null,label:null},
+    order:{title:'Comanda ta',text:'Detaliile comenzii.',action:null,label:null},
     ratings:{title:'Calificativele mele',text:'Calificativele primite ca vânzător și ca cumpărător.',action:null,label:null}
   };
+  if(view==='order'){ if(withId) lastOrderId=withId; else withId=lastOrderId; }
   currentToolView=view;
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
   $('#accountToolTitle').textContent=d.title;
   $('#accountToolSub').textContent=d.text;
   const content=$('#accountToolContent');
   if(content){
-    content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
-    if(['offers','offers-received','orders','orders-seller','notifications','messages','cart','transactions','invoices','stats'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
+    if(view==='order'){ content.innerHTML=''; $('#accountToolSub').textContent=''; }
+    else content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
+    if(['offers','offers-received','orders','orders-seller','order','notifications','messages','cart','transactions','invoices','stats'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
     if(['offer-questions','bulk-price','generator','b2b','ratings'].includes(view)) safe(()=>renderUtilTool(view,content))();
   }
 }
@@ -492,7 +496,12 @@ async function loadToolData(view, box, withId, refId){
     });
   }else if(view==='orders'||view==='orders-seller'){
     const r=await api('/api/orders'+(view==='orders'?'?seen=buyer':'')), role=view==='orders'?'buyer':'seller';
-    items=r.orders.filter(o=>o.role===role).map(orderCardHtml);
+    drawOrdersList(box,r.orders.filter(o=>o.role===role),view); return;
+  }else if(view==='order'){
+    const r=await api('/api/orders'), o=r.orders.find(x=>String(x.id)===String(withId));
+    $('#accountToolTitle').textContent=o?'Comanda nr. '+o.id:'Comanda ta';
+    if(!o){ box.innerHTML='<div class="info-card"><p class="muted">Comanda nu a fost găsită.</p><button type="button" class="btn ghost small" data-go="account-tool?view=orders">Comenzile mele</button></div>'; return; }
+    box.innerHTML=orderDetailHtml(o); return;
   }else if(view==='messages'){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
@@ -510,6 +519,80 @@ async function loadToolData(view, box, withId, refId){
 }
 
 /* ---------- comenzi din anunțuri / coș ---------- */
+
+/* ---------- Comenzi: listă cu taburi + pagină de detaliu ---------- */
+const ORD_TABS=[['active','Active',['new','confirmed','shipped']],['suspended','Suspendate',['suspended']],['completed','Finalizate',['completed']],['cancelled','Anulate',['cancelled']],['all','Toate',null]];
+let ordTab='active';
+let lastOrderId='';
+function ordCls(st){ return st==='completed'?'ok':(st==='cancelled'?'bad':((st==='new'||st==='suspended')?'wait':'go')); }
+function orderRowHtml(o){
+  const money=Number(o.price||0).toLocaleString('ro-RO')+' lei', seller=o.role==='seller';
+  const thumb=o.thumb?`<img src="${esc(o.thumb)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
+  return `<article class="ar-row ord-row" data-go="account-tool?view=order&with=${o.id}" tabindex="0" role="link" aria-label="Comanda nr. ${o.id}">
+    <div class="ar-thumb">${thumb}</div>
+    <div class="ar-main"><div class="ar-sub">Comanda nr. ${o.id}</div><h3 class="ar-title">${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</h3>${o.other_name?`<div class="ar-meta">${seller?'Cumpărător':'Vânzător'}: ${esc(o.other_name)}</div>`:''}</div>
+    <div class="ar-foot"><span class="ar-views ord-st ${ordCls(o.status)}">${esc(ORDER_ST[o.status]||o.status)}</span><span class="ar-qty">${esc(fmtDateTime(o.created_at))}</span><span class="ar-price">${esc(money)}</span></div></article>`;
+}
+function drawOrdersList(box,list,view){
+  const inTab=(o,t)=>{ const d=ORD_TABS.find(x=>x[0]===t); return !d[2]||d[2].includes(o.status); };
+  if(!ORD_TABS.some(t=>t[0]===ordTab)) ordTab='active';
+  box.innerHTML=`<div class="ord-wrap"><div class="util-form ord-search"><input type="search" id="ordSearch" placeholder="Caută în comenzi" aria-label="Caută în comenzi" autocomplete="off"></div>
+    <div class="acc-tabs ord-tabs" role="tablist">${ORD_TABS.map(t=>`<button type="button" role="tab" class="acc-tab ord-tab" data-ord-tab="${t[0]}">${t[1]} <em>${list.filter(o=>inTab(o,t[0])).length}</em></button>`).join('')}</div>
+    <div class="ord-count" id="ordCount"></div><div class="ar-list ord-list" id="ordList"></div></div>`;
+  const draw=()=>{
+    const q=($('#ordSearch').value||'').trim().toLowerCase();
+    const rows=list.filter(o=>inTab(o,ordTab)&&(!q||[o.id,o.title,o.other_name].join(' ').toLowerCase().includes(q)));
+    $$('.ord-tab',box).forEach(b=>{ const on=b.dataset.ordTab===ordTab; b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); });
+    const lbl=(ORD_TABS.find(t=>t[0]===ordTab)||[])[1]||'';
+    $('#ordCount').textContent=rows.length?`Comenzi ${lbl.toLowerCase()} (${rows.length})`:'';
+    $('#ordList').innerHTML=rows.map(orderRowHtml).join('')||`<p class="muted ord-empty">${q?'Nicio comandă găsită.':'Nu există comenzi în această categorie.'}</p>`;
+  };
+  $('#ordSearch').addEventListener('input',draw);
+  box.querySelector('.ord-tabs').addEventListener('click',e=>{ const b=e.target.closest('[data-ord-tab]'); if(!b) return; ordTab=b.dataset.ordTab; draw(); });
+  box.addEventListener('keydown',e=>{ const r=e.target.closest&&e.target.closest('.ord-row'); if(r&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); navigate(r.dataset.go); } });
+  draw();
+}
+function orderDetailHtml(o){
+  const money=v=>esc(Number(v||0).toLocaleString('ro-RO'))+' lei', seller=o.role==='seller', qty=Math.max(1,Number(o.quantity)||1);
+  const addr=[o.ship_address,o.ship_city,o.ship_county].filter(Boolean).join(', ');
+  const closed=['cancelled','completed'].includes(o.status), btns=[];
+  if(seller&&!closed){
+    if(o.status==='new') btns.push(['confirmed','Confirmă comanda','primary']);
+    if(o.status==='new'||o.status==='confirmed') btns.push(['shipped','Marchează expediată','primary']);
+    btns.push(['completed','Finalizată','primary']);
+    if(o.status==='suspended') btns.push(['confirmed','Reia comanda','ghost']); else btns.push(['suspended','Suspendată','ghost']);
+    btns.push(['cancelled','Anulată','danger']);
+  }else if(!seller&&o.status==='new') btns.push(['cancelled','Anulează comanda','danger']);
+  const thumb=o.thumb?`<img src="${esc(o.thumb)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
+  const prod=o.listing_id?`<button type="button" class="seller-link ord-link" data-open="${o.listing_id}">${esc(o.title||'Comandă')}</button>`:`<span>${esc(o.title||'Comandă')}</span>`;
+  const unit=Number(o.price||0)/qty;
+  const party=o.other_name?`<div class="ord-party"><div class="ord-party-name">${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n})}</div>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<div class="ord-line">👤 ${esc(o.other_person)}</div>`:''}${o.other_id?`<button type="button" class="btn ghost small" data-go="account-tool?view=messages&with=${o.other_id}">✉ Scrie mesaj</button>`:''}</div>`:'';
+  const reasonOn=o.status_reason&&['suspended','cancelled','completed'].includes(o.status);
+  return `<div class="ord-detail">
+    <div class="ord-head"><h3>Comanda nr. ${o.id} din ${esc(fmtDateTime(o.created_at))}</h3><button type="button" class="ar-btn ord-print" data-order-print="${o.id}" aria-label="Tipărește comanda" title="Tipărește">🖨</button></div>
+    <div class="ord-status-box"><span class="ord-st ${ordCls(o.status)}">${esc(ORDER_ST[o.status]||o.status)}</span>${reasonOn?`<p class="ord-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}</div>
+    <div class="ord-prod"><div class="ar-thumb ord-big">${thumb}</div><div class="ord-prod-main">${prod}<div class="ord-qty">${qty} buc. × ${money(unit)}</div></div></div>
+    <div class="ord-totals"><div><span>Cost produse:</span><b>${money(o.price)}</b></div></div>
+    <h4 class="ord-sec">${seller?'Date cumpărător și livrare':'Vânzător și livrare'}</h4>
+    ${party}
+    ${(seller&&o.phones&&o.phones.length)?contactHtml(o.phones,'Cumpărătorul'):''}
+    ${(!seller&&o.phones&&o.phones.length)?contactHtml(o.phones,'Vânzătorul'):''}
+    ${(o.recipient_name||o.recipient_phone)?`<div class="ord-kv"><small>Destinatar</small><span>${esc(o.recipient_name||'—')}${o.recipient_phone?' · '+esc(fmtPhone(o.recipient_phone)):''}</span></div>`:''}
+    <div class="ord-kv"><small>Adresa de livrare</small><span>${esc(addr||'—')}</span></div>
+    <div class="ord-kv"><small>Observații client</small><span>${o.note?esc(o.note):'– nu sunt –'}</span></div>
+    ${(!seller&&o.awb)?`<div class="ord-kv"><small>AWB</small><span><b>${esc(o.awb)}</b></span></div>`:''}
+    ${o.got_stars?`<div class="ord-kv"><small>Calificativ primit</small><span>${starsHtml(o.got_stars)}${o.got_comment?' · „'+esc(o.got_comment)+'”':''}</span></div>`:''}
+    ${seller?`<h4 class="ord-sec">Observații vânzător</h4><p class="ord-hint">Aceste observații le vezi doar tu, pentru gestionarea comenzii.</p><div class="util-form"><textarea id="ordSellerNote" rows="4" maxlength="1000">${esc(o.seller_note||'')}</textarea><button type="button" class="btn ghost small" data-order-save="note" data-oid="${o.id}">Salvează observațiile</button></div>
+    <h4 class="ord-sec">AWB</h4><p class="ord-hint">Cumpărătorul vede AWB-ul și primește o notificare.</p><div class="util-form ord-awb"><input id="ordAwb" maxlength="40" value="${esc(o.awb||'')}" placeholder="Număr AWB" autocomplete="off"><button type="button" class="btn primary small" data-order-save="awb" data-oid="${o.id}">Salvează AWB</button></div>`:''}
+    ${(btns.length||o.status==='completed'||o.listing_id)?`<h4 class="ord-sec">${btns.length?'Schimbă statusul comenzii':'Opțiuni'}</h4><div class="ord-actions">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-open="${o.listing_id}">Vezi anunțul</button>`:''}</div>`:''}
+  </div>`;
+}
+function printOrder(o){
+  const w=window.open('','_blank'); if(!w){ toast('Permite ferestrele pop-up ca să tipărești.'); return; }
+  const addr=[o.ship_address,o.ship_city,o.ship_county].filter(Boolean).join(', ');
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Comanda nr. ${o.id}</title><style>body{font:15px/1.5 system-ui,sans-serif;margin:28px;color:#111}h1{font-size:20px}td{padding:4px 12px 4px 0;vertical-align:top}</style><h1>Comanda nr. ${o.id} din ${esc(fmtDateTime(o.created_at))}</h1><table><tr><td>Status</td><td>${esc(ORDER_ST[o.status]||o.status)}</td></tr><tr><td>Produs</td><td>${esc(o.title||'')} × ${Number(o.quantity)||1}</td></tr><tr><td>Total</td><td>${esc(Number(o.price||0).toLocaleString('ro-RO'))} lei</td></tr><tr><td>${o.role==='seller'?'Cumpărător':'Vânzător'}</td><td>${esc(o.other_name||'')}</td></tr>${(o.recipient_name||o.recipient_phone)?`<tr><td>Destinatar</td><td>${esc(o.recipient_name||'')} ${esc(o.recipient_phone||'')}</td></tr>`:''}<tr><td>Adresa de livrare</td><td>${esc(addr)}</td></tr>${o.awb?`<tr><td>AWB</td><td>${esc(o.awb)}</td></tr>`:''}</table>`);
+  w.document.close(); w.focus(); w.print();
+}
 function orderCardHtml(o){
   const money=v=>esc(Number(v).toLocaleString('ro-RO'))+' lei', seller=o.role==='seller';
   const addr=[o.ship_address,o.ship_city,o.ship_county].filter(Boolean).join(', ');
@@ -2419,6 +2502,10 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); { const rm=$('#requestModal'); if(rm) rm.classList.add('hidden'); } toast('Cererea a fost ștearsă.'); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
   if((el=t.closest('[data-order]'))){ e.stopPropagation(); safe(openOrder)(Number(el.dataset.order)); return; }
+  if((el=t.closest('[data-order-save]'))){ const oid=el.dataset.oid, kind=el.dataset.orderSave;
+    const body=kind==='awb'?{awb:($('#ordAwb')||{}).value||''}:{seller_note:($('#ordSellerNote')||{}).value||''};
+    safe(async()=>{ await api('/api/orders/'+oid+'/details',{method:'PATCH',body:JSON.stringify(body)}); toast(kind==='awb'?'AWB salvat.':'Observațiile au fost salvate.'); renderAccountTool('order',oid); })(); return; }
+  if((el=t.closest('[data-order-print]'))){ const oid=el.dataset.orderPrint; safe(async()=>{ const r=await api('/api/orders'); const o=r.orders.find(x=>String(x.id)===String(oid)); if(o) printOrder(o); })(); return; }
   if((el=t.closest('[data-order-status]'))){ const oid=el.dataset.orderStatus, to=el.dataset.to;
     if(el.dataset.bySeller==='1'&&(to==='suspended'||to==='cancelled')){ openOrderReason(oid,to,el.dataset.hasListing==='1',el.dataset.title); return; }
     if(to==='cancelled'&&!confirm('Sigur vrei să anulezi comanda?')) return;
