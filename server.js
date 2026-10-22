@@ -1781,10 +1781,12 @@ app.put('/api/orders/:id(\\d+)/rating',auth,requireDb,ah(async(req,res)=>{
 // Public: media și ultimele calificative ale unui utilizator, separat ca vânzător și ca cumpărător.
 app.get('/api/sellers/:id(\\d+)/ratings',requireDb,ah(async(req,res)=>{
  const id=Number(req.params.id);
+ const lim=req.query.all==='1'?200:20;
  const pack=async(tbl,rated,rater)=>{
   const sum=(await pool.query(`SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM ${tbl} WHERE ${rated}=$1`,[id])).rows[0];
-  const list=(await pool.query(`SELECT r.stars,r.comment,r.created_at,COALESCE(NULLIF(u.nickname,''),split_part(u.name,' ',1),'Utilizator') who FROM ${tbl} r LEFT JOIN users u ON u.id=r.${rater} WHERE r.${rated}=$1 ORDER BY r.created_at DESC LIMIT 20`,[id])).rows;
-  return {avg:sum.avg,count:sum.n,ratings:list};
+  const list=(await pool.query(`SELECT r.stars,r.comment,r.created_at,COALESCE(NULLIF(u.nickname,''),split_part(u.name,' ',1),'Utilizator') who FROM ${tbl} r LEFT JOIN users u ON u.id=r.${rater} WHERE r.${rated}=$1 ORDER BY r.created_at DESC LIMIT ${lim}`,[id])).rows;
+  const dist={};(await pool.query(`SELECT stars,COUNT(*)::int n FROM ${tbl} WHERE ${rated}=$1 GROUP BY stars`,[id])).rows.forEach(x=>{dist[x.stars]=x.n;});
+  return {avg:sum.avg,count:sum.n,ratings:list,dist};
  };
  res.set('Cache-Control','no-store');
  res.json({seller:await pack('seller_ratings','seller_id','buyer_id'),buyer:await pack('buyer_ratings','buyer_id','seller_id')});

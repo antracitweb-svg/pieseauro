@@ -194,7 +194,7 @@ function parseHash(){
   return { name: name || 'home', params: new URLSearchParams(qs||'') };
 }
 function navigate(x){ const target='#/'+x; if(location.hash===target) route(); else location.hash=target; }
-function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='account-tool' && params.get('view')!=='cart') || (name==='requests' && params.get('t')==='mine') || (name==='rezultate' && ['mine'].includes(params.get('mode'))); }
+function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='account-tool' && !['cart','reviews'].includes(params.get('view'))) || (name==='requests' && params.get('t')==='mine') || (name==='rezultate' && ['mine'].includes(params.get('mode'))); }
 function showPage(id){ $$('.page').forEach(p=>p.classList.toggle('active',p.id===id)); window.scrollTo(0,0); }
 
 const BN_MAP={home:'home',rezultate:'rezultate',saved:'rezultate',vinde:'vinde',mesagerie:'mesagerie',cont:'cont',settings:'cont','anunturile-mele':'cont'};
@@ -341,18 +341,20 @@ function renderAccountTool(view, withId, refId){
     generator:{title:'Generator de anunțuri',text:'Completezi câteva date și primești titlul și descrierea gata de folosit.',action:null,label:null},
     b2b:{title:'B2B',text:'Instrumente pentru parcuri de dezmembrări, service-uri și magazine cu stoc mare.',action:null,label:null},
     order:{title:'Comanda ta',text:'Detaliile comenzii.',action:null,label:null},
+    reviews:{title:'Recenzii',text:'',action:null,label:null},
     ratings:{title:'Calificativele mele',text:'Calificativele primite ca vânzător și ca cumpărător.',action:null,label:null}
   };
   if(view==='order'){ if(withId) lastOrderId=withId; else withId=lastOrderId; }
+  { const eb=$('#accountToolEyebrow'); if(eb) eb.textContent=view==='reviews'?'RECENZII':'CONT'; }
   currentToolView=view;
   const d=data[view]||{title:'Cont',text:'Secțiunea nu a fost găsită.',action:null,label:null};
   $('#accountToolTitle').textContent=d.title;
   $('#accountToolSub').textContent=d.text;
   const content=$('#accountToolContent');
   if(content){
-    if(view==='order'){ content.innerHTML=''; $('#accountToolSub').textContent=''; }
+    if(view==='order'||view==='reviews'){ content.innerHTML=''; $('#accountToolSub').textContent=''; }
     else content.innerHTML=`<div class="info-card account-tool-card"><p>${esc(d.text)}</p>${d.action?`<button class="btn primary" data-action="${esc(d.action)}">${esc(d.label)}</button>`:''}</div>`;
-    if(['offers','offers-received','orders','orders-seller','order','notifications','messages','cart','transactions','invoices','stats'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
+    if(['offers','offers-received','orders','orders-seller','order','reviews','notifications','messages','cart','transactions','invoices','stats'].includes(view)) safe(()=>loadToolData(view,content,withId,refId))();
     if(['offer-questions','bulk-price','generator','b2b','ratings'].includes(view)) safe(()=>renderUtilTool(view,content))();
   }
 }
@@ -473,30 +475,15 @@ async function loadToolData(view, box, withId, refId){
     await Promise.all([pAc,pLs]); return;
   }else if(view==='offers'){
     const r=await api('/api/offers/mine'); offersMine=r.offers;
-    items=r.offers.map(o=>{
-      const open=o.request_status==='open', pend=o.status==='pending';
-      const st=pend&&!open?'Cererea s-a închis':(OFFER_ST[o.status]||o.status);
-      const im=(o.req_images&&o.req_images[0])||(o.images&&o.images[0])||'';
-      const car=[o.make,o.model,o.year].filter(Boolean).join(' · ')||'Orice mașină';
-      return `<article class="ar-row ar-req" data-offer-open="${o.id}" tabindex="0" role="link" aria-label="${esc(o.request_title)}">
-        <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">💬</span>'}</div>
-        <div class="ar-main"><h3 class="ar-title">${esc(o.request_title)}</h3><div class="ar-meta">${esc(car)}</div>${o.message?`<p class="ar-desc">${esc(o.message.slice(0,140))}${o.message.length>140?'…':''}</p>`:''}<div class="ar-sub">${o.buyer_name?'Cumpărător: '+esc(o.buyer_name)+' '+rateInline(o.buyer_rating_avg,o.buyer_rating_n):''}</div></div>
-        <div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-offer-open="${o.id}">Vezi cererea</button>${pend&&open?`<button type="button" class="ar-btn ar-edit" data-offer-edit="${o.id}" title="Editează oferta" aria-label="Editează oferta">✎</button><button type="button" class="ar-btn ar-del" data-offer-del="${o.id}" title="Retrage oferta" aria-label="Retrage oferta">🗑</button>`:''}${o.buyer_id?`<button type="button" class="ar-btn" data-go="account-tool?view=messages&with=${o.buyer_id}" title="Scrie mesaj" aria-label="Scrie mesaj">✉</button>`:''}</div>
-        <div class="ar-foot"><span class="ar-views">${esc(st)}</span><span class="ar-qty">${esc(fmtDate(o.created_at))}</span><span class="ar-price">${esc(money(o.price))}</span></div></article>`;
-    });
+    drawOffersReceived(box,r.offers,money,offerMineRowHtml,['request_title','buyer_name','message'],'oferte trimise'); return;
   }else if(view==='offers-received'){
     const r=await api('/api/offers/received');
-    items=r.offers.map(o=>{
-      const pend=o.status==='pending', im=(o.images&&o.images[0])||(o.req_images&&o.req_images[0])||'';
-      return `<article class="ar-row ar-req" data-open-request="${o.request_id}" data-mode="mine" tabindex="0" role="link" aria-label="${esc(o.request_title)}">
-        <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">💬</span>'}</div>
-        <div class="ar-main"><h3 class="ar-title">${esc(o.request_title)}</h3><div class="ar-meta">${o.seller_name?(o.seller_id?`<button type="button" class="seller-link" data-seller-profile="${o.seller_id}">${esc(o.seller_name)}</button>`:esc(o.seller_name))+' '+rateInline(o.seller_rating_avg,o.seller_rating_n):'Vânzător'}</div>${o.message?`<p class="ar-desc">${esc(o.message.slice(0,140))}${o.message.length>140?'…':''}</p>`:''}</div>
-        <div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-open-request="${o.request_id}" data-mode="mine">Cererea și ofertanții</button>${pend?`<button type="button" class="ar-btn" data-offer-accept="${o.id}" title="Acceptă oferta" aria-label="Acceptă oferta">✓</button>`:''}${o.seller_id?`<button type="button" class="ar-btn" data-go="account-tool?view=messages&with=${o.seller_id}" title="Scrie mesaj" aria-label="Scrie mesaj">✉</button>`:''}</div>
-        <div class="ar-foot"><span class="ar-views">${esc(OFFER_ST[o.status]||o.status)}</span><span class="ar-qty">${esc(fmtDate(o.created_at))}</span><span class="ar-price">${esc(money(o.price))}</span></div></article>`;
-    });
+    drawOffersReceived(box,r.offers,money); return;
   }else if(view==='orders'||view==='orders-seller'){
     const r=await api('/api/orders'+(view==='orders'?'?seen=buyer':'')), role=view==='orders'?'buyer':'seller';
     drawOrdersList(box,r.orders.filter(o=>o.role===role),view); return;
+  }else if(view==='reviews'){
+    await drawReviewsPage(box,withId,refId==='buyer'?'buyer':'seller'); return;
   }else if(view==='order'){
     const r=await api('/api/orders'), o=r.orders.find(x=>String(x.id)===String(withId));
     $('#accountToolTitle').textContent=o?'Comanda nr. '+o.id:'Comanda ta';
@@ -531,7 +518,7 @@ function orderRowHtml(o){
   return `<article class="ar-row ord-row" data-go="account-tool?view=order&with=${o.id}" tabindex="0" role="link" aria-label="Comanda nr. ${o.id}">
     <div class="ar-thumb">${thumb}</div>
     <div class="ar-main"><div class="ar-sub">Comanda nr. ${o.id}</div><h3 class="ar-title">${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</h3>${o.other_name?`<div class="ar-meta">${seller?'Cumpărător':'Vânzător'}: ${esc(o.other_name)}</div>`:''}</div>
-    <div class="ar-foot"><span class="ar-views ord-st ${ordCls(o.status)}">${esc(ORDER_ST[o.status]||o.status)}</span><span class="ar-qty">${esc(fmtDateTime(o.created_at))}</span><span class="ar-price">${esc(money)}</span></div></article>`;
+    <div class="ar-foot"><span class="ar-views">${esc(ORDER_ST[o.status]||o.status)}</span><span class="ar-qty">${esc(fmtDateTime(o.created_at))}</span><span class="ar-price">${esc(money)}</span></div></article>`;
 }
 function drawOrdersList(box,list,view){
   const inTab=(o,t)=>{ const d=ORD_TABS.find(x=>x[0]===t); return !d[2]||d[2].includes(o.status); };
@@ -566,11 +553,11 @@ function orderDetailHtml(o){
   const thumb=o.has_thumb?`<img src="/api/orders/${o.id}/thumb" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
   const prod=o.listing_id?`<button type="button" class="seller-link ord-link" data-order-listing="${o.id}">${esc(o.title||'Comandă')}</button>`:`<span>${esc(o.title||'Comandă')}</span>`;
   const unit=Number(o.price||0)/qty;
-  const party=o.other_name?`<div class="ord-party"><div class="ord-party-name">${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n})}</div>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<div class="ord-line">👤 ${esc(o.other_person)}</div>`:''}${o.other_id?`<button type="button" class="btn ghost small" data-go="account-tool?view=messages&with=${o.other_id}">✉ Scrie mesaj</button>`:''}</div>`:'';
+  const party=o.other_name?`<div class="ord-party"><div class="ord-party-name">${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n},o.other_id,seller?'buyer':'seller')}</div>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<div class="ord-line">👤 ${esc(o.other_person)}</div>`:''}${o.other_id?`<button type="button" class="btn ghost small" data-go="account-tool?view=messages&with=${o.other_id}">✉ Scrie mesaj</button>`:''}</div>`:'';
   const reasonOn=o.status_reason&&['suspended','cancelled','completed'].includes(o.status);
   return `<div class="ord-detail">
     <div class="ord-head"><h3>Comanda nr. ${o.id} din ${esc(fmtDateTime(o.created_at))}</h3><button type="button" class="ar-btn ord-print" data-order-print="${o.id}" aria-label="Tipărește comanda" title="Tipărește">🖨</button></div>
-    <div class="ord-status-box"><span class="ord-st ${ordCls(o.status)}">${esc(ORDER_ST[o.status]||o.status)}</span>${reasonOn?`<p class="ord-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}</div>
+    <div class="ord-status-box"><span class="ord-st">${esc(ORDER_ST[o.status]||o.status)}</span>${reasonOn?`<p class="ord-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}</div>
     <div class="ord-prod"><div class="ar-thumb ord-big" data-order-listing="${o.id}">${thumb}</div><div class="ord-prod-main">${prod}<div class="ord-qty">${qty} buc. × ${money(unit)}</div></div></div>
     <div class="ord-totals"><div><span>Cost produse:</span><b>${money(o.price)}</b></div></div>
     <h4 class="ord-sec">${seller?'Date cumpărător și livrare':'Vânzător și livrare'}</h4>
@@ -586,6 +573,71 @@ function orderDetailHtml(o){
     <h4 class="ord-sec">AWB</h4><p class="ord-hint">Cumpărătorul vede AWB-ul și primește o notificare.</p><div class="util-form ord-awb"><input id="ordAwb" maxlength="40" value="${esc(o.awb||'')}" placeholder="Număr AWB" autocomplete="off"><button type="button" class="btn primary small" data-order-save="awb" data-oid="${o.id}">Salvează AWB</button></div>`:''}
     ${(btns.length||o.status==='completed'||o.listing_id)?`<h4 class="ord-sec">${btns.length?'Schimbă statusul comenzii':'Opțiuni'}</h4><div class="ord-actions">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-order-listing="${o.id}">Vezi anunțul</button>`:''}</div>`:''}
   </div>`;
+}
+
+/* ---------- Oferte primite: același aspect ca la comenzi (căutare + taburi + rânduri) ---------- */
+const OFF_TABS=[['pending','În așteptare',['pending']],['accepted','Acceptate',['accepted']],['rejected','Respinse',['rejected']],['all','Toate',null]];
+let offTab='pending';
+function offerRowHtml(o,money){
+  const pend=o.status==='pending', im=(o.images&&o.images[0])||(o.req_images&&o.req_images[0])||'';
+  const cls=o.status==='accepted'?'ok':(o.status==='rejected'?'bad':'wait');
+  return `<article class="ar-row ar-req ord-row" data-open-request="${o.request_id}" data-mode="mine" tabindex="0" role="link" aria-label="${esc(o.request_title)}">
+    <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">💬</span>'}</div>
+    <div class="ar-main"><h3 class="ar-title">${esc(o.request_title)}</h3><div class="ar-meta">${o.seller_name?(o.seller_id?`<button type="button" class="seller-link" data-seller-profile="${o.seller_id}">${esc(o.seller_name)}</button>`:esc(o.seller_name))+' '+rateInline(o.seller_rating_avg,o.seller_rating_n,o.seller_id,'seller'):'Vânzător'}</div>${o.message?`<p class="ar-desc">${esc(o.message.slice(0,140))}${o.message.length>140?'…':''}</p>`:''}</div>
+    <div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-open-request="${o.request_id}" data-mode="mine">Cererea și ofertanții</button>${pend?`<button type="button" class="ar-btn" data-offer-accept="${o.id}" title="Acceptă oferta" aria-label="Acceptă oferta">✓</button>`:''}${o.seller_id?`<button type="button" class="ar-btn" data-go="account-tool?view=messages&with=${o.seller_id}" title="Scrie mesaj" aria-label="Scrie mesaj">✉</button>`:''}</div>
+    <div class="ar-foot"><span class="ar-views">${esc(OFFER_ST[o.status]||o.status)}</span><span class="ar-qty">${esc(fmtDate(o.created_at))}</span><span class="ar-price">${esc(money(o.price))}</span></div></article>`;
+}
+function offerMineRowHtml(o,money){
+  const open=o.request_status==='open', pend=o.status==='pending';
+  const st=pend&&!open?'Cererea s-a închis':(OFFER_ST[o.status]||o.status);
+  const im=(o.req_images&&o.req_images[0])||(o.images&&o.images[0])||'';
+  const car=[o.make,o.model,o.year].filter(Boolean).join(' · ')||'Orice mașină';
+  return `<article class="ar-row ar-req ord-row" data-offer-open="${o.id}" tabindex="0" role="link" aria-label="${esc(o.request_title)}">
+    <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">💬</span>'}</div>
+    <div class="ar-main"><h3 class="ar-title">${esc(o.request_title)}</h3><div class="ar-meta">${esc(car)}</div>${o.message?`<p class="ar-desc">${esc(o.message.slice(0,140))}${o.message.length>140?'…':''}</p>`:''}<div class="ar-sub">${o.buyer_name?'Cumpărător: '+esc(o.buyer_name)+' '+rateInline(o.buyer_rating_avg,o.buyer_rating_n,o.buyer_id,'buyer'):''}</div></div>
+    <div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-offer-open="${o.id}">Vezi cererea</button>${pend&&open?`<button type="button" class="ar-btn ar-edit" data-offer-edit="${o.id}" title="Editează oferta" aria-label="Editează oferta">✎</button><button type="button" class="ar-btn ar-del" data-offer-del="${o.id}" title="Retrage oferta" aria-label="Retrage oferta">🗑</button>`:''}${o.buyer_id?`<button type="button" class="ar-btn" data-go="account-tool?view=messages&with=${o.buyer_id}" title="Scrie mesaj" aria-label="Scrie mesaj">✉</button>`:''}</div>
+    <div class="ar-foot"><span class="ar-views">${esc(st)}</span><span class="ar-qty">${esc(fmtDate(o.created_at))}</span><span class="ar-price">${esc(money(o.price))}</span></div></article>`;
+}
+function drawOffersReceived(box,list,money,rowFn,fields,what){
+  rowFn=rowFn||offerRowHtml; fields=fields||['request_title','seller_name','message']; what=what||'oferte';
+  const inTab=(o,t)=>{ const d=OFF_TABS.find(x=>x[0]===t); return !d[2]||d[2].includes(o.status); };
+  if(!OFF_TABS.some(t=>t[0]===offTab)) offTab='pending';
+  box.innerHTML=`<div class="ord-wrap"><div class="util-form ord-search"><input type="search" id="offSearch" placeholder="Caută în oferte" aria-label="Caută în oferte" autocomplete="off"></div>
+    <div class="acc-tabs ord-tabs" role="tablist">${OFF_TABS.map(t=>`<button type="button" role="tab" class="acc-tab ord-tab" data-off-tab="${t[0]}">${t[1]} <em>${list.filter(o=>inTab(o,t[0])).length}</em></button>`).join('')}</div>
+    <div class="ord-count" id="offCount"></div><div class="ar-list ord-list" id="offList"></div></div>`;
+  const draw=()=>{
+    const q=($('#offSearch').value||'').trim().toLowerCase();
+    const rows=list.filter(o=>inTab(o,offTab)&&(!q||fields.map(f=>o[f]||'').join(' ').toLowerCase().includes(q)));
+    $$('.ord-tab',box).forEach(b=>{ const on=b.dataset.offTab===offTab; b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); });
+    const lbl=(OFF_TABS.find(t=>t[0]===offTab)||[])[1]||'';
+    $('#offCount').textContent=rows.length?`${what==='oferte'?'Oferte':'Oferte trimise'} ${lbl.toLowerCase()} (${rows.length})`:'';
+    $('#offList').innerHTML=rows.map(o=>rowFn(o,money)).join('')||`<p class="muted ord-empty">${q?'Nicio ofertă găsită.':'Nu există oferte în această categorie.'}</p>`;
+  };
+  $('#offSearch').addEventListener('input',draw);
+  box.querySelector('.ord-tabs').addEventListener('click',e=>{ const b=e.target.closest('[data-off-tab]'); if(!b) return; offTab=b.dataset.offTab; draw(); });
+  box.addEventListener('keydown',e=>{ const r=e.target.closest&&e.target.closest('.ar-row[data-open-request]'); if(r&&e.target===r&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); r.click(); } });
+  draw();
+}
+
+/* ---------- Pagina de recenzii (vânzător / cumpărător) ---------- */
+async function drawReviewsPage(box,uid,role){
+  box.innerHTML='<div class="info-card"><p class="muted">Se încarcă…</p></div>';
+  const id=Number(uid);
+  if(!id){ box.innerHTML='<div class="info-card"><p class="muted">Utilizator invalid.</p></div>'; return; }
+  const [sp,rt]=await Promise.all([api('/api/sellers/'+id).catch(()=>null),api('/api/sellers/'+id+'/ratings?all=1')]);
+  const name=(sp&&sp.seller&&sp.seller.name)||'Utilizator';
+  $('#accountToolTitle').textContent=name;
+  const part=rt[role]||{avg:null,count:0,ratings:[]};
+  const dist=[0,0,0,0,0,0]; if(part.dist) for(const k in part.dist) dist[Number(k)]=Number(part.dist[k])||0; else (part.ratings||[]).forEach(x=>{ dist[x.stars]++; });
+  const total=part.count||0;
+  const tab=(r,t,p)=>`<button type="button" class="acc-tab${role===r?' on':''}" data-go="account-tool?view=reviews&with=${id}&ref=${r}" role="tab" aria-selected="${role===r}">${t} <em>${(p&&p.count)||0}</em></button>`;
+  const bars=[5,4,3,2,1].map(n=>`<div class="rv-bar"><span>${n} ★</span><i><u style="width:${total?Math.round(dist[n]/total*100):0}%"></u></i><small>${dist[n]}</small></div>`).join('');
+  const list=(part.ratings||[]).map(x=>`<article class="rv-item"><div class="rv-top">${starsHtml(x.stars)}<b>${esc(x.who||'Utilizator')}</b><small>${esc(fmtDate(x.created_at))}</small></div><p>${x.comment?esc(x.comment):'<span class="muted">Fără comentariu</span>'}</p></article>`).join('');
+  box.innerHTML=`<div class="rv-wrap">
+    <div class="acc-tabs ord-tabs" role="tablist">${tab('seller','Ca vânzător',rt.seller)}${tab('buyer','Ca cumpărător',rt.buyer)}</div>
+    ${total?`<div class="rv-summary"><div class="rv-score"><b>${esc(String(part.avg).replace('.',','))}</b><span>din 5</span>${starsHtml(part.avg)}<small>${total} ${total===1?'recenzie':'recenzii'}</small></div><div class="rv-bars">${bars}</div></div>
+    <div class="ord-count">Recenzii ${role==='seller'?'ca vânzător':'ca cumpărător'} (${total})</div><div class="rv-list">${list}</div>${total>(part.ratings||[]).length?'<p class="muted ord-empty">Se afișează cele mai recente recenzii.</p>':''}`:`<p class="muted ord-empty">Nu există recenzii ${role==='seller'?'ca vânzător':'ca cumpărător'} încă.</p>`}
+    <div class="row" style="margin-top:14px"><button type="button" class="btn ghost small" data-seller-profile="${id}">Vezi profilul</button></div></div>`;
 }
 async function openOrderListing(oid){
   const modal=$('#detailModal'), box=$('#detailContent');
@@ -615,7 +667,7 @@ function orderCardHtml(o){
     btns.push(['cancelled','Anulată','danger']);
   }else if(!seller&&o.status==='new') btns.push(['cancelled','Anulează comanda','danger']);
   const cls=(o.status==='new'||o.status==='suspended')?'pending':(o.status==='cancelled'?'bad':'new');
-  return `<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</b><p>${seller?'Vânzare':'Cumpărare'} · ${money(o.price)} · <span class="badge ${cls}">${esc(ORDER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}</p>${o.other_name?`<div class="order-party">${(!seller&&o.other_id)?`<button type="button" class="req-offer-logo order-logo" data-seller-profile="${o.other_id}" aria-label="Profil ${esc(o.other_name)}"><span>${esc(o.other_name.charAt(0).toUpperCase())}</span>${o.other_has_avatar?`<img src="/api/users/${o.other_id}/avatar" alt="" loading="lazy" decoding="async" data-av>`:''}</button>`:(o.other_id?`<span class="req-offer-logo order-logo"><span>${esc(o.other_name.charAt(0).toUpperCase())}</span>${o.other_has_avatar?`<img src="/api/users/${o.other_id}/avatar" alt="" loading="lazy" decoding="async" data-av>`:''}</span>`:'')}<div><p class="muted" style="margin:0">${seller?'Cumpărător':'Vânzător'}: ${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</p>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<p class="muted" style="margin:2px 0 0">👤 Persoană: <b>${esc(o.other_person)}</b></p>`:''}</div></div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n})}</div>`:''}${(o.recipient_name||o.recipient_phone)?`<p>👤 Destinatar: <b>${esc(o.recipient_name||'—')}</b>${o.recipient_phone?' · 📞 '+esc(fmtPhone(o.recipient_phone)):''}</p>`:''}${addr?`<p>📍 Livrare: ${esc(addr)}</p>`:''}${o.note?`<p class="muted">Mesaj: ${esc(o.note)}</p>`:''}${(o.status_reason&&['suspended','cancelled','completed'].includes(o.status))?`<p class="order-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}${o.got_stars?`<p>Calificativ primit: ${starsHtml(o.got_stars)}${o.got_comment?' · „'+esc(o.got_comment)+'”':''}</p>`:''}${(seller&&o.phones&&o.phones.length)?contactHtml(o.phones,'Cumpărătorul'):''}<div class="row">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-open="${o.listing_id}">Vezi anunțul</button>`:''}</div></div>`;
+  return `<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</b><p>${seller?'Vânzare':'Cumpărare'} · ${money(o.price)} · <span class="badge ${cls}">${esc(ORDER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}</p>${o.other_name?`<div class="order-party">${(!seller&&o.other_id)?`<button type="button" class="req-offer-logo order-logo" data-seller-profile="${o.other_id}" aria-label="Profil ${esc(o.other_name)}"><span>${esc(o.other_name.charAt(0).toUpperCase())}</span>${o.other_has_avatar?`<img src="/api/users/${o.other_id}/avatar" alt="" loading="lazy" decoding="async" data-av>`:''}</button>`:(o.other_id?`<span class="req-offer-logo order-logo"><span>${esc(o.other_name.charAt(0).toUpperCase())}</span>${o.other_has_avatar?`<img src="/api/users/${o.other_id}/avatar" alt="" loading="lazy" decoding="async" data-av>`:''}</span>`:'')}<div><p class="muted" style="margin:0">${seller?'Cumpărător':'Vânzător'}: ${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</p>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<p class="muted" style="margin:2px 0 0">👤 Persoană: <b>${esc(o.other_person)}</b></p>`:''}</div></div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n},o.other_id,seller?'buyer':'seller')}</div>`:''}${(o.recipient_name||o.recipient_phone)?`<p>👤 Destinatar: <b>${esc(o.recipient_name||'—')}</b>${o.recipient_phone?' · 📞 '+esc(fmtPhone(o.recipient_phone)):''}</p>`:''}${addr?`<p>📍 Livrare: ${esc(addr)}</p>`:''}${o.note?`<p class="muted">Mesaj: ${esc(o.note)}</p>`:''}${(o.status_reason&&['suspended','cancelled','completed'].includes(o.status))?`<p class="order-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}${o.got_stars?`<p>Calificativ primit: ${starsHtml(o.got_stars)}${o.got_comment?' · „'+esc(o.got_comment)+'”':''}</p>`:''}${(seller&&o.phones&&o.phones.length)?contactHtml(o.phones,'Cumpărătorul'):''}<div class="row">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-open="${o.listing_id}">Vezi anunțul</button>`:''}</div></div>`;
 }
 async function openOrder(id){
   if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
@@ -787,7 +839,7 @@ function myRequestHtml(x, offers){
     const canRate=won&&o.order_id&&o.order_status==='completed';
     const rateBtn=canRate?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.order_id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.seller_name||'vânzător')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':'☆ Dă calificativ vânzătorului'}</button>`:'';
     const rateHint=(won&&o.order_id&&['suspended','cancelled'].includes(o.order_status))?`<p class="order-reason req-rate-hint"><b>Comanda a fost ${o.order_status==='suspended'?'suspendată':'anulată'} de vânzător.</b>${o.order_reason?' Mesaj: '+esc(o.order_reason):''}</p>`:((won&&o.order_id&&!canRate)?`<p class="muted req-rate-hint">Poți da calificativul după ce comanda este marcată ca finalizată.</p>`:'');
-    return `<article class="info-card req-offer${won?' is-won':''}${lost?' is-lost':''}">${won?'<div class="req-win-ribbon">🏆 Oferta câștigătoare</div>':''}<div class="req-offer-head">${slogo}<div class="req-offer-who">${sname}${o.company?' <span class="badge">Firmă</span>':''}${o.seller_person&&o.seller_person!==o.seller_name?`<div class="req-offer-person">👤 Persoană: <b>${esc(o.seller_person)}</b></div>`:''}${o.company&&o.seller_nick?`<small class="muted"> · cont: ${esc(o.seller_nick)}</small>`:''}<div class="rate-line">${ratingLine({avg:o.seller_rating_avg,count:o.seller_rating_n})}</div></div><div class="req-offer-price">${mn(o.price)}</div></div>
+    return `<article class="info-card req-offer${won?' is-won':''}${lost?' is-lost':''}">${won?'<div class="req-win-ribbon">🏆 Oferta câștigătoare</div>':''}<div class="req-offer-head">${slogo}<div class="req-offer-who">${sname}${o.company?' <span class="badge">Firmă</span>':''}${o.seller_person&&o.seller_person!==o.seller_name?`<div class="req-offer-person">👤 Persoană: <b>${esc(o.seller_person)}</b></div>`:''}${o.company&&o.seller_nick?`<small class="muted"> · cont: ${esc(o.seller_nick)}</small>`:''}<div class="rate-line">${ratingLine({avg:o.seller_rating_avg,count:o.seller_rating_n},o.seller_id,'seller')}</div></div><div class="req-offer-price">${mn(o.price)}</div></div>
       <p class="muted"><span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(OFFER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}${o.updated_at?' · modificată '+fmtDate(o.updated_at):''}</p>
       ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:''}
       ${imgGalleryHtml(o.images,'Poză ofertă')}
@@ -825,7 +877,7 @@ function myOfferHtml(o){
     ${reqCrumbs('Ofertele mele',o.make,o.model)}
     ${imgGalleryHtml(o.req_images,o.request_title||'Cerere',true)}
     <div class="ad-titlerow"><h2>${esc(o.request_title)}</h2></div>
-    <p class="ad-sub">Cerere de la ${esc(o.buyer_name||'cumpărător')} ${rateInline(o.buyer_rating_avg,o.buyer_rating_n)}</p>
+    <p class="ad-sub">Cerere de la ${esc(o.buyer_name||'cumpărător')} ${rateInline(o.buyer_rating_avg,o.buyer_rating_n,o.buyer_id,'buyer')}</p>
     <div class="ad-chips">${o.kind?`<span class="lchip">${esc(REQ_KIND[o.kind]||'')}</span>`:''}<span class="badge ${open?'pending':'new'}">${esc(REQ_ST[o.request_status]||o.request_status||'')}</span></div>
     ${reqSpecHtml(o)}
     <h3 class="ad-h">Ce caută cumpărătorul</h3>${reqDetailsHtml({...o,created_at:undefined})}
@@ -836,7 +888,7 @@ function myOfferHtml(o){
       ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:'<p class="muted">Fără mesaj.</p>'}
       ${imgGalleryHtml(o.images,'Poza ofertei mele')}
       <div class="row">${editable?`<button type="button" class="btn primary small rq-desk" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small rq-desk" data-seller-msg="${o.buyer_id}">✉️ Scrie mesaj</button></div></div>
-    ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b><div class="rate-line">${ratingLine({avg:o.buyer_rating_avg,count:o.buyer_rating_n})}</div>${(o.ship_address||o.city||o.county)?`<p>📍 Livrare: ${esc([o.ship_address,o.city,o.county].filter(Boolean).join(', '))}</p>`:''}${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}
+    ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b><div class="rate-line">${ratingLine({avg:o.buyer_rating_avg,count:o.buyer_rating_n},o.buyer_id,'buyer')}</div>${(o.ship_address||o.city||o.county)?`<p>📍 Livrare: ${esc([o.ship_address,o.city,o.county].filter(Boolean).join(', '))}</p>`:''}${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}
   </aside>
   </div>${callbar}`;
 }
@@ -855,7 +907,7 @@ function publicRequestHtml(x){
   </div>
   <aside class="ad-side">
     <div class="ad-card rq-card">
-      <div class="seller-head">${avatarSpan(x.user_id,x.user_name||'C','seller-avatar')}<div><b>${esc(x.user_name||'Cumpărător')}</b><small>${esc(fmtDate(x.created_at))}${where?' · '+esc(where):''}</small><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n})}</div></div></div>
+      <div class="seller-head">${avatarSpan(x.user_id,x.user_name||'C','seller-avatar')}<div><b>${esc(x.user_name||'Cumpărător')}</b><small>${esc(fmtDate(x.created_at))}${where?' · '+esc(where):''}</small><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n},x.user_id,'buyer')}</div></div></div>
       <div class="contact-slot req-actions" id="reqContactSlot"><div class="rq-desk-row"><button type="button" class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button type="button" class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button></div></div>
     </div>
   </aside>
@@ -1275,7 +1327,7 @@ function detailHtml(x, phones, canContact){
       <p class="ad-ship">${x.delivery?'🚚 Livrare disponibilă':'📍 Ridicare personală'}</p>
     </div>
     <div class="ad-card">
-      <div class="seller-head">${avatarSpan(x.user_id,x.seller_name||'V','seller-avatar')}<div><b>${x.user_id?`<button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">${seller}</button>`:seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small><div class="rate-line">${ratingLine({avg:x.seller_rating_avg,count:x.seller_rating_n})}</div></div></div>
+      <div class="seller-head">${avatarSpan(x.user_id,x.seller_name||'V','seller-avatar')}<div><b>${x.user_id?`<button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">${seller}</button>`:seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small><div class="rate-line">${ratingLine({avg:x.seller_rating_avg,count:x.seller_rating_n},x.user_id,'seller')}</div></div></div>
       ${x.seller_ads?`<p class="seller-stats">${adsLabel(x.seller_ads)} active${x.seller_since?` · pe AutoPiese din ${new Date(x.seller_since).getFullYear()}`:''}${x.user_id?` · <button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">Vezi toate</button>`:''}</p>`:''}
       ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
@@ -1371,7 +1423,7 @@ function reqRowHtml(x, mine){
       <h3 class="ar-title">${esc(x.title)}</h3>
       <div class="ar-meta">${esc(car)}${ex?` · +${ex} ${ex===1?'piesă suplimentară':'piese suplimentare'}`:''}</div>
       ${x.description?`<p class="ar-desc">${esc(x.description.slice(0,140))}${x.description.length>140?'…':''}</p>`:''}
-      <div class="ar-sub">${mine?esc(REQ_ST[x.status]||x.status):(where?'📍 '+esc(where)+' · ':'')+avatarSpan(x.user_id,x.user_name||'C','ar-av')+' '+esc(x.user_name||'Cumpărător')+' '+rateInline(x.user_rating_avg,x.user_rating_n)}</div>
+      <div class="ar-sub">${mine?esc(REQ_ST[x.status]||x.status):(where?'📍 '+esc(where)+' · ':'')+avatarSpan(x.user_id,x.user_name||'C','ar-av')+' '+esc(x.user_name||'Cumpărător')+' '+rateInline(x.user_rating_avg,x.user_rating_n,x.user_id,'buyer')}</div>
     </div>
     <div class="ar-acts${mine?'':' contact-slot'}">${acts}</div>
     <div class="ar-foot"><span class="ar-views">${mine?`💬 ${n} ${n===1?'ofertă':'oferte'}${np?` (${np} noi)`:''}`:esc(REQ_KIND[x.kind]||'Cerere piesă')}</span><span class="ar-qty">${esc(fmtDate(x.created_at))}</span><span class="ar-price ar-state">${mine?esc(REQ_ST[x.status]||x.status):'Deschisă'}</span></div></article>`;
@@ -1406,7 +1458,7 @@ async function loadStores(parks){
   try{
     let list = (await api('/api/sellers')).sellers || [];
     if(parks) list = list.filter(s=>s.dism);
-    grid.innerHTML = list.map(s=>`<article class="info-card"><div class="seller-head">${avatarSpan(s.id,s.name,'seller-avatar')}<div><span class="badge">${s.dism?'DEZMEMBRĂRI':'VÂNZĂTOR'}</span><h3>${esc(s.name)}</h3></div></div><p class="rate-line">${ratingLine({avg:s.rating_avg,count:s.rating_n})}</p><p>${s.n} ${s.n===1?'anunț':'anunțuri'}${s.county?' · '+esc(s.county):''}</p><button class="btn ghost small" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`).join('');
+    grid.innerHTML = list.map(s=>`<article class="info-card"><div class="seller-head">${avatarSpan(s.id,s.name,'seller-avatar')}<div><span class="badge">${s.dism?'DEZMEMBRĂRI':'VÂNZĂTOR'}</span><h3>${esc(s.name)}</h3></div></div><p class="rate-line">${ratingLine({avg:s.rating_avg,count:s.rating_n},s.id,'seller')}</p><p>${s.n} ${s.n===1?'anunț':'anunțuri'}${s.county?' · '+esc(s.county):''}</p><button class="btn ghost small" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`).join('');
     $('#storesEmpty').classList.toggle('hidden', list.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -2465,7 +2517,7 @@ async function openSellerProfile(id){
     const own=currentUser&&currentUser.id===s.id;
     const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
     const phones=(s.phones||[]).map(p=>`<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(String(p.phone).replace(/[^\d+]/g,''))}">Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}">WhatsApp</a>`:''}</div></div>`).join('');
-    box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small><div class="rate-line">Ca vânzător: ${ratingLine(s.rating)}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating)}</div></div></div>
+    box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small><div class="rate-line">Ca vânzător: ${ratingLine(s.rating,s.id,'seller')}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating,s.id,'buyer')}</div></div></div>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
     ${s.vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${s.vacation.until?' până la '+esc(fmtDate(s.vacation.until+'T00:00:00')):''}.</div>`:''}
     ${phones||'<p class="muted">Vânzătorul nu a afișat un număr de telefon.</p>'}
@@ -2529,6 +2581,7 @@ document.addEventListener('click', e=>{
   if(t.closest('#accGraphBtn')){ drawAccChart(); const c=$('#accChart'); if(c) c.scrollIntoView({block:'nearest',behavior:'smooth'}); return; }
   if((el=t.closest('[data-stats-range]'))){ statsRange=Number(el.dataset.statsRange)||0; drawStats(); return; }
   if((el=t.closest('[data-stats-pick]'))){ statsPick=el.dataset.statsPick; drawStats(); const sb=$('#statsBox'); if(sb) sb.scrollIntoView({block:'start',behavior:'smooth'}); return; }
+  if((el=t.closest('[data-reviews]'))){ e.stopPropagation(); $$('.modal').forEach(m=>m.classList.add('hidden')); navigate('account-tool?view=reviews&with='+Number(el.dataset.reviews)+'&ref='+(el.dataset.role==='buyer'?'buyer':'seller')); return; }
   if((el=t.closest('[data-seller-profile]'))){ e.stopPropagation(); openSellerProfile(Number(el.dataset.sellerProfile)); return; }
   if((el=t.closest('[data-open-request],[data-offer-open]'))){
     const inner=t.closest('button,a');
@@ -2993,11 +3046,12 @@ document.addEventListener('submit', e=>{
 
 /* ---------- Calificative pentru vânzători ---------- */
 function starsHtml(avg){ const p=Math.max(0,Math.min(100,(Number(avg)||0)/5*100)); return `<span class="stars" style="--p:${p}%" aria-hidden="true">★★★★★</span>`; }
-function ratingLine(r){
+function revLink(inner,uid,role){ return uid?`<button type="button" class="rate-link" data-reviews="${Number(uid)}" data-role="${role==='buyer'?'buyer':'seller'}" title="Vezi recenziile" aria-label="Vezi recenziile">${inner}</button>`:inner; }
+function ratingLine(r,uid,role){
   if(!r||!r.count) return '<span class="muted">Fără calificative încă</span>';
-  return `${starsHtml(r.avg)} <b>${esc(String(r.avg).replace('.',','))}</b> <span class="muted">(${r.count} ${r.count===1?'calificativ':'calificative'})</span>`;
+  return revLink(`${starsHtml(r.avg)} <b>${esc(String(r.avg).replace('.',','))}</b> <span class="muted">(${r.count} ${r.count===1?'calificativ':'calificative'})</span>`,uid,role);
 }
-function rateInline(avg,n){ n=Number(n)||0; return n?`<span class="rate-inline">${starsHtml(avg)} <b>${esc(String(avg).replace('.',','))}</b> <small>(${n})</small></span>`:'<span class="rate-inline muted"><small>fără calificative</small></span>'; }
+function rateInline(avg,n,uid,role){ n=Number(n)||0; return n?revLink(`<span class="rate-inline">${starsHtml(avg)} <b>${esc(String(avg).replace('.',','))}</b> <small>(${n})</small></span>`,uid,role):'<span class="rate-inline muted"><small>fără calificative</small></span>'; }
 async function loadSellerRatings(id){
   const box=$('#sellerRatings'); if(!box) return;
   try{
