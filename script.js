@@ -491,7 +491,7 @@ async function loadToolData(view, box, withId, refId){
         <div class="ar-foot"><span class="ar-views">${esc(OFFER_ST[o.status]||o.status)}</span><span class="ar-qty">${esc(fmtDate(o.created_at))}</span><span class="ar-price">${esc(money(o.price))}</span></div></article>`;
     });
   }else if(view==='orders'||view==='orders-seller'){
-    const r=await api('/api/orders'), role=view==='orders'?'buyer':'seller';
+    const r=await api('/api/orders'+(view==='orders'?'?seen=buyer':'')), role=view==='orders'?'buyer':'seller';
     items=r.orders.filter(o=>o.role===role).map(orderCardHtml);
   }else if(view==='messages'){
     if(withId){

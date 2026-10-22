@@ -2386,3 +2386,6 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .bill-type{display:flex;gap:18px;flex-wrap:wrap}
 .bill-type label{display:flex;align-items:center;gap:6px;font-weight:600}
 .bill-type input{width:auto}
+
+/* Insigna de pe butonul de meniu: rămâne în interiorul antetului (nu mai e tăiată sus) */
+.header .nav-badge{top:-3px;right:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;font:800 10px/18px Inter,system-ui,sans-serif;box-shadow:0 0 0 2px #0e0f12}
