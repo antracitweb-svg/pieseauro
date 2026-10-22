@@ -1516,7 +1516,7 @@ app.post('/api/offers/:id/reject',auth,requireDb,ah(async(req,res)=>{
  res.json({ok:true});
 }));
 app.get('/api/offers/received',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,o.seller_id,q.id request_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name,'+SELLER_RATE('o.seller_id','seller_rating')+' FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
+ const r=await pool.query('SELECT o.id,o.price,o.message,o.status,o.created_at,o.seller_id,o.images[1:1] images,q.images[1:1] req_images,q.id request_id,q.title request_title,COALESCE(u.nickname,u.name) seller_name,'+SELLER_RATE('o.seller_id','seller_rating')+' FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id WHERE q.user_id=$1 ORDER BY o.created_at DESC LIMIT 200',[req.user.id]);
  res.json({offers:r.rows});
 }));
 app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{

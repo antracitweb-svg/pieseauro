@@ -200,7 +200,7 @@ const BN_MAP={home:'home',rezultate:'rezultate',saved:'rezultate',vinde:'vinde',
 function setBottomNav(name){ const t=BN_MAP[name]||''; $$('#bottomNav [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t)); }
 const SKEL=Array(6).fill('<div class="ar-row ar-skel"><div class="skel ar-thumb"></div><div class="ar-main"><div class="skel skel-line"></div><div class="skel skel-line short"></div></div></div>').join('');
 function route(){
-  const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); closeLightbox();
+  const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); const rm=$('#requestModal'); if(rm) rm.classList.add('hidden'); closeLightbox();
   const { name, params } = parseHash();
   if(name==='menu'){ history.replaceState(null,'',location.pathname+location.search+'#/home'); route(); openMenu(); return; }
   closeMenu(true);
@@ -424,11 +424,24 @@ async function loadToolData(view, box, withId, refId){
     items=r.offers.map(o=>{
       const open=o.request_status==='open', pend=o.status==='pending';
       const st=pend&&!open?'Cererea s-a închis':(OFFER_ST[o.status]||o.status);
-      return `<div class="info-card tool-item offer-card" data-offer-open="${o.id}"><b>${esc(o.request_title)}</b><p class="muted">${esc([o.make,o.model,o.year].filter(Boolean).join(' · ')||'Orice mașină')}${o.buyer_name?' · cumpărător: '+esc(o.buyer_name)+' '+rateInline(o.buyer_rating_avg,o.buyer_rating_n):''}</p><p>Oferta mea: <b>${money(o.price)}</b> · <span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(st)}</span> · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row"><button type="button" class="btn primary small" data-offer-open="${o.id}">Vezi cererea</button>${pend&&open?`<button type="button" class="btn ghost small" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small" data-go="account-tool?view=messages&with=${o.buyer_id}">Scrie mesaj</button></div></div>`;
+      const im=(o.req_images&&o.req_images[0])||(o.images&&o.images[0])||'';
+      const car=[o.make,o.model,o.year].filter(Boolean).join(' · ')||'Orice mașină';
+      return `<article class="ar-row ar-req" data-offer-open="${o.id}" tabindex="0" role="link" aria-label="${esc(o.request_title)}">
+        <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">💬</span>'}</div>
+        <div class="ar-main"><h3 class="ar-title">${esc(o.request_title)}</h3><div class="ar-meta">${esc(car)}</div>${o.message?`<p class="ar-desc">${esc(o.message.slice(0,140))}${o.message.length>140?'…':''}</p>`:''}<div class="ar-sub">${o.buyer_name?'Cumpărător: '+esc(o.buyer_name)+' '+rateInline(o.buyer_rating_avg,o.buyer_rating_n):''}</div></div>
+        <div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-offer-open="${o.id}">Vezi cererea</button>${pend&&open?`<button type="button" class="ar-btn ar-edit" data-offer-edit="${o.id}" title="Editează oferta" aria-label="Editează oferta">✎</button><button type="button" class="ar-btn ar-del" data-offer-del="${o.id}" title="Retrage oferta" aria-label="Retrage oferta">🗑</button>`:''}${o.buyer_id?`<button type="button" class="ar-btn" data-go="account-tool?view=messages&with=${o.buyer_id}" title="Scrie mesaj" aria-label="Scrie mesaj">✉</button>`:''}</div>
+        <div class="ar-foot"><span class="ar-views">${esc(st)}</span><span class="ar-qty">${esc(fmtDate(o.created_at))}</span><span class="ar-price">${esc(money(o.price))}</span></div></article>`;
     });
   }else if(view==='offers-received'){
     const r=await api('/api/offers/received');
-    items=r.offers.map(o=>`<div class="info-card tool-item"><b>${esc(o.request_title)}</b><p>${money(o.price)}${o.seller_name?' · '+esc(o.seller_name)+' '+rateInline(o.seller_rating_avg,o.seller_rating_n):''} · ${esc(OFFER_ST[o.status]||o.status)} · ${fmtDate(o.created_at)}</p>${o.message?`<p class="muted">${esc(o.message)}</p>`:''}<div class="row"><button type="button" class="btn ghost small" data-open-request="${o.request_id}" data-mode="mine">Cererea și ofertanții</button>${o.status==='pending'?`<button class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button>`:''}<button class="btn ghost small" data-go="account-tool?view=messages&with=${o.seller_id}">Scrie mesaj</button></div></div>`);
+    items=r.offers.map(o=>{
+      const pend=o.status==='pending', im=(o.images&&o.images[0])||(o.req_images&&o.req_images[0])||'';
+      return `<article class="ar-row ar-req" data-open-request="${o.request_id}" data-mode="mine" tabindex="0" role="link" aria-label="${esc(o.request_title)}">
+        <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">💬</span>'}</div>
+        <div class="ar-main"><h3 class="ar-title">${esc(o.request_title)}</h3><div class="ar-meta">${o.seller_name?esc(o.seller_name)+' '+rateInline(o.seller_rating_avg,o.seller_rating_n):'Vânzător'}</div>${o.message?`<p class="ar-desc">${esc(o.message.slice(0,140))}${o.message.length>140?'…':''}</p>`:''}</div>
+        <div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-open-request="${o.request_id}" data-mode="mine">Cererea și ofertanții</button>${pend?`<button type="button" class="ar-btn" data-offer-accept="${o.id}" title="Acceptă oferta" aria-label="Acceptă oferta">✓</button>`:''}${o.seller_id?`<button type="button" class="ar-btn" data-go="account-tool?view=messages&with=${o.seller_id}" title="Scrie mesaj" aria-label="Scrie mesaj">✉</button>`:''}</div>
+        <div class="ar-foot"><span class="ar-views">${esc(OFFER_ST[o.status]||o.status)}</span><span class="ar-qty">${esc(fmtDate(o.created_at))}</span><span class="ar-price">${esc(money(o.price))}</span></div></article>`;
+    });
   }else if(view==='orders'||view==='orders-seller'){
     const r=await api('/api/orders'), role=view==='orders'?'buyer':'seller';
     items=r.orders.filter(o=>o.role===role).map(orderCardHtml);
@@ -612,10 +625,16 @@ function reqDetailsHtml(x){
   const rows=[['Marcă',x.make],['Model',x.model],['An',x.year],['Variantă',x.variant],['Motor',x.engine],['Serie șasiu (VIN)',x.vin],['Caut',REQ_KIND[x.kind]],['Locație',[x.city,x.county].filter(Boolean).join(', ')],['Adresa de livrare',x.ship_address],['Publicată',x.created_at?fmtDate(x.created_at):'']].filter(r=>r[1]);
   let extra=[]; try{ extra=typeof x.extra_parts==='string'?JSON.parse(x.extra_parts||'[]'):(x.extra_parts||[]); }catch{}
   extra=Array.isArray(extra)?extra.filter(p=>p&&p.title):[];
-  return `${rows.length?`<dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>`:''}
-    ${x.description?`<h3 class="ad-h">Descriere</h3><p class="detail-desc">${esc(x.description)}</p>`:''}
+  return `${x.description?`<h3 class="ad-h">Descriere</h3><p class="detail-desc">${esc(x.description)}</p>`:''}
     ${extra.length?`<h3 class="ad-h">Piese căutate în plus (${extra.length})</h3><ul class="req-extra">${extra.map(p=>`<li><b>${esc(p.title)}</b>${p.details?`<br><span class="muted">${esc(p.details)}</span>`:''}</li>`).join('')}</ul>`:''}
-    ${(x.images&&x.images.length)?`<h3 class="ad-h">Poze</h3>${imgGalleryHtml(x.images,x.title||'Cerere')}`:''}`;
+    ${rows.length?`<h3 class="ad-h">Detalii</h3><dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>`:''}`;
+}
+/* Pagina unei cereri / oferte: același format ca pagina unui anunț (breadcrumb, carusel foto, titlu, coloană laterală, bară fixă jos pe telefon) */
+function reqCrumbs(){ return `<nav class="ad-crumbs" aria-label="Navigare">${[...arguments].filter(Boolean).map(t=>`<span>${esc(t)}</span>`).join('<i>›</i>')}</nav>`; }
+function reqCarSub(x){ return [x.make,x.model,x.year].filter(Boolean).join(' · ')||'Orice mașină'; }
+function reqSpecHtml(x){
+  const spec=[['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
+  return spec.length?`<div class="ad-car"><small>Piesa se potrivește la</small><div class="ad-spec">${spec.map(r=>`<div><span>${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('')}</div></div>`:'';
 }
 function myRequestHtml(x, offers){
   const open=x.status==='open', mn=v=>new Intl.NumberFormat('ro-RO').format(Number(v))+' lei';
@@ -628,28 +647,72 @@ function myRequestHtml(x, offers){
       ${o.status!=='rejected'?`<div class="req-offer-phones">${contactHtml(o.phones,'Ofertantul')}</div>`:''}
       <div class="row">${pend&&open?`<button type="button" class="btn primary small" data-offer-accept="${o.id}">Acceptă oferta</button><button type="button" class="btn danger small" data-offer-reject="${o.id}">Refuză</button>`:''}${o.seller_id?`<button type="button" class="btn ghost small" data-seller-msg="${o.seller_id}">✉️ Scrie mesaj</button>`:''}</div></article>`;
   }).join('');
-  return `<div class="eyebrow">CEREREA MEA</div><h2>${esc(x.title)}</h2>
-    <p><span class="badge ${open?'pending':'new'}">${esc(REQ_ST[x.status]||x.status)}</span></p>
+  const btns=[];
+  if(Number(x.edit_secs)>0) btns.push(`<button type="button" class="btn ghost small" data-edit-request="${x.id}" data-edit-until="${Date.now()+Number(x.edit_secs)*1000}">✎ Editează (mai ai ${Math.ceil(Number(x.edit_secs)/60)} min)</button>`);
+  btns.push(`<button type="button" class="btn danger small" data-del-request="${x.id}">🗑 Șterge cererea</button>`);
+  const per=btns.length<=3?Math.max(btns.length,1):Math.ceil(btns.length/2);
+  const np=offers.filter(o=>o.status==='pending').length;
+  return `<div class="ad rq">
+  <div class="ad-main">
+    ${reqCrumbs('Cererile mele',x.make,x.model)}
+    <div class="ad-owner"><div class="ad-owner-btns" style="--per:${per}">${btns.join('')}</div><p class="ad-owner-info">${esc(REQ_ST[x.status]||x.status)} · ${offers.length} ${offers.length===1?'ofertă':'oferte'}${np?` (${np} în așteptare)`:''}</p><p class="ad-owner-dates">Data publicării: ${esc(fmtDateTime(x.created_at))}</p></div>
+    ${imgGalleryHtml(x.images,x.title||'Cerere',true)}
+    <div class="ad-titlerow"><h2>${esc(x.title)}</h2></div>
+    <p class="ad-sub">${esc(reqCarSub(x))}</p>
+    <div class="ad-chips"><span class="badge ${open?'pending':'new'}">${esc(REQ_ST[x.status]||x.status)}</span>${x.kind?`<span class="lchip">${esc(REQ_KIND[x.kind]||'')}</span>`:''}</div>
+    ${reqSpecHtml(x)}
     ${reqDetailsHtml(x)}
-    <h3 class="ad-h">Oferte primite (${offers.length})</h3>
-    ${list||'<p class="muted">Nu ai primit încă nicio ofertă. Vânzătorii vor apărea aici cu nume, preț și telefon.</p>'}`;
+  </div>
+  <aside class="ad-side">
+    <h3 class="ad-h rq-offers-h">Oferte primite (${offers.length})</h3>
+    ${list||'<p class="muted">Nu ai primit încă nicio ofertă. Vânzătorii vor apărea aici cu nume, preț și telefon.</p>'}
+  </aside>
+  </div>`;
 }
 function myOfferHtml(o){
   const open=o.request_status==='open', pend=o.status==='pending', mn=v=>new Intl.NumberFormat('ro-RO').format(Number(v))+' lei';
-  return `<div class="eyebrow">OFERTA MEA</div><h2>${esc(o.request_title)}</h2>
-    <p class="muted">Cerere de la ${esc(o.buyer_name||'cumpărător')} ${rateInline(o.buyer_rating_avg,o.buyer_rating_n)}</p>
-    <h3 class="ad-h">Ce caută cumpărătorul</h3>${reqDetailsHtml({...o,images:o.req_images,created_at:undefined})}
-    <h3 class="ad-h">Oferta mea</h3>
+  const editable=pend&&open;
+  const callbar=`<div class="ad-callbar">${o.buyer_id?`<button type="button" class="btn ghost" data-seller-msg="${o.buyer_id}">✉️ Scrie mesaj</button>`:''}${editable?`<button type="button" class="btn primary" data-offer-edit="${o.id}">Editează oferta</button>`:''}</div>`;
+  return `<div class="ad rq">
+  <div class="ad-main">
+    ${reqCrumbs('Ofertele mele',o.make,o.model)}
+    ${imgGalleryHtml(o.req_images,o.request_title||'Cerere',true)}
+    <div class="ad-titlerow"><h2>${esc(o.request_title)}</h2></div>
+    <p class="ad-sub">Cerere de la ${esc(o.buyer_name||'cumpărător')} ${rateInline(o.buyer_rating_avg,o.buyer_rating_n)}</p>
+    <div class="ad-chips">${o.kind?`<span class="lchip">${esc(REQ_KIND[o.kind]||'')}</span>`:''}<span class="badge ${open?'pending':'new'}">${esc(REQ_ST[o.request_status]||o.request_status||'')}</span></div>
+    ${reqSpecHtml(o)}
+    <h3 class="ad-h">Ce caută cumpărătorul</h3>${reqDetailsHtml({...o,created_at:undefined})}
+  </div>
+  <aside class="ad-side">
+    <h3 class="ad-h rq-offers-h">Oferta mea</h3>
     <div class="info-card req-offer"><div class="req-offer-head"><div><span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(pend&&!open?'Cererea s-a închis':(OFFER_ST[o.status]||o.status))}</span> <small class="muted">${fmtDate(o.created_at)}${o.updated_at?' · modificată '+fmtDate(o.updated_at):''}</small></div><div class="req-offer-price">${mn(o.price)}</div></div>
       ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:'<p class="muted">Fără mesaj.</p>'}
       ${imgGalleryHtml(o.images,'Poza ofertei mele')}
-      <div class="row">${pend&&open?`<button type="button" class="btn primary small" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small" data-seller-msg="${o.buyer_id}">✉️ Scrie mesaj</button></div></div>
-    ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b><div class="rate-line">${ratingLine({avg:o.buyer_rating_avg,count:o.buyer_rating_n})}</div>${(o.ship_address||o.city||o.county)?`<p>📍 Livrare: ${esc([o.ship_address,o.city,o.county].filter(Boolean).join(', '))}</p>`:''}${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}`;
+      <div class="row">${editable?`<button type="button" class="btn primary small rq-desk" data-offer-edit="${o.id}">Editează oferta</button><button type="button" class="btn danger small" data-offer-del="${o.id}">Retrage oferta</button>`:''}<button type="button" class="btn ghost small rq-desk" data-seller-msg="${o.buyer_id}">✉️ Scrie mesaj</button></div></div>
+    ${o.status==='accepted'?`<h3 class="ad-h">Datele cumpărătorului</h3><div class="info-card"><b>${esc(o.buyer_name||'Cumpărător')}</b><div class="rate-line">${ratingLine({avg:o.buyer_rating_avg,count:o.buyer_rating_n})}</div>${(o.ship_address||o.city||o.county)?`<p>📍 Livrare: ${esc([o.ship_address,o.city,o.county].filter(Boolean).join(', '))}</p>`:''}${contactHtml(o.phones,'Cumpărătorul')}</div>`:''}
+  </aside>
+  </div>${callbar}`;
 }
 function publicRequestHtml(x){
-  return `<div class="eyebrow">CERERE DE PIESE</div><h2>${esc(x.title)}</h2><p class="muted">${esc(x.user_name||'Cumpărător')} · ${fmtDate(x.created_at)}</p><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n})}</div>
+  const where=[x.city,x.county].filter(Boolean).join(', ');
+  const callbar=`<div class="ad-callbar"><button type="button" class="btn ghost" data-req-contact="${x.id}">✉ Contactează</button><button type="button" class="btn primary" data-offer-request="${x.id}">Oferă piesa</button></div>`;
+  return `<div class="ad rq">
+  <div class="ad-main">
+    ${reqCrumbs('Piese căutate',x.make,x.model,x.county)}
+    ${imgGalleryHtml(x.images,x.title||'Cerere',true)}
+    <div class="ad-titlerow"><h2>${esc(x.title)}</h2></div>
+    <p class="ad-sub">${esc(reqCarSub(x))}${where?' · 📍 '+esc(where):''}</p>
+    <div class="ad-chips"><span class="badge pending">Cerere deschisă</span>${x.kind?`<span class="lchip">${esc(REQ_KIND[x.kind]||'')}</span>`:''}</div>
+    ${reqSpecHtml(x)}
     ${reqDetailsHtml(x)}
-    <div class="contact-slot req-actions"><button type="button" class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button type="button" class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button></div>`;
+  </div>
+  <aside class="ad-side">
+    <div class="ad-card rq-card">
+      <div class="seller-head"><span class="seller-avatar">${esc((x.user_name||'C').charAt(0).toUpperCase())}</span><div><b>${esc(x.user_name||'Cumpărător')}</b><small>${esc(fmtDate(x.created_at))}${where?' · '+esc(where):''}</small><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n})}</div></div></div>
+      <div class="contact-slot req-actions" id="reqContactSlot"><div class="rq-desk-row"><button type="button" class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button type="button" class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button></div></div>
+    </div>
+  </aside>
+  </div>${callbar}`;
 }
 async function openRequestModal(id, mode){
   const modal=$('#requestModal'), box=$('#requestContent');
@@ -962,20 +1025,28 @@ function renderPagination(){
 /* ---------- vizualizare foto ---------- */
 let lightboxImages = [];
 let lightboxIndex = 0;
+let lightboxAlt = 'Poza anunțului';
+/* Înlocuim elementul <img> la fiecare poză: browserul nu mai poate afișa poza anterioară (ex. din „Cereri piese”) cât se încarcă cea nouă */
+function freshLightboxImg(){
+  const old=$('#imageLightboxImg'); if(!old) return null;
+  const img=document.createElement('img'); img.id='imageLightboxImg'; img.alt=lightboxAlt;
+  old.replaceWith(img); return img;
+}
 function openLightbox(src, images=[], index=0, alt='Poza anunțului'){
   const list = Array.isArray(images) && images.length ? images : [src];
   lightboxImages = list.filter(Boolean);
   lightboxIndex = Math.max(0, Math.min(Number(index)||0, lightboxImages.length-1));
-  const modal = $('#imageLightbox'), image = $('#imageLightboxImg');
-  if(!modal || !image || !lightboxImages.length) return;
-  image.alt = alt || 'Poza anunțului';
+  lightboxAlt = alt || 'Poza anunțului';
+  const modal = $('#imageLightbox');
+  if(!modal || !lightboxImages.length) return;
   modal.classList.remove('hidden');
   document.body.classList.add('lightbox-open');
   renderLightbox();
 }
 function renderLightbox(){
-  const modal=$('#imageLightbox'), image=$('#imageLightboxImg'), counter=$('#imageLightboxCounter');
-  if(!modal||!image||!lightboxImages.length) return;
+  const modal=$('#imageLightbox'), counter=$('#imageLightboxCounter');
+  if(!modal||!lightboxImages.length) return;
+  const image=freshLightboxImg(); if(!image) return;
   image.src=lightboxImages[lightboxIndex];
   if(counter) counter.textContent=`${lightboxIndex+1} / ${lightboxImages.length}`;
   const prev=$('#imageLightboxPrev'), next=$('#imageLightboxNext');
@@ -985,7 +1056,8 @@ function renderLightbox(){
 function closeLightbox(){
   const modal=$('#imageLightbox'); if(!modal) return;
   modal.classList.add('hidden'); document.body.classList.remove('lightbox-open');
-  const image=$('#imageLightboxImg'); if(image) image.removeAttribute('src');
+  lightboxImages=[]; lightboxIndex=0;
+  freshLightboxImg();
 }
 function moveLightbox(step){
   if(lightboxImages.length<2) return;
@@ -1182,7 +1254,11 @@ async function loadRequests(mine){
 async function requestContact(id, btn){
   if(!currentUser){ openAuth('requests'); return; }
   const r = await api(`/api/requests/${id}/contact`);
-  btn.closest('.contact-slot').innerHTML = contactHtml(r.phones,'Cumpărătorul');
+  const inModal = btn.closest('#requestModal') && $('#reqContactSlot');
+  const slot = inModal || btn.closest('.contact-slot');
+  if(!slot) return;
+  slot.innerHTML = contactHtml(r.phones,'Cumpărătorul');
+  if(inModal){ const cb=btn.closest('.ad-callbar'); if(cb) cb.querySelectorAll('[data-req-contact]').forEach(b=>b.remove()); slot.scrollIntoView({block:'center',behavior:'smooth'}); }
 }
 async function loadStores(parks){
   const grid = $('#storesGrid'); $('#storesEmpty').classList.add('hidden');
@@ -1554,10 +1630,10 @@ async function handleImgBox(e){
   try{ for(const file of files){ try{ state[key].push(await fileToDataUrl(file)); }catch(err){ toast(err.message); } } }
   finally{ state[key+'Busy']=false; renderImgBox(key); }
 }
-function imgGalleryHtml(images, alt){
+function imgGalleryHtml(images, alt, big){
   const list=(Array.isArray(images)?images:[]).filter(Boolean); if(!list.length) return '';
   const n=list.length;
-  return `<div class="ad-gal req-gal"><div class="detail-gallery ad-slider req-slider" data-slider>${list.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(alt)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(alt)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>${n>1?`<button type="button" class="ad-nav prev" data-ad-slide="-1" aria-label="Poza anterioară">‹</button><button type="button" class="ad-nav next" data-ad-slide="1" aria-label="Poza următoare">›</button><span class="ad-count">1 / ${n}</span><div class="ad-dots" aria-hidden="true">${list.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}</div>`;
+  return `<div class="ad-gal${big?'':' req-gal'}"><div class="detail-gallery ad-slider${big?'':' req-slider'}" data-slider>${list.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(alt)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(alt)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>${n>1?`<button type="button" class="ad-nav prev" data-ad-slide="-1" aria-label="Poza anterioară">‹</button><button type="button" class="ad-nav next" data-ad-slide="1" aria-label="Poza următoare">›</button><span class="ad-count">1 / ${n}</span><div class="ad-dots" aria-hidden="true">${list.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}</div>`;
 }
 
 /* ---------- preselecție mașină pentru cereri ---------- */
@@ -2293,7 +2369,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); { const dm=$('#detailModal'); if(dm&&!dm.classList.contains('hidden')) openDetail(id,true); } toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); { const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); } toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-edit-request]'))){ if(Date.now()>Number(el.dataset.editUntil||0)){ toast('Au trecut cele 10 minute în care puteai modifica cererea.'); loadRequests(true); return; } navigate('cerere-noua?edit='+el.dataset.editRequest); return; }
-  if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); loadRequests(true); })(); return; }
+  if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); { const rm=$('#requestModal'); if(rm) rm.classList.add('hidden'); } toast('Cererea a fost ștearsă.'); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
   if((el=t.closest('[data-order]'))){ e.stopPropagation(); safe(openOrder)(Number(el.dataset.order)); return; }
   if((el=t.closest('[data-order-status]'))){ const oid=el.dataset.orderStatus, to=el.dataset.to; if(to==='cancelled'&&!confirm('Sigur vrei să anulezi comanda?')) return; safe(async()=>{ await api('/api/orders/'+oid+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); toast('Comanda a fost actualizată.'); renderAccountTool(currentToolView||'orders'); })(); return; }
@@ -2386,6 +2462,7 @@ document.addEventListener('keydown', e=>{
   }
   if(e.key==='Escape'){ const m=$$('.modal').filter(x=>!x.classList.contains('hidden')).pop(); if(m) closeModal(m); }
   if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.listing[data-open],.ar-row[data-open]')){ e.preventDefault(); openDetail(Number(e.target.dataset.open)); }
+  if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.ar-row[data-offer-open]')){ e.preventDefault(); openRequestModal(Number(e.target.dataset.offerOpen),'offer'); }
   if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.ar-row[data-open-request]')){ e.preventDefault(); openRequestModal(Number(e.target.dataset.openRequest), e.target.dataset.mode||'public'); }
 });
 
