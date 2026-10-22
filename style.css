@@ -2362,3 +2362,8 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .seller-avatar-img{position:relative;overflow:hidden}
 .seller-avatar-img i{font-style:normal}
 .seller-avatar-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}
+
+/* Comenzi: motiv suspendare / anulare */
+.order-reason{margin:8px 0;padding:9px 12px;border-left:3px solid var(--gold,#b8935a);background:var(--pale,#f7f5f0);border-radius:8px;font-size:14px}
+.order-restock{display:flex;gap:8px;align-items:flex-start;font-size:14px;font-weight:600}
+.order-restock input{margin-top:3px;width:auto}

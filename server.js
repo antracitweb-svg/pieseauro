@@ -393,6 +393,7 @@ async function dbReady(){
   'CREATE TABLE IF NOT EXISTS login_attempts (key TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
   'CREATE INDEX IF NOT EXISTS login_attempts_key_idx ON login_attempts(key,at)',
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE',
+  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_reason TEXT',
   'CREATE TABLE IF NOT EXISTS rate_state (map TEXT NOT NULL, key TEXT NOT NULL, data TEXT NOT NULL, exp BIGINT NOT NULL, PRIMARY KEY(map,key))',
   'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS kind TEXT',
   'CREATE TABLE IF NOT EXISTS seller_ratings (id SERIAL PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, stars SMALLINT NOT NULL CHECK(stars BETWEEN 1 AND 5), comment TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ)',
@@ -1189,7 +1190,7 @@ app.post('/api/account/delete',requireDb,auth,ah(async(req,res)=>{
   const pw=String((req.body&&req.body.password)||'');
   const u=(await pool.query('SELECT password_hash FROM users WHERE id=$1',[req.user.id])).rows[0];
   if(!pw||!u||!(await bcrypt.compare(pw,u.password_hash)))return res.status(401).json({error:'PAROLA_GRESITA'});
-  const open=await pool.query("SELECT 1 FROM orders WHERE (buyer_id=$1 OR seller_id=$1) AND status IN ('new','confirmed','shipped') LIMIT 1",[req.user.id]);
+  const open=await pool.query("SELECT 1 FROM orders WHERE (buyer_id=$1 OR seller_id=$1) AND status IN ('new','confirmed','shipped','suspended') LIMIT 1",[req.user.id]);
   if(open.rowCount)return res.status(409).json({error:'COMENZI_ACTIVE'});
   const c=await pool.connect();
   try{
@@ -1343,7 +1344,7 @@ app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
 app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
  const q=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.kind,r.county,r.city,r.ship_address,r.description,r.extra_parts,r.status,r.created_at,r.images,GREATEST(0,CEIL(EXTRACT(EPOCH FROM (r.created_at+INTERVAL '10 minutes'-NOW()))))::int edit_secs FROM part_requests r WHERE r.id=$1 AND r.user_id=$2",[req.params.id,req.user.id]);
  if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});
- const o=await pool.query("SELECT o.id,o.price,o.message,o.images,o.status,o.created_at,o.updated_at,o.seller_id,CASE WHEN o.status='accepted' THEN COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) ELSE COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) END seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,CASE WHEN o.status='accepted' THEN u.name END seller_person,(u.store_logo IS NOT NULL) seller_has_logo,u.phone user_phone,(SELECT od.id FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_id,(SELECT od.status FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_status,(SELECT sr.stars FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_stars,(SELECT sr.comment FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_comment,"+SELLER_RATE('o.seller_id','seller_rating')+" FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
+ const o=await pool.query("SELECT o.id,o.price,o.message,o.images,o.status,o.created_at,o.updated_at,o.seller_id,CASE WHEN o.status='accepted' THEN COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) ELSE COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) END seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,CASE WHEN o.status='accepted' THEN u.name END seller_person,(u.store_logo IS NOT NULL) seller_has_logo,u.phone user_phone,(SELECT od.id FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_id,(SELECT od.status FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_status,(SELECT od.status_reason FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_reason,(SELECT sr.stars FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_stars,(SELECT sr.comment FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_comment,"+SELLER_RATE('o.seller_id','seller_rating')+" FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
  const ids=[...new Set(o.rows.filter(x=>x.status!=='rejected'&&x.seller_id).map(x=>x.seller_id))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  const offers=o.rows.map(x=>{
@@ -1635,35 +1636,40 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  res.status(201).json({ok:true,order_id:r.rows[0].id});
 }));
 app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
+ const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.status_reason,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
  const ids=[...new Set(r.rows.map(x=>x.other_id).filter(Boolean))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  res.json({orders:r.rows.map(x=>({...x,phones:ph.filter(p=>p.user_id===x.other_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp}))}))});
 }));
 app.patch('/api/orders/:id/status',auth,requireDb,ah(async(req,res)=>{
  const to=String((req.body||{}).status||'');
- if(!['confirmed','shipped','completed','cancelled'].includes(to))return res.status(400).json({error:'STATUS_INVALIDE'});
+ if(!['confirmed','shipped','completed','suspended','cancelled'].includes(to))return res.status(400).json({error:'STATUS_INVALIDE'});
  const o=(await pool.query('SELECT id,buyer_id,seller_id,title,status,listing_id,quantity,stock_reserved FROM orders WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[req.params.id,req.user.id])).rows[0];
  if(!o)return res.status(404).json({error:'NOT_FOUND'});
  const seller=o.seller_id===req.user.id;
  if(!seller&&!(to==='cancelled'&&o.status==='new'))return res.status(403).json({error:'INTERZIS'});
  if(['cancelled','completed'].includes(o.status))return res.status(409).json({error:'COMANDA_INCHISA'});
  // Tranziții permise (aceleași ca butoanele din interfață): „finalizată” doar după „expediată”.
- const NEXT={new:['confirmed','shipped','cancelled'],confirmed:['shipped','cancelled'],shipped:['completed','cancelled']};
+ const NEXT={new:['confirmed','shipped','completed','suspended','cancelled'],confirmed:['shipped','completed','suspended','cancelled'],shipped:['completed','suspended','cancelled'],suspended:['confirmed','shipped','completed','cancelled']};
+ // Vânzătorul trebuie să explice cumpărătorului de ce suspendă sau anulează comanda.
+ const reason=clip((req.body||{}).reason,500);
+ if(reason&&/(https?:\/\/|www\.)/i.test(reason))return res.status(400).json({error:'LINK_INTERZIS'});
+ if(seller&&['suspended','cancelled'].includes(to)&&(!reason||reason.length<3))return res.status(400).json({error:'MOTIV_OBLIGATORIU'});
+ const restock=!(seller&&(req.body||{}).restock===false);
  if(!(NEXT[o.status]||[]).includes(to))return res.status(409).json({error:'STATUS_INVALIDE'});
  const c=await pool.connect();
  try{
   await c.query('BEGIN');
-  const u=await c.query('UPDATE orders SET status=$1'+(to==='cancelled'?',stock_reserved=FALSE':'')+' WHERE id=$2 AND status=$3 RETURNING id',[to,o.id,o.status]);
+  const u=await c.query('UPDATE orders SET status=$1,status_reason=$4'+(to==='cancelled'?',stock_reserved=FALSE':'')+' WHERE id=$2 AND status=$3 RETURNING id',[to,o.id,o.status,(['suspended','cancelled','completed'].includes(to)&&reason)?reason:null]);
   if(!u.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'COMANDA_INCHISA'});}
-  if(to==='cancelled'&&o.stock_reserved&&o.listing_id){
+  if(to==='cancelled'&&o.stock_reserved&&o.listing_id&&restock){
    // Stocul rezervat se întoarce; un anunț „vândut” automat (stoc 0) revine la „publicat”.
    await c.query("UPDATE listings SET quantity=COALESCE(quantity,0)+$2,status=CASE WHEN status='sold' AND COALESCE(quantity,0)<=0 THEN 'approved' ELSE status END WHERE id=$1",[o.listing_id,Number(o.quantity)||1]);
   }
   await c.query('COMMIT');
  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
- const L={confirmed:'confirmată',shipped:'expediată',completed:'finalizată',cancelled:'anulată'};
- await notify(seller?o.buyer_id:o.seller_id,'Comanda pentru „'+(o.title||'piesă')+'” a fost '+L[to]+'.','order');
+ const L={confirmed:'confirmată',shipped:'expediată',completed:'finalizată',suspended:'suspendată',cancelled:'anulată'};
+ await notify(seller?o.buyer_id:o.seller_id,'Comanda pentru „'+(o.title||'piesă')+'” a fost '+L[to]+(seller?' de vânzător':'')+'.'+(reason&&['suspended','cancelled','completed'].includes(to)?' Mesaj: '+reason:''),'order');
  res.json({ok:true,status:to});
 }));
 app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
