@@ -1,4 +1,3 @@
-<<<<<<< LOCAL (Your changes)
 'use strict';
 /* AutoPiese V26 — frontend (fără handlere inline, compatibil cu CSP) */
 const $ = (s, r=document) => r.querySelector(s);
