@@ -1853,11 +1853,11 @@ function uaLabel(ua){
   const br=/Edg\//.test(s)?'Edge':/OPR\/|Opera/.test(s)?'Opera':/Firefox\//.test(s)?'Firefox':/Chrome\/|CriOS\//.test(s)?'Chrome':/Safari\//.test(s)?'Safari':'Browser';
   return br+' pe '+dev;
 }
-function fmtDateTime(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleString('ro-RO',{dateStyle:'short',timeStyle:'short'}); }
+function fmtDateTimeShort(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleString('ro-RO',{dateStyle:'short',timeStyle:'short'}); }
 async function loadSessions(){
   const box=$('#sessionList'); if(!box) return;
   const r=await api('/api/auth/sessions'), list=r.sessions||[];
-  box.innerHTML=list.map(x=>`<div class="sess-row"><div><b>${esc(uaLabel(x.user_agent))}</b>${x.current?' <span class="badge new">Acest dispozitiv</span>':''}<small>Ultima activitate: ${esc(fmtDateTime(x.last_seen_at))} · conectat pe ${esc(fmtDate(x.created_at))}</small></div>${x.current?'':`<button type="button" class="set-btn" data-session-del="${x.id}">Deconectează</button>`}</div>`).join('')||'<p class="muted">Nu există sesiuni active.</p>';
+  box.innerHTML=list.map(x=>`<div class="sess-row"><div><b>${esc(uaLabel(x.user_agent))}</b>${x.current?' <span class="badge new">Acest dispozitiv</span>':''}<small>Ultima activitate: ${esc(fmtDateTimeShort(x.last_seen_at))} · conectat pe ${esc(fmtDate(x.created_at))}</small></div>${x.current?'':`<button type="button" class="set-btn" data-session-del="${x.id}">Deconectează</button>`}</div>`).join('')||'<p class="muted">Nu există sesiuni active.</p>';
   $('#sessionsOthersBtn').classList.toggle('hidden', list.filter(x=>!x.current).length===0);
 }
 async function loadBlocks(){
