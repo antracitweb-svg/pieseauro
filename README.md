@@ -8,7 +8,7 @@ Totul într-un singur folder, fără subfoldere obligatorii:
 - `index.html`, `style.css`, `script.js` – frontend-ul
 - `package.json`, `render.yaml` – configurare Node și Render
 - `assets/` (opțional) – imagini, dacă le adaugi mai târziu
-- `vehicles.json` (opțional) – snapshot local al catalogului auto; serverul îl creează automat după prima sincronizare dacă are acces la sursa VehiclesDB
+- `vehicles-catalog.js` – catalog local de mărci/modele (fallback); administratorul poate extinde catalogul din baza de date prin panoul admin
 
 Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și conținutul din `assets/`. `server.js` și `package.json` nu pot fi descărcate.
 
@@ -30,7 +30,7 @@ Fără `RESEND_*`, „Ai uitat parola?” răspunde că emailul nu este configur
 - Conturi: înregistrare, login cu email sau nickname, sesiuni revocabile, resetare parolă, schimbare email, până la 4 telefoane (cu marcaj WhatsApp).
 - Anunțuri: publicare (intră în moderare), căutare multi-cuvânt, filtre, „Anunțurile mele”, favorite sincronizate pe cont, până la 8 poze per anunț cu comprimare automată și galerie responsive pe telefon/tabletă/laptop/desktop.
 - Cereri de piese, raportări, panou admin cu jurnal de activitate.
-- Catalog mărci/modele din VehiclesDB (CC-BY 4.0), cu sincronizare automată și cache local în același folder. Sunt încercate două surse ale catalogului înainte de fallback.
+- Catalog mărci/modele: listă locală curată (`vehicles-catalog.js`, sursa originală VehiclesDB, CC-BY 4.0), extensibilă din baza de date prin panoul admin. Fără descărcări online la runtime.
 - Poze pentru anunțuri: până la 8 imagini, comprimate înainte de salvare și păstrate în baza de date.
 - SEO: pagini `/piese/<id>-<slug>`, date structurate Product, `robots.txt`, `sitemap.xml`.
 
@@ -83,7 +83,7 @@ Atenție: pozele rămân în bucket și după ștergerea anunțului (curățarea
 
 ## Corecturi catalog și căutare
 - Pornire server: `ah` era folosit înainte de definire (eroare `Cannot access 'ah' before initialization`) – mutat sus.
-- Catalog: snapshotul local `vehicles.json` nu mai blochează actualizarea (se reîncearcă sursa online dacă are peste 7 zile); o singură descărcare chiar dacă vin mai multe cereri simultan; nume corecte în fallback (Land Rover, Alfa Romeo, Rolls-Royce, Aston Martin); potrivire mai bună la „Identifică mașina”.
+- Catalog: listă locală curată (`vehicles-catalog.js`) + extensii din baza de date (admin); fără dependență de descărcări online la runtime; nume corecte (Land Rover, Alfa Romeo, Rolls-Royce, Aston Martin); potrivire mai bună la „Identifică mașina”.
 - Căutare: diacritice extinse (Škoda, Citroën etc.), coduri OEM găsite și când sunt scrise cu spații/liniuțe, căutare și în an și combustibil, filtre marcă/model/județ/categorie insensibile la majuscule, spații și cratime, anunțurile fără preț la finalul sortării crescătoare, paginare protejată de valori invalide.
 - Frontend: lista de mărci se reîncarcă automat dacă prima cerere eșuează.
 

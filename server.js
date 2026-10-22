@@ -42,6 +42,11 @@ async function storeImages(images,userId){
   if(!STORAGE_ON) return images;
   return Promise.all(images.map(img=>isDataImg(img)?uploadImage(img,userId):img));
 }
+// Șterge din Supabase Storage toate pozele încărcate de un utilizator (chei u<id>/...) — apelat la ștergerea contului.
+function deleteStoredImages(userId){
+  if(!STORAGE_ON) return;
+  fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET,{method:'DELETE',headers:{Authorization:'Bearer '+SUPA_KEY,apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({prefixes:['u'+userId+'/']})}).catch(e=>console.error('Supabase Storage delete:',e.message));
+}
 console.log(STORAGE_ON?'Poze: Supabase Storage (bucket '+SUPA_BUCKET+')':'Poze: salvate în baza de date (SUPABASE_URL / SUPABASE_SERVICE_KEY lipsesc)');
 const { CURATED_VEHICLES } = require('./vehicles-catalog');
 // Anunțurile noi se publică automat. Pentru moderare manuală setează AUTO_APPROVE=false în Render.
@@ -681,7 +686,7 @@ app.post('/api/admin/vehicles/sync',auth,admin,requireDb,async(req,res)=>{
 });
 
 app.get('/api/me',async(req,res)=>{
- if(!pool)return res.json({user:null,mode:'prototype'});
+ if(!pool)return res.json({user:null,mode:'no-database'});
  try{
   const t=req.cookies.session; if(!t)return res.json({user:null,verification:VERIF});
   const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status,u.email_verified,(u.avatar IS NOT NULL) has_avatar FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(t)]);
@@ -1206,6 +1211,7 @@ app.post('/api/account/delete',requireDb,auth,ah(async(req,res)=>{
     await c.query('DELETE FROM users WHERE id=$1',[req.user.id]);
     await c.query('COMMIT');
   }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
+  deleteStoredImages(req.user.id);
   logEvent(null,'account_delete','user',req.user.id,(req.user.nickname||req.user.name||'')+' · '+(req.user.email||''));
   res.clearCookie('session',{httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/'});
   res.json({ok:true});

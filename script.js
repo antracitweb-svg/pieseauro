@@ -212,7 +212,7 @@ function route(){
     return;
   }
   showPage(id); setBottomNav(name);
-  if(name==='home'){ $('#topSearchInput').value=''; $('#homeSearchInput').value=''; loadHome(); }
+  if(name==='home'){ $('#topSearchInput').value=''; $('#homeSearchInput').value=''; }
   else if(name==='rezultate') enterResults(params);
   else if(name==='cerere') safe(enterCarPick)();
   else if(name==='cerere-noua') safe(enterRequestForm)(params.get('from'),params.get('edit'));
@@ -913,15 +913,6 @@ function toggleCart(id,btn){
   writeJSON('autopiese_cart',n.slice(0,50));
   if(btn&&btn.dataset.cart) btn.textContent=has?'🛒 Adaugă în coș':'✓ În coș';
   toast(has?'Eliminat din coș.':'Adăugat în coș.');
-}
-
-/* ---------- acasă ---------- */
-async function loadHome(){
-  const box = $('#homeListings');
-  try{
-    const r = await api('/api/listings?limit=6');
-    box.innerHTML = r.listings.length ? r.listings.map(x=>card(x)).join('') : '<div class="empty">Încă nu sunt anunțuri publicate. <button class="link" data-action="sell">Publică primul anunț</button></div>';
-  }catch(e){ box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
 }
 
 /* ---------- rezultate ---------- */
