@@ -2264,3 +2264,6 @@ button[data-tip],a[data-tip],.icon-btn,.ad-ico,.ar-btn,.mr-btn,.mine-act,.ad-nav
   font-size:14px;font-weight:600;line-height:1.4;
 }
 .page-head .req-lock-note{margin:8px 0 0;font-size:13.5px}
+
+/* Buton Modifică cerere (primele 10 minute) */
+.ar-btn.ar-edit{color:#7a5a28}
