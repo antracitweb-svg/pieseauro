@@ -365,6 +365,11 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_name TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_site TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_logo TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_type TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_name TEXT',
+  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS recipient_name TEXT',
+  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS recipient_phone TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_msg BOOLEAN NOT NULL DEFAULT TRUE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_offer BOOLEAN NOT NULL DEFAULT TRUE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_order BOOLEAN NOT NULL DEFAULT TRUE',
@@ -679,7 +684,7 @@ app.get('/api/me',async(req,res)=>{
  if(!pool)return res.json({user:null,mode:'prototype'});
  try{
   const t=req.cookies.session; if(!t)return res.json({user:null,verification:VERIF});
-  const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status,u.email_verified FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(t)]);
+  const r=await pool.query('SELECT s.id session_id,s.expires_at,u.id,u.name,u.nickname,u.email,u.phone,u.show_phone,u.role,u.status,u.email_verified,(u.avatar IS NOT NULL) has_avatar FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(t)]);
   if(!r.rowCount)return res.json({user:null,verification:VERIF});
   const u=r.rows[0];
   if(u.status!=='active')return res.json({user:null,verification:VERIF});
@@ -817,8 +822,9 @@ app.post('/api/auth/reset-password',requireDb,async(req,res)=>{
 app.put('/api/account/details',requireDb,auth,async(req,res)=>{
  try{
   const b=req.body||{}, t=(v,max)=>{const x=String(v==null?'':v).trim().replace(/\s+/g,' ');return x.length>max?null:x;};
-  const f={ship_county:t(b.ship_county,60),ship_city:t(b.ship_city,80),ship_details:t(b.ship_details,300),bill_company:t(b.bill_company,120),bill_cui:t(b.bill_cui,20),bill_regcom:t(b.bill_regcom,30),bill_address:t(b.bill_address,300),bill_bank:t(b.bill_bank,80),bill_iban:t(b.bill_iban,40)};
+  const f={ship_county:t(b.ship_county,60),ship_city:t(b.ship_city,80),ship_details:t(b.ship_details,300),bill_company:t(b.bill_company,120),bill_name:t(b.bill_name,120),bill_type:t(b.bill_type,3),bill_cui:t(b.bill_cui,20),bill_regcom:t(b.bill_regcom,30),bill_address:t(b.bill_address,300),bill_bank:t(b.bill_bank,80),bill_iban:t(b.bill_iban,40)};
   if(Object.values(f).some(v=>v===null))return res.status(400).json({error:'DATE_INVALIDE'});
+  if(f.bill_type&&!['pf','pj'].includes(f.bill_type))return res.status(400).json({error:'DATE_INVALIDE'});
   if(f.bill_cui&&!/^(RO)?\s?\d{2,10}$/i.test(f.bill_cui))return res.status(400).json({error:'CUI_INVALID'});
   if(f.bill_iban){
    const iban=f.bill_iban.replace(/\s+/g,'').toUpperCase();
@@ -833,7 +839,7 @@ app.put('/api/account/details',requireDb,auth,async(req,res)=>{
 });
 app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
  try{
-  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,(store_logo IS NOT NULL) has_logo,mail_msg,mail_offer,mail_order,mail_alert,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
+  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_type,bill_name,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,(store_logo IS NOT NULL) has_logo,(avatar IS NOT NULL) has_avatar,mail_msg,mail_offer,mail_order,mail_alert,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
   const phones=(await pool.query('SELECT id,phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id',[req.user.id])).rows;
   res.json({user:u,phones});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
@@ -1204,6 +1210,26 @@ app.post('/api/account/delete',requireDb,auth,ah(async(req,res)=>{
   res.clearCookie('session',{httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/'});
   res.json({ok:true});
 }));
+/* ===== Poză de profil (avatar) ===== */
+const AVATAR_MAX=200000;
+app.get('/api/users/:id(\\d+)/avatar',requireDb,ah(async(req,res)=>{
+  const r=await pool.query("SELECT avatar,store_logo FROM users WHERE id=$1 AND status='active'",[Number(req.params.id)]);
+  const row=r.rows[0]||{}; const v=row.avatar||row.store_logo;
+  if(!v){res.set('Cache-Control','public, max-age=300');return res.status(404).end();}
+  const m=/^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(v);
+  if(m){res.set('Cache-Control','public, max-age=300').type('image/'+m[1]).send(Buffer.from(m[2],'base64'));return;}
+  if(isStoredUrl(v)){res.set('Cache-Control','public, max-age=300');return res.redirect(302,v);}
+  res.status(404).end();
+}));
+app.put('/api/account/avatar',requireDb,auth,ah(async(req,res)=>{
+  const b=req.body||{};
+  if(b.remove===true){await pool.query('UPDATE users SET avatar=NULL WHERE id=$1',[req.user.id]);return res.json({ok:true,has_avatar:false});}
+  if(!isDataImg(b.avatar)||b.avatar.length>AVATAR_MAX)return res.status(400).json({error:'POZA_INVALIDA'});
+  let url;
+  try{url=(await storeImages([b.avatar],req.user.id))[0];}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
+  await pool.query('UPDATE users SET avatar=$1 WHERE id=$2',[url,req.user.id]);
+  res.json({ok:true,has_avatar:true});
+}));
 /* ===== Logo-uri magazine (rând în subsolul site-ului) ===== */
 const STORE_LOGO_MAX=450000;
 app.get('/api/stores/logos',requireDb,ah(async(req,res)=>{
@@ -1334,7 +1360,7 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
 });
 
 app.get('/api/requests',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
  res.json({requests:r.rows});
 });
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
@@ -1344,7 +1370,7 @@ app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
 app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
  const q=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.kind,r.county,r.city,r.ship_address,r.description,r.extra_parts,r.status,r.created_at,r.images,GREATEST(0,CEIL(EXTRACT(EPOCH FROM (r.created_at+INTERVAL '10 minutes'-NOW()))))::int edit_secs FROM part_requests r WHERE r.id=$1 AND r.user_id=$2",[req.params.id,req.user.id]);
  if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});
- const o=await pool.query("SELECT o.id,o.price,o.message,o.images,o.status,o.created_at,o.updated_at,o.seller_id,CASE WHEN o.status='accepted' THEN COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) ELSE COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) END seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,CASE WHEN o.status='accepted' THEN u.name END seller_person,(u.store_logo IS NOT NULL) seller_has_logo,u.phone user_phone,(SELECT od.id FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_id,(SELECT od.status FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_status,(SELECT od.status_reason FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_reason,(SELECT sr.stars FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_stars,(SELECT sr.comment FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_comment,"+SELLER_RATE('o.seller_id','seller_rating')+" FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
+ const o=await pool.query("SELECT o.id,o.price,o.message,o.images,o.status,o.created_at,o.updated_at,o.seller_id,CASE WHEN o.status='accepted' THEN COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) ELSE COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) END seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,CASE WHEN o.status='accepted' THEN u.name END seller_person,(u.store_logo IS NOT NULL) seller_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) seller_has_avatar,u.phone user_phone,(SELECT od.id FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_id,(SELECT od.status FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_status,(SELECT od.status_reason FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_reason,(SELECT sr.stars FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_stars,(SELECT sr.comment FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_comment,"+SELLER_RATE('o.seller_id','seller_rating')+" FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
  const ids=[...new Set(o.rows.filter(x=>x.status!=='rejected'&&x.seller_id).map(x=>x.seller_id))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  const offers=o.rows.map(x=>{
@@ -1355,7 +1381,7 @@ app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
  res.json({request:q.rows[0],offers});
 }));
 app.get('/api/requests/:id(\\d+)',requireDb,ah(async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.id=$1 AND r.status='open'",[req.params.id]);
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.id=$1 AND r.status='open'",[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  res.json({request:r.rows[0]});
 }));
@@ -1618,6 +1644,8 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  const avail=Math.max(1,Number(l.quantity)||1), qty=Math.floor(Number(b.quantity)||1);
  if(qty<1||qty>avail)return res.status(400).json({error:'CANTITATE_INVALIDA'});
  const county=clip(b.ship_county,60), city=clip(b.ship_city,80), addr=clip(b.ship_address,300), note=clip(b.note,500);
+ const rName=clip(b.recipient_name,100), rPhone=clip(b.recipient_phone,25);
+ if(rPhone&&!/^\+?[0-9 ().-]{6,20}$/.test(rPhone))return res.status(400).json({error:'TELEFON_INVALID'});
  if(!county||(l.delivery&&(!city||!addr)))return res.status(400).json({error:'ADRESA_LIPSA'});
  const dup=await pool.query("SELECT 1 FROM orders WHERE buyer_id=$1 AND listing_id=$2 AND status='new' LIMIT 1",[req.user.id,l.id]);
  if(dup.rowCount)return res.status(409).json({error:'COMANDA_EXISTA'});
@@ -1629,14 +1657,14 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
   const up=await c.query("UPDATE listings SET quantity=COALESCE(quantity,1)-$2 WHERE id=$1 AND status='approved' AND COALESCE(quantity,1)>=$2 RETURNING quantity",[l.id,qty]);
   if(!up.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'CANTITATE_INVALIDA'});}
   if(Number(up.rows[0].quantity)<=0)await c.query("UPDATE listings SET status='sold' WHERE id=$1 AND status='approved'",[l.id]);
-  r=await c.query('INSERT INTO orders(buyer_id,seller_id,listing_id,title,price,quantity,ship_county,ship_city,ship_address,note,stock_reserved) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE) RETURNING id',[req.user.id,l.user_id,l.id,l.title,(Number(l.price)||0)*qty,qty,county,city,addr,note]);
+  r=await c.query('INSERT INTO orders(buyer_id,seller_id,listing_id,title,price,quantity,ship_county,ship_city,ship_address,note,stock_reserved,recipient_name,recipient_phone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE,$11,$12) RETURNING id',[req.user.id,l.user_id,l.id,l.title,(Number(l.price)||0)*qty,qty,county,city,addr,note,rName||null,rPhone||null]);
   await c.query('COMMIT');
  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
  await notify(l.user_id,'Comandă nouă pentru „'+l.title+'” ('+qty+' buc.). Vezi „Comenzi primite”.','order');
  res.status(201).json({ok:true,order_id:r.rows[0].id});
 }));
 app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.status_reason,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
+ const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.recipient_name,o.recipient_phone,o.status_reason,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) other_has_avatar,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
  const ids=[...new Set(r.rows.map(x=>x.other_id).filter(Boolean))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  res.json({orders:r.rows.map(x=>({...x,phones:ph.filter(p=>p.user_id===x.other_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp}))}))});

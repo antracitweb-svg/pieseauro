@@ -13,7 +13,7 @@ const ERR = {
   EMAIL_SEND_FAILED:'Emailul nu a putut fi trimis. Încearcă din nou.',RECOVERY_RATE_LIMIT:'Ai cerut prea multe resetări. Încearcă peste 15 minute.',
   LOGIN_RATE_LIMIT:'Prea multe încercări. Încearcă din nou mai târziu.',RESET_EXPIRED:'Linkul a expirat sau a fost deja folosit.',
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',EMAIL_NOT_VERIFIED:'Confirmă adresa de email (verifică mesajul primit) ca să poți continua.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
-  PHONE_EXISTS:'Acest număr este deja adăugat.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
+  PHONE_EXISTS:'Acest număr este deja adăugat.',TELEFON_INVALID:'Telefonul destinatarului nu este valid.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
   CALIFICATIV_INVALID:'Alege un număr de stele între 1 și 5.',COMANDA_NEFINALIZATA:'Poți da calificativ doar după ce comanda este finalizată.',CSV_GOL:'Fișierul nu conține rânduri de importat.',PREA_MULTE_RANDURI:'Fișierul are prea multe rânduri. Importă cel mult 300 odată.',
   EDIT_EXPIRAT:'Au trecut cele 10 minute în care puteai modifica cererea.',PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',MAX_CAUTARI:'Ai atins limita de 30 de căutări salvate. Șterge una ca să poți salva alta.',BLOCAT:'Nu poți trimite acestui utilizator.',BLOCAT_DE_TINE:'Ai blocat acest utilizator. Deblochează-l din Setări cont ca să continui.',VANZATOR_IN_VACANTA:'Vânzătorul este în vacanță și nu primește comenzi acum.',DATA_INVALIDA:'Data aleasă nu este validă (cel mult 365 de zile de acum).',NU_SE_POATE_BLOCA:'Acest utilizator nu poate fi blocat.',MAX_BLOCARI:'Ai atins limita de 200 de utilizatori blocați.',BOT_CHECK:'Verificarea de securitate a expirat. Reîncarcă pagina.',PREA_MULTE_CERERI:'Prea multe cereri într-un timp scurt. Încearcă din nou peste un minut.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
   CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',TERMENI_NEACCEPTATI:'Trebuie să accepți Termenii și Politica de confidențialitate.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',COMANDA_PROPRIE:'Nu poți comanda propriul anunț.',CANTITATE_INVALIDA:'Cantitatea cerută nu este disponibilă.',ADRESA_LIPSA:'Completează județul, localitatea și adresa de livrare.',STORAGE_EROARE:'Pozele nu au putut fi încărcate. Încearcă din nou.',COMANDA_EXISTA:'Ai deja o comandă în așteptare pentru acest anunț.',COMANDA_INCHISA:'Comanda este deja închisă.',PREA_MULTE_COMENZI:'Ai trimis prea multe comenzi. Încearcă mai târziu.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',DESTINATAR_NEGASIT:'Nu am găsit niciun utilizator cu acest nickname.'
@@ -265,8 +265,56 @@ function renderHeader(){
   renderVerifyBanner();
   refreshCounts();
 }
+/* ---------- Poză de profil ---------- */
+const avInit = n => esc((String(n||'').trim().charAt(0)||'?').toUpperCase());
+function avatarSpan(id,name,cls,has){
+  const img=(id&&has!==false)?`<img src="/api/users/${Number(id)}/avatar" alt="" loading="lazy" decoding="async" data-av>`:'';
+  return `<span class="${cls} av-img"><i>${avInit(name)}</i>${img}</span>`;
+}
+/* CSP nu permite onerror inline: dacă poza lipsește, rămâne litera */
+document.addEventListener('error',e=>{ const t=e.target; if(t&&t.tagName==='IMG'&&t.hasAttribute('data-av')) t.remove(); },true);
+function avatarToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error('Alege o poză JPG, PNG sau WebP.'));
+    const rd=new FileReader();
+    rd.onload=()=>{ const img=new Image(); img.onload=()=>{
+      const S=320, side=Math.min(img.width,img.height), sx=(img.width-side)/2, sy=(img.height-side)/2;
+      const cv=document.createElement('canvas'); cv.width=cv.height=S; const ctx=cv.getContext('2d');
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,S,S); ctx.drawImage(img,sx,sy,side,side,0,0,S,S);
+      let out=cv.toDataURL('image/jpeg',.85); if(out.length>190000) out=cv.toDataURL('image/jpeg',.6);
+      if(out.length>190000) return reject(new Error('Poza este prea complexă. Încearcă alta.'));
+      resolve(out);
+    }; img.onerror=()=>reject(new Error('Imaginea nu a putut fi citită.')); img.src=rd.result; };
+    rd.onerror=()=>reject(new Error('Fișierul nu a putut fi citit.')); rd.readAsDataURL(file);
+  });
+}
+function renderAccountAvatar(bust){
+  const b=$('#avatarBtn'); if(!b||!currentUser) return;
+  const has=currentUser.has_avatar===true;
+  b.innerHTML='<i>👤</i>'+(has?`<img src="/api/users/${Number(currentUser.id)}/avatar${bust?'?v='+bust:''}" alt="" data-av>`:'');
+  $('#avatarRemove').classList.toggle('hidden',!has);
+}
+async function onAvatarPick(){
+  const inp=$('#avatarFile'), f=inp.files[0]; if(!f) return;
+  try{
+    const data=await avatarToDataUrl(f);
+    await api('/api/account/avatar',{method:'PUT',body:JSON.stringify({avatar:data})});
+    currentUser.has_avatar=true; renderAccountAvatar(Date.now()); toast('Poza de profil a fost salvată.');
+  }catch(err){ toast(err.message||'Poza nu a putut fi salvată.'); }
+  inp.value='';
+}
+async function removeAvatar(){
+  try{ await api('/api/account/avatar',{method:'PUT',body:JSON.stringify({remove:true})}); currentUser.has_avatar=false; renderAccountAvatar(); toast('Poza de profil a fost ștearsă.'); }
+  catch(err){ toast(err.message||'Poza nu a putut fi ștearsă.'); }
+}
+function syncBillType(){
+  const t=(document.querySelector('input[name="billType"]:checked')||{}).value;
+  $('#billPfBox').classList.toggle('hidden',t==='pj'); $('#billPjBox').classList.toggle('hidden',t!=='pj');
+}
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
+  renderAccountAvatar();
+  api('/api/account/settings').then(r=>{ if(currentUser&&r.user){ currentUser.has_avatar=!!r.user.has_avatar; renderAccountAvatar(); } }).catch(()=>{});
   renderHeader();
   /* pe telefon pornește cu o singură secțiune deschisă */
   if(window.matchMedia('(max-width:800px)').matches){
@@ -448,7 +496,7 @@ async function loadToolData(view, box, withId, refId){
   }else if(view==='messages'){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
-      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><div class="thread-head"><b>${nm}</b><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></div>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p>${m.ref_title&&m.listing_id?`<p class="muted">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></p>`:''}<p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="clean-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form>`}</div>`);
+      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><div class="thread-head"><span class="thread-who">${avatarSpan(r.other.id,r.other.name||'U','mrow-av')}<b>${nm}</b></span><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></div>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p>${m.ref_title&&m.listing_id?`<p class="muted">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></p>`:''}<p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="clean-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form>`}</div>`);
       return;
     }
     const r=await api('/api/messages');
@@ -475,7 +523,7 @@ function orderCardHtml(o){
     btns.push(['cancelled','Anulată','danger']);
   }else if(!seller&&o.status==='new') btns.push(['cancelled','Anulează comanda','danger']);
   const cls=(o.status==='new'||o.status==='suspended')?'pending':(o.status==='cancelled'?'bad':'new');
-  return `<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</b><p>${seller?'Vânzare':'Cumpărare'} · ${money(o.price)} · <span class="badge ${cls}">${esc(ORDER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}</p>${o.other_name?`<div class="order-party">${(!seller&&o.other_id)?`<button type="button" class="req-offer-logo order-logo" data-seller-profile="${o.other_id}" aria-label="Profil ${esc(o.other_name)}"><span>${esc(o.other_name.charAt(0).toUpperCase())}</span>${o.other_has_logo?`<img src="/api/stores/${o.other_id}/logo" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</button>`:''}<div><p class="muted" style="margin:0">${seller?'Cumpărător':'Vânzător'}: ${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</p>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<p class="muted" style="margin:2px 0 0">👤 Persoană: <b>${esc(o.other_person)}</b></p>`:''}</div></div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n})}</div>`:''}${addr?`<p>📍 Livrare: ${esc(addr)}</p>`:''}${o.note?`<p class="muted">Mesaj: ${esc(o.note)}</p>`:''}${(o.status_reason&&['suspended','cancelled','completed'].includes(o.status))?`<p class="order-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}${o.got_stars?`<p>Calificativ primit: ${starsHtml(o.got_stars)}${o.got_comment?' · „'+esc(o.got_comment)+'”':''}</p>`:''}${(seller&&o.phones&&o.phones.length)?contactHtml(o.phones,'Cumpărătorul'):''}<div class="row">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-open="${o.listing_id}">Vezi anunțul</button>`:''}</div></div>`;
+  return `<div class="info-card tool-item"><b>${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</b><p>${seller?'Vânzare':'Cumpărare'} · ${money(o.price)} · <span class="badge ${cls}">${esc(ORDER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}</p>${o.other_name?`<div class="order-party">${(!seller&&o.other_id)?`<button type="button" class="req-offer-logo order-logo" data-seller-profile="${o.other_id}" aria-label="Profil ${esc(o.other_name)}"><span>${esc(o.other_name.charAt(0).toUpperCase())}</span>${o.other_has_avatar?`<img src="/api/users/${o.other_id}/avatar" alt="" loading="lazy" decoding="async" data-av>`:''}</button>`:(o.other_id?`<span class="req-offer-logo order-logo"><span>${esc(o.other_name.charAt(0).toUpperCase())}</span>${o.other_has_avatar?`<img src="/api/users/${o.other_id}/avatar" alt="" loading="lazy" decoding="async" data-av>`:''}</span>`:'')}<div><p class="muted" style="margin:0">${seller?'Cumpărător':'Vânzător'}: ${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</p>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<p class="muted" style="margin:2px 0 0">👤 Persoană: <b>${esc(o.other_person)}</b></p>`:''}</div></div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n})}</div>`:''}${(o.recipient_name||o.recipient_phone)?`<p>👤 Destinatar: <b>${esc(o.recipient_name||'—')}</b>${o.recipient_phone?' · 📞 '+esc(fmtPhone(o.recipient_phone)):''}</p>`:''}${addr?`<p>📍 Livrare: ${esc(addr)}</p>`:''}${o.note?`<p class="muted">Mesaj: ${esc(o.note)}</p>`:''}${(o.status_reason&&['suspended','cancelled','completed'].includes(o.status))?`<p class="order-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}${o.got_stars?`<p>Calificativ primit: ${starsHtml(o.got_stars)}${o.got_comment?' · „'+esc(o.got_comment)+'”':''}</p>`:''}${(seller&&o.phones&&o.phones.length)?contactHtml(o.phones,'Cumpărătorul'):''}<div class="row">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-open="${o.listing_id}">Vezi anunțul</button>`:''}</div></div>`;
 }
 async function openOrder(id){
   if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
@@ -486,13 +534,14 @@ async function openOrder(id){
   const q=$('#orderQty'); q.max=Math.max(1,Number(x.quantity)||1); q.value=1;
   $('#orderDeliveryHint').textContent=x.delivery?'Completează adresa unde vrei să primești piesa.':'Vânzătorul nu a bifat livrare: poți lăsa adresa goală și stabiliți ridicarea personală.';
   const sc=$('#orderCounty'); if(sc.options.length<2) sc.insertAdjacentHTML('beforeend',COUNTIES.map(c=>`<option>${esc(c)}</option>`).join(''));
-  sc.value=''; $('#orderCity').value=''; $('#orderAddress').value=''; $('#orderNote').value=''; setMsg($('#orderMsg'),'');
-  try{ const u=(await api('/api/account/settings')).user||{}; sc.value=u.ship_county||''; $('#orderCity').value=u.ship_city||''; $('#orderAddress').value=u.ship_details||''; }catch{}
+  sc.value=''; $('#orderCity').value=''; $('#orderAddress').value=''; $('#orderNote').value=''; $('#orderName').value=''; $('#orderPhone').value=''; $('#orderName').placeholder='Nume din cont'; $('#orderPhone').placeholder='Telefon din cont'; setMsg($('#orderMsg'),'');
+  try{ const rs=await api('/api/account/settings'), u=rs.user||{}; sc.value=u.ship_county||''; $('#orderCity').value=u.ship_city||''; $('#orderAddress').value=u.ship_details||'';
+    if(u.name) $('#orderName').placeholder=u.name; const ph=((rs.phones||[])[0]||{}).phone||u.phone; if(ph) $('#orderPhone').placeholder=fmtPhone(ph); }catch{}
   $('#orderModal').classList.remove('hidden');
 }
 async function submitOrder(){
   const msg=$('#orderMsg'); setMsg(msg,'');
-  const body={listing_id:Number($('#orderListingId').value),quantity:Number($('#orderQty').value)||1,ship_county:$('#orderCounty').value,ship_city:$('#orderCity').value.trim(),ship_address:$('#orderAddress').value.trim(),note:$('#orderNote').value.trim()};
+  const body={listing_id:Number($('#orderListingId').value),quantity:Number($('#orderQty').value)||1,ship_county:$('#orderCounty').value,ship_city:$('#orderCity').value.trim(),ship_address:$('#orderAddress').value.trim(),note:$('#orderNote').value.trim(),recipient_name:$('#orderName').value.trim(),recipient_phone:$('#orderPhone').value.trim()};
   if(!body.ship_county){ setMsg(msg,'Alege județul.','error'); return; }
   if(state.orderDelivery&&(!body.ship_city||!body.ship_address)){ setMsg(msg,'Completează localitatea și adresa de livrare.','error'); return; }
   try{
@@ -642,7 +691,7 @@ function myRequestHtml(x, offers){
   const list=offers.map(o=>{
     const pend=o.status==='pending', won=o.status==='accepted', lost=o.status==='rejected';
     const sname=o.seller_id?`<button type="button" class="seller-link" data-seller-profile="${o.seller_id}" title="Vezi profilul și calificativele">${esc(o.seller_name||'Vânzător')}</button>`:`<b>${esc(o.seller_name||'Vânzător')}</b>`;
-    const slogo=o.seller_id?`<button type="button" class="req-offer-logo" data-seller-profile="${o.seller_id}" aria-label="Profil ${esc(o.seller_name||'vânzător')}"><span>${esc((o.seller_name||'V').charAt(0).toUpperCase())}</span>${o.seller_has_logo===false?'':`<img src="/api/stores/${o.seller_id}/logo" alt="" loading="lazy" decoding="async" onerror="this.remove()">`}</button>`:'';
+    const slogo=o.seller_id?`<button type="button" class="req-offer-logo" data-seller-profile="${o.seller_id}" aria-label="Profil ${esc(o.seller_name||'vânzător')}"><span>${esc((o.seller_name||'V').charAt(0).toUpperCase())}</span>${o.seller_has_avatar===false?'':`<img src="/api/users/${o.seller_id}/avatar" alt="" loading="lazy" decoding="async" data-av>`}</button>`:'';
     const canRate=won&&o.order_id&&o.order_status==='completed';
     const rateBtn=canRate?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.order_id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.seller_name||'vânzător')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':'☆ Dă calificativ vânzătorului'}</button>`:'';
     const rateHint=(won&&o.order_id&&['suspended','cancelled'].includes(o.order_status))?`<p class="order-reason req-rate-hint"><b>Comanda a fost ${o.order_status==='suspended'?'suspendată':'anulată'} de vânzător.</b>${o.order_reason?' Mesaj: '+esc(o.order_reason):''}</p>`:((won&&o.order_id&&!canRate)?`<p class="muted req-rate-hint">Poți da calificativul după ce comanda este marcată ca finalizată.</p>`:'');
@@ -714,7 +763,7 @@ function publicRequestHtml(x){
   </div>
   <aside class="ad-side">
     <div class="ad-card rq-card">
-      <div class="seller-head"><span class="seller-avatar">${esc((x.user_name||'C').charAt(0).toUpperCase())}</span><div><b>${esc(x.user_name||'Cumpărător')}</b><small>${esc(fmtDate(x.created_at))}${where?' · '+esc(where):''}</small><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n})}</div></div></div>
+      <div class="seller-head">${avatarSpan(x.user_id,x.user_name||'C','seller-avatar')}<div><b>${esc(x.user_name||'Cumpărător')}</b><small>${esc(fmtDate(x.created_at))}${where?' · '+esc(where):''}</small><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n})}</div></div></div>
       <div class="contact-slot req-actions" id="reqContactSlot"><div class="rq-desk-row"><button type="button" class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button type="button" class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button></div></div>
     </div>
   </aside>
@@ -1143,7 +1192,7 @@ function detailHtml(x, phones, canContact){
       <p class="ad-ship">${x.delivery?'🚚 Livrare disponibilă':'📍 Ridicare personală'}</p>
     </div>
     <div class="ad-card">
-      <div class="seller-head"><span class="seller-avatar">${seller.charAt(0).toUpperCase()}</span><div><b>${x.user_id?`<button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">${seller}</button>`:seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small><div class="rate-line">${ratingLine({avg:x.seller_rating_avg,count:x.seller_rating_n})}</div></div></div>
+      <div class="seller-head">${avatarSpan(x.user_id,x.seller_name||'V','seller-avatar')}<div><b>${x.user_id?`<button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">${seller}</button>`:seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small><div class="rate-line">${ratingLine({avg:x.seller_rating_avg,count:x.seller_rating_n})}</div></div></div>
       ${x.seller_ads?`<p class="seller-stats">${adsLabel(x.seller_ads)} active${x.seller_since?` · pe AutoPiese din ${new Date(x.seller_since).getFullYear()}`:''}${x.user_id?` · <button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">Vezi toate</button>`:''}</p>`:''}
       ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
@@ -1239,7 +1288,7 @@ function reqRowHtml(x, mine){
       <h3 class="ar-title">${esc(x.title)}</h3>
       <div class="ar-meta">${esc(car)}${ex?` · +${ex} ${ex===1?'piesă suplimentară':'piese suplimentare'}`:''}</div>
       ${x.description?`<p class="ar-desc">${esc(x.description.slice(0,140))}${x.description.length>140?'…':''}</p>`:''}
-      <div class="ar-sub">${mine?esc(REQ_ST[x.status]||x.status):(where?'📍 '+esc(where)+' · ':'')+esc(x.user_name||'Cumpărător')+' '+rateInline(x.user_rating_avg,x.user_rating_n)}</div>
+      <div class="ar-sub">${mine?esc(REQ_ST[x.status]||x.status):(where?'📍 '+esc(where)+' · ':'')+avatarSpan(x.user_id,x.user_name||'C','ar-av')+' '+esc(x.user_name||'Cumpărător')+' '+rateInline(x.user_rating_avg,x.user_rating_n)}</div>
     </div>
     <div class="ar-acts${mine?'':' contact-slot'}">${acts}</div>
     <div class="ar-foot"><span class="ar-views">${mine?`💬 ${n} ${n===1?'ofertă':'oferte'}${np?` (${np} noi)`:''}`:esc(REQ_KIND[x.kind]||'Cerere piesă')}</span><span class="ar-qty">${esc(fmtDate(x.created_at))}</span><span class="ar-price ar-state">${mine?esc(REQ_ST[x.status]||x.status):'Deschisă'}</span></div></article>`;
@@ -1274,7 +1323,7 @@ async function loadStores(parks){
   try{
     let list = (await api('/api/sellers')).sellers || [];
     if(parks) list = list.filter(s=>s.dism);
-    grid.innerHTML = list.map(s=>`<article class="info-card"><span class="badge">${s.dism?'DEZMEMBRĂRI':'VÂNZĂTOR'}</span><h3>${esc(s.name)}</h3><p class="rate-line">${ratingLine({avg:s.rating_avg,count:s.rating_n})}</p><p>${s.n} ${s.n===1?'anunț':'anunțuri'}${s.county?' · '+esc(s.county):''}</p><button class="btn ghost small" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`).join('');
+    grid.innerHTML = list.map(s=>`<article class="info-card"><div class="seller-head">${avatarSpan(s.id,s.name,'seller-avatar')}<div><span class="badge">${s.dism?'DEZMEMBRĂRI':'VÂNZĂTOR'}</span><h3>${esc(s.name)}</h3></div></div><p class="rate-line">${ratingLine({avg:s.rating_avg,count:s.rating_n})}</p><p>${s.n} ${s.n===1?'anunț':'anunțuri'}${s.county?' · '+esc(s.county):''}</p><button class="btn ghost small" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`).join('');
     $('#storesEmpty').classList.toggle('hidden', list.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -1833,7 +1882,8 @@ async function loadSettings(){
   const sc = $('#shipCounty'); if(sc.options.length<2) sc.insertAdjacentHTML('beforeend', COUNTIES.map(c=>`<option>${esc(c)}</option>`).join(''));
   const u = r.user;
   sc.value = u.ship_county || ''; $('#shipCity').value = u.ship_city || ''; $('#shipDetails').value = u.ship_details || '';
-  $('#billCompany').value = u.bill_company || ''; $('#billCui').value = u.bill_cui || ''; $('#billRegcom').value = u.bill_regcom || '';
+  $('#billCompany').value = u.bill_company || ''; $('#billName').value = u.bill_name || '';
+  const bt = u.bill_type || ((u.bill_company||u.bill_cui)?'pj':'pf'); $$('input[name="billType"]').forEach(r=>{ r.checked = r.value===bt; }); syncBillType(); $('#billCui').value = u.bill_cui || ''; $('#billRegcom').value = u.bill_regcom || '';
   $('#billAddress').value = u.bill_address || ''; $('#billBank').value = u.bill_bank || ''; $('#billIban').value = u.bill_iban || '';
   $('#storeName').value = u.store_name || ''; $('#storeSite').value = u.store_site || '';
   state.storeLogo = undefined; state.storeLogoRemove = false; $('#storeLogoFile').value = '';
@@ -1976,7 +2026,7 @@ async function loadFooterLogos(){
 async function saveDetails(e){
   e.preventDefault(); const msg = $('#detailsMsg'); setMsg(msg,'');
   try{
-    await api('/api/account/details',{method:'PUT',body:JSON.stringify({ship_county:$('#shipCounty').value,ship_city:$('#shipCity').value,ship_details:$('#shipDetails').value,bill_company:$('#billCompany').value,bill_cui:$('#billCui').value,bill_regcom:$('#billRegcom').value,bill_address:$('#billAddress').value,bill_bank:$('#billBank').value,bill_iban:$('#billIban').value})});
+    await api('/api/account/details',{method:'PUT',body:JSON.stringify({ship_county:$('#shipCounty').value,ship_city:$('#shipCity').value,ship_details:$('#shipDetails').value,bill_type:(document.querySelector('input[name="billType"]:checked')||{}).value||'',bill_name:$('#billName').value,bill_company:$('#billCompany').value,bill_cui:$('#billCui').value,bill_regcom:$('#billRegcom').value,bill_address:$('#billAddress').value,bill_bank:$('#billBank').value,bill_iban:$('#billIban').value})});
     await loadSettings(); setMsg(msg,'Datele au fost salvate.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
@@ -2332,7 +2382,7 @@ async function openSellerProfile(id){
     const own=currentUser&&currentUser.id===s.id;
     const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
     const phones=(s.phones||[]).map(p=>`<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(String(p.phone).replace(/[^\d+]/g,''))}">Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}">WhatsApp</a>`:''}</div></div>`).join('');
-    box.innerHTML=`<div class="seller-head"><span class="seller-avatar seller-avatar-img"><i>${nm.charAt(0).toUpperCase()}</i><img src="/api/stores/${s.id}/logo" alt="" onerror="this.remove()"></span><div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small><div class="rate-line">Ca vânzător: ${ratingLine(s.rating)}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating)}</div></div></div>
+    box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small><div class="rate-line">Ca vânzător: ${ratingLine(s.rating)}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating)}</div></div></div>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
     ${s.vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${s.vacation.until?' până la '+esc(fmtDate(s.vacation.until+'T00:00:00')):''}.</div>`:''}
     ${phones||'<p class="muted">Vânzătorul nu a afișat un număr de telefon.</p>'}
@@ -2606,6 +2656,10 @@ function wire(){
   $('#emailChangeForm').addEventListener('submit', requestEmailChange);
   $('#phoneAddForm').addEventListener('submit', addPhone);
   $('#detailsForm').addEventListener('submit', saveDetails);
+  $$('input[name="billType"]').forEach(r=>r.addEventListener('change', syncBillType));
+  $('#avatarBtn').addEventListener('click', ()=>$('#avatarFile').click());
+  $('#avatarFile').addEventListener('change', onAvatarPick);
+  $('#avatarRemove').addEventListener('click', removeAvatar);
   $('#storeForm').addEventListener('submit', saveStore);
   $('#notifForm').addEventListener('submit', saveNotifPrefs);
   $('#vacationForm').addEventListener('submit', saveVacation);
@@ -2790,7 +2844,7 @@ function msgRow(m){
   return `<article class="mrow${unread?' unread':''}">
     <label class="mine-check"><input type="checkbox" data-ms-check="${m.id}" ${msgs.sel.has(m.id)?'checked':''} aria-label="Selectează mesajul"></label>
     <div class="mrow-main">
-      <button type="button" class="mrow-head" data-go="${esc(go)}"><span class="mrow-user">${MSG_USER_ICO}<span class="mrow-name">${m.mine&&msgs.box!=='inbox'?'Către ':''}${name}</span>${unread?'<em class="mrow-dot" aria-label="Necitit"></em>':''}</span><span class="mrow-date">${msgFmtDate(m.created_at)}</span></button>
+      <button type="button" class="mrow-head" data-go="${esc(go)}"><span class="mrow-user">${avatarSpan(m.other,m.other_name||'U','mrow-av')}<span class="mrow-name">${m.mine&&msgs.box!=='inbox'?'Către ':''}${name}</span>${unread?'<em class="mrow-dot" aria-label="Necitit"></em>':''}</span><span class="mrow-date">${msgFmtDate(m.created_at)}</span></button>
       <button type="button" class="mrow-body" data-go="${esc(go)}">${m.mine?'<span class="mrow-ok">✓</span> ':''}${esc(m.body)}</button>
       ${m.ref_title&&m.listing_id?`<div class="mrow-ref">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></div>`:''}
     </div></article>`;

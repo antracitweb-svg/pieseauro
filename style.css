@@ -2367,3 +2367,22 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .order-reason{margin:8px 0;padding:9px 12px;border-left:3px solid var(--gold,#b8935a);background:var(--pale,#f7f5f0);border-radius:8px;font-size:14px}
 .order-restock{display:flex;gap:8px;align-items:flex-start;font-size:14px;font-weight:600}
 .order-restock input{margin-top:3px;width:auto}
+
+/* Poză de profil */
+.av-img{position:relative;overflow:hidden}
+.av-img i{font-style:normal}
+.av-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff;border-radius:inherit}
+.acc-avatar-wrap{position:relative;flex:0 0 48px;width:48px;height:48px}
+#page-account .acc-avatar-wrap{flex-basis:40px;width:40px;height:40px}
+.acc-avatar-wrap .acc-avatar{position:relative;width:100%;height:100%;border:0;padding:0;overflow:hidden;cursor:pointer;flex:none}
+.acc-avatar-wrap .acc-avatar i{font-style:normal}
+.acc-avatar-wrap .acc-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.acc-avatar-wrap .acc-avatar:focus-visible{outline:2px solid var(--gold,#b8935a);outline-offset:2px}
+.acc-cam{position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:50%;background:#14110c;color:#e9d3a8;font:700 14px/18px sans-serif;text-align:center;pointer-events:none;border:2px solid #fff}
+#avatarRemove{display:block;margin-top:2px;font-size:12px}
+.mrow-av{width:28px;height:28px;border-radius:50%;flex:0 0 28px;display:grid;place-items:center;background:#e6e0d4;color:#7a5a28;font-weight:800;font-size:14px}
+.thread-who{display:flex;align-items:center;gap:10px;min-width:0}
+.ar-av{display:inline-grid;place-items:center;vertical-align:middle;width:18px;height:18px;border-radius:50%;background:#e6e0d4;color:#7a5a28;font-weight:800;font-size:10px}
+.bill-type{display:flex;gap:18px;flex-wrap:wrap}
+.bill-type label{display:flex;align-items:center;gap:6px;font-weight:600}
+.bill-type input{width:auto}

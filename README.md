@@ -228,3 +228,10 @@ Două taburi noi în panoul de admin (`#/admin`), ca administratorul să vadă c
 - Numere și pe titlurile secțiunilor (Vânzător / Cumpărător / Mesagerie), nu doar pe butoane.
 - Tooltip-uri pe pictograme: mouse (~0,5 s), tastatură (focus), telefon (apăsare lungă).
 - Poze glisabile stânga/dreapta pe telefon: anunțuri, lightbox, cereri, oferte, poza principală din admin.
+
+## Poză de profil, destinatar la comandă, facturare persoană fizică
+- **Poză de profil:** în Contul meu, apeși pe cercul din cardul de sus și alegi o poză (JPG/PNG/WebP). Se decupează pătrat și se comprimă în browser (320×320). Se salvează în Supabase Storage (sau în baza de date dacă Storage nu e configurat), în coloana nouă `users.avatar`. Apare în: Contul meu, oferte la cereri, comenzi, mesaje și conversații, profilul vânzătorului, detaliul anunțului, lista de vânzători, cereri. Dacă utilizatorul nu are poză, dar are logo de magazin, se folosește logo-ul; altfel rămâne litera inițială.
+- Endpointuri noi: `GET /api/users/:id/avatar` (public), `PUT /api/account/avatar` (`{avatar:"data:image/..."}` sau `{remove:true}`).
+- **Comandă pe alt nume/telefon:** formularul de comandă are „Nume destinatar” și „Telefon destinatar” (opționale). Goale = se folosesc datele din cont. Se salvează în `orders.recipient_name` / `orders.recipient_phone` și apar în cardul comenzii, pentru vânzător și cumpărător.
+- **Facturare:** în Setări → „3. Date de facturare” se alege Persoană fizică (nume complet) sau Persoană juridică (firmă, CUI, Reg. Com.). Coloane noi: `users.bill_type`, `users.bill_name`.
+- Toate coloanele noi se creează automat la pornirea serverului.
