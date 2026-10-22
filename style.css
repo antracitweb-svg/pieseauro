@@ -2399,8 +2399,6 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .ord-tab em{font-style:normal;font-size:12px;font-weight:600;color:var(--muted);margin-left:2px}
 .ord-count{margin:16px 0 4px;font-weight:700;font-size:14px;color:var(--muted)}
 .ord-list .ar-row{padding:18px 2px 14px;gap:8px 14px}
-.ord-st{font-weight:700}
-.ord-st.ok{color:#1c6d42}.ord-st.wait{color:#8f6d38}.ord-st.go{color:#8f6d38}.ord-st.bad{color:#a62a36}
 .ord-empty{padding:34px 0;text-align:center}
 .ord-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .ord-head h3{margin:0;font-size:19px;line-height:1.3}
@@ -2424,3 +2422,23 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .ord-detail .util-form{margin-top:0}
 .ord-awb{grid-template-columns:1fr auto;align-items:start}
 .ord-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+
+/* ===== Recenzii (vânzător / cumpărător) — tokenii site-ului ===== */
+.rate-link{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:inline}
+.rate-link:hover{text-decoration:underline}
+.rate-link:focus-visible{outline:2px solid var(--gold,#b8935a);outline-offset:2px;border-radius:4px}
+.rv-wrap{display:block;margin-top:6px}
+.rv-summary{display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:18px 0;border-bottom:1px solid var(--line)}
+.rv-score{display:grid;justify-items:start;gap:2px;min-width:110px}
+.rv-score b{font-family:var(--font-serif);font-size:44px;line-height:1;color:#14110c}
+.rv-score span,.rv-score small{color:var(--muted);font-size:13px}
+.rv-bars{flex:1 1 200px;display:grid;gap:6px;min-width:180px}
+.rv-bar{display:grid;grid-template-columns:34px 1fr 28px;gap:8px;align-items:center;font-size:13px}
+.rv-bar i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.rv-bar u{display:block;height:100%;background:var(--gold,#b8935a);text-decoration:none}
+.rv-bar small{color:var(--muted);text-align:right}
+.rv-list{display:block}
+.rv-item{padding:16px 2px;border-bottom:1px solid var(--line)}
+.rv-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rv-top small{margin-left:auto;color:var(--muted);font-size:13px}
+.rv-item p{margin:8px 0 0;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
