@@ -2337,3 +2337,28 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   .image-zoom-hint{display:none!important}
   .listing:hover,.listing:hover .listing-image img,.listing-fav:hover{transform:none}
 }
+
+/* ===== Oferta câștigătoare, profil vânzător din oferte ===== */
+.req-offer{position:relative}
+.req-offer.is-won{border:2px solid #1c6d42;background:linear-gradient(180deg,#f1faf4 0%,#fff 70%);box-shadow:0 10px 28px rgba(28,109,66,.16)}
+.req-offer.is-lost{opacity:.6;filter:grayscale(.45)}
+.req-offer.is-lost:hover{opacity:.9}
+.req-win-ribbon{display:inline-block;margin:-4px 0 10px;padding:5px 12px;border-radius:999px;background:#1c6d42;color:#fff;font-weight:900;font-size:13px;letter-spacing:.2px}
+.req-offer-head{display:flex;align-items:flex-start;gap:12px}
+.req-offer-who{flex:1;min-width:0}
+.req-offer-price{margin-left:auto;white-space:nowrap}
+.req-offer-logo{position:relative;flex:0 0 46px;width:46px;height:46px;border:1px solid var(--line);border-radius:12px;background:var(--pale);padding:0;overflow:hidden;cursor:pointer;display:grid;place-items:center}
+.req-offer-logo span{font-weight:900;font-size:18px;color:var(--gold-ink,#7a5a28)}
+.req-offer-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}
+.req-offer-logo:hover{border-color:var(--gold,#b8935a)}
+.req-rate-hint{margin:8px 0 0;font-size:13px}
+.ar-meta .seller-link{font-size:inherit}
+
+/* Persoana + logo/poză firmă în oferte, comenzi și profil */
+.req-offer-person{margin:3px 0 0;font-size:13px;color:var(--muted)}
+.req-offer-person b{color:var(--ink)}
+.order-party{display:flex;align-items:center;gap:10px;margin:6px 0}
+.order-logo{flex:0 0 40px;width:40px;height:40px}
+.seller-avatar-img{position:relative;overflow:hidden}
+.seller-avatar-img i{font-style:normal}
+.seller-avatar-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}
