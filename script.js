@@ -527,7 +527,7 @@ let lastOrderId='';
 function ordCls(st){ return st==='completed'?'ok':(st==='cancelled'?'bad':((st==='new'||st==='suspended')?'wait':'go')); }
 function orderRowHtml(o){
   const money=Number(o.price||0).toLocaleString('ro-RO')+' lei', seller=o.role==='seller';
-  const thumb=o.thumb?`<img src="${esc(o.thumb)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
+  const thumb=o.has_thumb?`<img src="/api/orders/${o.id}/thumb" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
   return `<article class="ar-row ord-row" data-go="account-tool?view=order&with=${o.id}" tabindex="0" role="link" aria-label="Comanda nr. ${o.id}">
     <div class="ar-thumb">${thumb}</div>
     <div class="ar-main"><div class="ar-sub">Comanda nr. ${o.id}</div><h3 class="ar-title">${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</h3>${o.other_name?`<div class="ar-meta">${seller?'Cumpărător':'Vânzător'}: ${esc(o.other_name)}</div>`:''}</div>
@@ -563,15 +563,15 @@ function orderDetailHtml(o){
     if(o.status==='suspended') btns.push(['confirmed','Reia comanda','ghost']); else btns.push(['suspended','Suspendată','ghost']);
     btns.push(['cancelled','Anulată','danger']);
   }else if(!seller&&o.status==='new') btns.push(['cancelled','Anulează comanda','danger']);
-  const thumb=o.thumb?`<img src="${esc(o.thumb)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
-  const prod=o.listing_id?`<button type="button" class="seller-link ord-link" data-open="${o.listing_id}">${esc(o.title||'Comandă')}</button>`:`<span>${esc(o.title||'Comandă')}</span>`;
+  const thumb=o.has_thumb?`<img src="/api/orders/${o.id}/thumb" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
+  const prod=o.listing_id?`<button type="button" class="seller-link ord-link" data-order-listing="${o.id}">${esc(o.title||'Comandă')}</button>`:`<span>${esc(o.title||'Comandă')}</span>`;
   const unit=Number(o.price||0)/qty;
   const party=o.other_name?`<div class="ord-party"><div class="ord-party-name">${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n})}</div>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<div class="ord-line">👤 ${esc(o.other_person)}</div>`:''}${o.other_id?`<button type="button" class="btn ghost small" data-go="account-tool?view=messages&with=${o.other_id}">✉ Scrie mesaj</button>`:''}</div>`:'';
   const reasonOn=o.status_reason&&['suspended','cancelled','completed'].includes(o.status);
   return `<div class="ord-detail">
     <div class="ord-head"><h3>Comanda nr. ${o.id} din ${esc(fmtDateTime(o.created_at))}</h3><button type="button" class="ar-btn ord-print" data-order-print="${o.id}" aria-label="Tipărește comanda" title="Tipărește">🖨</button></div>
     <div class="ord-status-box"><span class="ord-st ${ordCls(o.status)}">${esc(ORDER_ST[o.status]||o.status)}</span>${reasonOn?`<p class="ord-reason"><b>${seller?'Mesajul tău către cumpărător':'Mesaj de la vânzător'}:</b> ${esc(o.status_reason)}</p>`:''}</div>
-    <div class="ord-prod"><div class="ar-thumb ord-big">${thumb}</div><div class="ord-prod-main">${prod}<div class="ord-qty">${qty} buc. × ${money(unit)}</div></div></div>
+    <div class="ord-prod"><div class="ar-thumb ord-big" data-order-listing="${o.id}">${thumb}</div><div class="ord-prod-main">${prod}<div class="ord-qty">${qty} buc. × ${money(unit)}</div></div></div>
     <div class="ord-totals"><div><span>Cost produse:</span><b>${money(o.price)}</b></div></div>
     <h4 class="ord-sec">${seller?'Date cumpărător și livrare':'Vânzător și livrare'}</h4>
     ${party}
@@ -584,8 +584,17 @@ function orderDetailHtml(o){
     ${o.got_stars?`<div class="ord-kv"><small>Calificativ primit</small><span>${starsHtml(o.got_stars)}${o.got_comment?' · „'+esc(o.got_comment)+'”':''}</span></div>`:''}
     ${seller?`<h4 class="ord-sec">Observații vânzător</h4><p class="ord-hint">Aceste observații le vezi doar tu, pentru gestionarea comenzii.</p><div class="util-form"><textarea id="ordSellerNote" rows="4" maxlength="1000">${esc(o.seller_note||'')}</textarea><button type="button" class="btn ghost small" data-order-save="note" data-oid="${o.id}">Salvează observațiile</button></div>
     <h4 class="ord-sec">AWB</h4><p class="ord-hint">Cumpărătorul vede AWB-ul și primește o notificare.</p><div class="util-form ord-awb"><input id="ordAwb" maxlength="40" value="${esc(o.awb||'')}" placeholder="Număr AWB" autocomplete="off"><button type="button" class="btn primary small" data-order-save="awb" data-oid="${o.id}">Salvează AWB</button></div>`:''}
-    ${(btns.length||o.status==='completed'||o.listing_id)?`<h4 class="ord-sec">${btns.length?'Schimbă statusul comenzii':'Opțiuni'}</h4><div class="ord-actions">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-open="${o.listing_id}">Vezi anunțul</button>`:''}</div>`:''}
+    ${(btns.length||o.status==='completed'||o.listing_id)?`<h4 class="ord-sec">${btns.length?'Schimbă statusul comenzii':'Opțiuni'}</h4><div class="ord-actions">${btns.map(b=>`<button type="button" class="btn ${b[2]} small" data-order-status="${o.id}" data-to="${b[0]}" data-by-seller="${seller?1:0}" data-has-listing="${o.listing_id?1:0}" data-title="${esc(o.title||'comanda')}">${b[1]}</button>`).join('')}${(o.status==='completed'&&o.other_id)?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.other_name||'')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':(seller?'☆ Califică cumpărătorul':'☆ Califică vânzătorul')}</button>`:''}${o.listing_id?`<button type="button" class="btn ghost small" data-order-listing="${o.id}">Vezi anunțul</button>`:''}</div>`:''}
   </div>`;
+}
+async function openOrderListing(oid){
+  const modal=$('#detailModal'), box=$('#detailContent');
+  box.innerHTML='<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden');
+  try{
+    const r=await api('/api/orders/'+encodeURIComponent(oid)+'/listing');
+    const live=r.listing.status==='approved';
+    box.innerHTML=(live?'':'<p class="form-note">Acest anunț nu mai este activ (vândut sau retras). Îl vezi pentru că ai comandat piesa.</p>')+detailHtml(r.listing,r.phones,live);
+  }catch(e){ box.innerHTML='<p>'+esc(e.status===404?'Anunțul a fost șters și nu mai poate fi afișat.':(e.message||'Eroare.'))+'</p>'; }
 }
 function printOrder(o){
   const w=window.open('','_blank'); if(!w){ toast('Permite ferestrele pop-up ca să tipărești.'); return; }
@@ -2502,6 +2511,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); { const rm=$('#requestModal'); if(rm) rm.classList.add('hidden'); } toast('Cererea a fost ștearsă.'); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
   if((el=t.closest('[data-order]'))){ e.stopPropagation(); safe(openOrder)(Number(el.dataset.order)); return; }
+  if((el=t.closest('[data-order-listing]'))){ safe(openOrderListing)(el.dataset.orderListing); return; }
   if((el=t.closest('[data-order-save]'))){ const oid=el.dataset.oid, kind=el.dataset.orderSave;
     const body=kind==='awb'?{awb:($('#ordAwb')||{}).value||''}:{seller_note:($('#ordSellerNote')||{}).value||''};
     safe(async()=>{ await api('/api/orders/'+oid+'/details',{method:'PATCH',body:JSON.stringify(body)}); toast(kind==='awb'?'AWB salvat.':'Observațiile au fost salvate.'); renderAccountTool('order',oid); })(); return; }

@@ -1675,7 +1675,7 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
 app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
  // Cumpărătorul a deschis „Comenzile mele”: marcăm starea curentă ca văzută (insigna dispare până la următoarea schimbare de status).
  if(req.query.seen==='buyer')await pool.query('UPDATE orders SET buyer_seen_status=status WHERE buyer_id=$1 AND buyer_seen_status IS DISTINCT FROM status',[req.user.id]);
- const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.recipient_name,o.recipient_phone,o.status_reason,o.awb,CASE WHEN o.seller_id=$1 THEN o.seller_note END seller_note,CASE WHEN l.images[1] ~ '^https?://' THEN l.images[1] END thumb,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) other_has_avatar,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id LEFT JOIN listings l ON l.id=o.listing_id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
+ const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.recipient_name,o.recipient_phone,o.status_reason,o.awb,CASE WHEN o.seller_id=$1 THEN o.seller_note END seller_note,(COALESCE(array_length(l.images,1),0)>0) has_thumb,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) other_has_avatar,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id LEFT JOIN listings l ON l.id=o.listing_id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
  const ids=[...new Set(r.rows.map(x=>x.other_id).filter(Boolean))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  res.json({orders:r.rows.map(x=>({...x,phones:ph.filter(p=>p.user_id===x.other_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp}))}))});
@@ -1710,6 +1710,24 @@ app.patch('/api/orders/:id/status',auth,requireDb,ah(async(req,res)=>{
  const L={confirmed:'confirmată',shipped:'expediată',completed:'finalizată',suspended:'suspendată',cancelled:'anulată'};
  await notify(seller?o.buyer_id:o.seller_id,'Comanda pentru „'+(o.title||'piesă')+'” a fost '+L[to]+(seller?' de vânzător':'')+'.'+(reason&&['suspended','cancelled','completed'].includes(to)?' Mesaj: '+reason:''),'order');
  res.json({ok:true,status:to});
+}));
+app.get('/api/orders/:id(\\d+)/thumb',auth,requireDb,ah(async(req,res)=>{
+ const r=await pool.query('SELECT l.images[1] img FROM orders o JOIN listings l ON l.id=o.listing_id WHERE o.id=$1 AND (o.buyer_id=$2 OR o.seller_id=$2)',[req.params.id,req.user.id]);
+ const img=r.rows[0]&&r.rows[0].img;
+ if(!img)return res.status(404).end();
+ const m=/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+\/=]+)$/.exec(img);
+ res.set('Cache-Control','private, max-age=3600');
+ if(m){res.type('image/'+m[1]);return res.send(Buffer.from(m[2],'base64'));}
+ if(/^https?:\/\//.test(img))return res.redirect(302,img);
+ res.status(404).end();
+}));
+app.get('/api/orders/:id(\\d+)/listing',auth,requireDb,ah(async(req,res)=>{
+ const r=await pool.query(`SELECT l.*,${SELLER_COLS},u.show_phone seller_show_phone,${VAC_SQL('u')} seller_vacation,CASE WHEN ${VAC_SQL('u')} THEN u.vacation_until::text END seller_vacation_until FROM orders o JOIN listings l ON l.id=o.listing_id LEFT JOIN users u ON u.id=l.user_id WHERE o.id=$1 AND (o.buyer_id=$2 OR o.seller_id=$2)`,[req.params.id,req.user.id]);
+ if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ const x=r.rows[0]; let phones=[];
+ if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id LIMIT 4',[x.user_id])).rows;
+ delete x.seller_show_phone;
+ res.json({listing:x,phones});
 }));
 app.patch('/api/orders/:id(\\d+)/details',auth,requireDb,ah(async(req,res)=>{
  const o=(await pool.query('SELECT id,buyer_id,seller_id,title,awb FROM orders WHERE id=$1 AND seller_id=$2',[req.params.id,req.user.id])).rows[0];
