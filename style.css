@@ -1098,7 +1098,7 @@ img,video{max-width:100%}
     background:radial-gradient(120% 90% at 18% 0%,rgba(255,255,255,.35),transparent 55%);
     opacity:.55;
   }
-  .bottom-nav button{color:#f4ead4;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+  .bottom-nav button{color:#f4ead4;text-shadow:none}
   .bottom-nav svg{filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))}
   .bottom-nav button.on{color:#fff}
   .bottom-nav button.on:not(.bn-sell){background:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
@@ -2127,3 +2127,140 @@ button[data-tip],a[data-tip],.icon-btn,.ad-ico,.ar-btn,.mr-btn,.mine-act,.ad-nav
 .req-gal .detail-gallery.ad-slider .detail-gallery-item,.req-gal .detail-gallery.ad-slider .detail-gallery-item:first-child{flex:0 0 100%;width:100%;height:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;scroll-snap-align:center;scroll-snap-stop:always;cursor:zoom-in;grid-column:auto}
 .req-gal .detail-gallery.ad-slider .detail-gallery-item img{width:100%;height:100%;object-fit:contain;background:transparent}
 .adm-main-img{touch-action:pan-y}
+
+/* ==========================================================================
+   V-3D — butoane cu adâncime, elegante și odihnitoare
+   - Fără text-shadow: scrisul rămâne curat.
+   - Efectul vine din: gradient fin, muchie luminoasă sus, "talpă" jos, umbră moale.
+   - Hover: se ridică ușor + luciu discret. Apăsare: se înfundă.
+   ========================================================================== */
+:root{
+  --btn-lift:0 1px 0 rgba(255,255,255,.04);
+  --btn-press-ease:cubic-bezier(.22,.8,.3,1);
+}
+.btn,.pick-btn,.set-btn,.filter-toggle,.save-search,.result-search button{
+  text-shadow:none;
+  -webkit-font-smoothing:antialiased;
+  transition:transform .18s var(--btn-press-ease),box-shadow .18s var(--btn-press-ease),background-color .18s ease,background-position .6s ease,border-color .18s ease,color .18s ease,filter .18s ease;
+}
+
+/* Principal — negru cald cu muchie aurie */
+.btn.primary,.result-search button{
+  background:
+    linear-gradient(115deg,transparent 38%,rgba(233,211,168,.20) 50%,transparent 62%) no-repeat 140% 0/250% 100%,
+    linear-gradient(180deg,#34302a 0%,#1b1914 52%,#0e0f12 100%);
+  color:var(--gold-pale,#e9d3a8);
+  border:1px solid #070708;
+  box-shadow:
+    inset 0 1px 0 rgba(233,211,168,.30),
+    inset 0 -1px 0 rgba(0,0,0,.45),
+    0 3px 0 #000,
+    0 9px 18px rgba(14,15,18,.26);
+  transform:translateY(0);
+}
+.btn.primary:hover,.result-search button:hover{
+  background:
+    linear-gradient(115deg,transparent 38%,rgba(255,255,255,.42) 50%,transparent 62%) no-repeat -40% 0/250% 100%,
+    linear-gradient(180deg,#f0dcb2 0%,#cfa96a 55%,#b8935a 100%);
+  color:#14110c;
+  border-color:#8a6a35;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(122,90,40,.35),
+    0 3px 0 #7a5a28,
+    0 12px 24px rgba(184,147,90,.34);
+  transform:translateY(-2px);
+  filter:none;
+}
+.btn.primary:active,.result-search button:active{
+  transform:translateY(2px) scale(1);
+  filter:none;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,.30),
+    0 1px 0 #000,
+    0 3px 8px rgba(14,15,18,.20);
+}
+.btn.primary:hover:active{
+  box-shadow:inset 0 2px 4px rgba(90,64,24,.35),0 1px 0 #7a5a28,0 3px 8px rgba(184,147,90,.25);
+}
+
+/* Secundar (ghost) — sticlă caldă, mai discret */
+.btn.ghost,.pick-btn,.set-btn,.filter-toggle,.save-search{
+  background:linear-gradient(180deg,#fffdf8 0%,#f6eedb 100%);
+  color:var(--gold-ink,#7a5a28);
+  border:1px solid #d8c9aa;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 2px 0 #e0d2b2,
+    0 6px 12px rgba(40,30,10,.07);
+}
+.btn.ghost:hover,.pick-btn:hover,.set-btn:hover,.filter-toggle:hover,.save-search:hover{
+  background:linear-gradient(180deg,#fffaf0 0%,#f1e4c4 100%);
+  border-color:var(--gold,#b8935a);
+  transform:translateY(-1px);
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #d6c394,0 10px 18px rgba(184,147,90,.20);
+}
+.btn.ghost:active,.pick-btn:active,.set-btn:active,.filter-toggle:active,.save-search:active{
+  transform:translateY(1px) scale(1);
+  filter:none;
+  box-shadow:inset 0 2px 3px rgba(122,90,40,.18),0 0 0 #e0d2b2;
+}
+
+/* Pericol — roșu fin, fără țipăt */
+.btn.danger{
+  background:linear-gradient(180deg,#fff8f8 0%,#fbe6e8 100%);
+  color:#a62a36;
+  border:1px solid #efc6ca;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 0 #ecc0c5,0 6px 12px rgba(166,42,54,.08);
+}
+.btn.danger:hover{
+  background:linear-gradient(180deg,#fff2f3 0%,#f8d9dc 100%);
+  border-color:#d98a93;
+  transform:translateY(-1px);
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #e3a9b0,0 10px 18px rgba(166,42,54,.14);
+}
+.btn.danger:active{transform:translateY(1px);box-shadow:inset 0 2px 3px rgba(166,42,54,.18),0 0 0 #ecc0c5}
+
+/* WhatsApp — verde adânc */
+.btn.wa{
+  background:linear-gradient(180deg,#2fcb6b 0%,#1a9a4b 100%);
+  color:#fff;
+  border:1px solid #147a3b;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 3px 0 #0f6330,0 9px 16px rgba(31,168,85,.26);
+}
+.btn.wa:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 0 #0f6330,0 12px 22px rgba(31,168,85,.34)}
+.btn.wa:active{transform:translateY(2px);box-shadow:inset 0 2px 4px rgba(0,0,0,.25),0 1px 0 #0f6330}
+
+/* Butoane mici: talpă mai subțire, ca să nu pară umflate */
+.btn.small.primary{box-shadow:inset 0 1px 0 rgba(233,211,168,.28),inset 0 -1px 0 rgba(0,0,0,.4),0 2px 0 #000,0 6px 12px rgba(14,15,18,.22)}
+.btn.small.primary:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 0 #7a5a28,0 8px 16px rgba(184,147,90,.3);transform:translateY(-1px)}
+.btn.small.primary:active{transform:translateY(1px);box-shadow:inset 0 2px 3px rgba(0,0,0,.3),0 0 0 #000}
+
+/* Dezactivat / încărcare: fără relief */
+.btn:disabled,.btn[disabled]{transform:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;filter:saturate(.7)}
+
+/* Tastatură: contur clar, auriu */
+.btn:focus-visible,.pick-btn:focus-visible,.set-btn:focus-visible,.filter-toggle:focus-visible,.save-search:focus-visible,.result-search button:focus-visible{
+  outline:2px solid var(--gold,#b8935a);outline-offset:3px;
+}
+
+/* Telefon: fără ridicare la hover (nu există hover real), doar înfundare la atingere */
+@media (hover:none){
+  .btn.primary:hover,.result-search button:hover{transform:none}
+  .btn.ghost:hover,.btn.danger:hover,.btn.wa:hover,.pick-btn:hover,.set-btn:hover,.filter-toggle:hover,.save-search:hover{transform:none}
+}
+
+/* Utilizatori sensibili la mișcare */
+@media (prefers-reduced-motion:reduce){
+  .btn,.pick-btn,.set-btn,.filter-toggle,.save-search,.result-search button{transition:none}
+  .btn:hover,.btn:active{transform:none!important}
+}
+
+/* Nota "cererea nu se mai poate modifica" */
+.req-lock-note{
+  margin:12px 0;padding:10px 14px;border-radius:10px;
+  background:linear-gradient(180deg,#fffaf0,#f8efd9);
+  border:1px solid #e6d7b4;color:#7a5a28;
+  font-size:14px;font-weight:600;line-height:1.4;
+}
+.page-head .req-lock-note{margin:8px 0 0;font-size:13.5px}
