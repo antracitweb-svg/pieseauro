@@ -3213,13 +3213,10 @@ document.addEventListener('change', e=>{
   loadCatalog().then(()=>{ if(parseHash().name==='rezultate') applyFiltersToUI(); });
 })();
 
-/* meniul de jos: ascuns implicit, apare când atingi ecranul și se ascunde după câteva secunde */
+/* meniul de jos: rămâne vizibil; se retrage doar cât timp meniul lateral e deschis (html.menu-open în CSS) */
 (function(){
   const nav=document.getElementById('bottomNav'); if(!nav) return;
-  let t;
-  const show=()=>{ nav.classList.add('show'); clearTimeout(t); t=setTimeout(()=>nav.classList.remove('show'),3000); };
-  ['touchstart','touchmove','pointerdown'].forEach(ev=>document.addEventListener(ev,show,{passive:true}));
-  nav.addEventListener('click',()=>{ clearTimeout(t); t=setTimeout(()=>nav.classList.remove('show'),1200); });
+  nav.classList.add('show');
 })();
 
 /* apăsare vizibilă pe telefon */

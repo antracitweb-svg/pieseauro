@@ -2442,3 +2442,94 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .rv-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rv-top small{margin-left:auto;color:var(--muted);font-size:13px}
 .rv-item p{margin:8px 0 0;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+
+/* =====================================================================
+   ANTET „liquid glass” — cu un sfert mai îngust pe toate ecranele
+   (desktop 78→58px, tabletă 72→54px, telefon 34→26px)
+   Fundalul e translucid, dar întunecat/tonat, ca logo-ul și pictogramele
+   crem-aurii să rămână lizibile peste orice conținut din spate.
+   ===================================================================== */
+.header{
+  background:linear-gradient(180deg,rgba(46,41,34,.52) 0%,rgba(14,15,18,.36) 100%);
+  -webkit-backdrop-filter:blur(18px) saturate(1.7) brightness(.7);
+  backdrop-filter:blur(18px) saturate(1.7) brightness(.7);
+  border-bottom:1px solid rgba(233,211,168,.38);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),inset 0 -1px 0 rgba(255,255,255,.06),0 8px 26px rgba(0,0,0,.2);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.header{background:rgba(14,15,18,.94)}}
+@media (prefers-reduced-transparency:reduce){.header{background:rgba(14,15,18,.96);-webkit-backdrop-filter:none;backdrop-filter:none}}
+
+/* culori logo + pictograme (crem/auriu, cu o umbră fină pentru contrast) */
+.header .brand{color:#f6eedd}
+.header .brand-copy strong{color:#f6eedd;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+.header .brand-copy strong span{color:#ecd3a0}
+.header .brand-copy small{color:#d9cdb2;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.header .brand-mark:before{border-top-color:#ecd3a0}
+.header .brand-mark i{background:#d4b483;box-shadow:-18px 2px 0 #ecd3a0}
+.header .icon-btn{color:#f6eedd;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
+.header .icon-btn span{background:#d4b483;color:#0e0f12}
+.header .garage-btn{color:#f6eedd;background:rgba(255,255,255,.1);border-color:rgba(233,211,168,.5);text-shadow:0 1px 3px rgba(0,0,0,.45)}
+.header .garage-btn.on{background:rgba(212,180,131,.3);color:#fff}
+.header .menu-btn{background:rgba(255,255,255,.1);border:1px solid rgba(233,211,168,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+.header .menu-btn i{background:#f6eedd;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+
+/* înălțimi (−25%) */
+.header .nav{min-height:58px}
+.header .brand-mark{width:32px;height:22px}
+.header .brand-mark:before{top:4px;height:12px;border-top-width:3px}
+.header .brand-mark i{width:7px;height:7px;top:11px;box-shadow:-14px 2px 0 #ecd3a0}
+.header .brand-copy strong{font-size:22px;letter-spacing:-1px}
+.header .brand-copy small{margin-top:3px;font-size:7px}
+.header .icon-btn{min-height:36px;min-width:36px;font-size:20px;padding:4px}
+.header .menu-btn{width:38px;min-width:38px;height:34px;min-height:34px;border-radius:10px}
+.header .menu-btn i{width:18px}
+.header .garage-btn{min-height:30px;padding:5px 11px;font-size:12.5px}
+.page{min-height:calc(100vh - 58px)}
+.home-wrap{min-height:calc(100vh - 58px)}
+
+@media(min-width:681px) and (max-width:980px){
+  .header .nav{min-height:54px}
+  .header .brand-copy strong{font-size:21px}
+  .page,.home-wrap{min-height:calc(100vh - 54px)}
+}
+@media(max-width:680px){
+  .header .nav{min-height:26px;gap:3px}
+  .header .brand{gap:3px}
+  .header .brand-mark{width:16px;height:12px}
+  .header .brand-mark:before{top:2px;height:8px;border-top-width:2px}
+  .header .brand-mark i{width:5px;height:5px;top:7px;box-shadow:-9px 1px 0 #ecd3a0}
+  .header .brand-copy strong{font-size:clamp(12px,3.6vw,14px);letter-spacing:-.3px}
+  .header .icon-btn{min-height:22px;min-width:22px;font-size:14px;padding:1px}
+  .header .icon-btn::after{top:-8px;bottom:-8px}
+  .header .icon-btn span{font-size:7px;padding:1px 3px}
+  .header .search-top{font-size:15px}
+  .header .menu-btn{width:24px;min-width:24px;height:20px;min-height:20px;gap:2px;border-radius:6px;margin-left:2px}
+  .header .menu-btn::after{inset:-8px}
+  .header .menu-btn i{width:11px;height:1.5px}
+  .header .garage-btn{min-height:20px;padding:2px 7px;font-size:9.5px;max-width:82px}
+  .header .nav-badge{top:-4px;right:-4px;min-width:14px;height:14px;font-size:8px;line-height:14px;padding:0 3px;border-radius:7px}
+  .page,.home-wrap{min-height:calc(100vh - 26px)}
+}
+@media(max-width:360px){
+  .header .garage-btn{max-width:56px;padding:2px 5px}
+}
+
+/* =====================================================================
+   BARA DE JOS (telefon) — cu un sfert mai mare, mereu vizibilă;
+   se retrage când meniul lateral e deschis și reapare când se închide
+   ===================================================================== */
+@media(max-width:800px){
+  body{padding-bottom:calc(46px + env(safe-area-inset-bottom,0px))}
+  .bottom-nav{
+    left:16px;right:16px;
+    bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    padding:2px 8px;border-radius:20px;
+    transform:none;opacity:1;pointer-events:auto;
+    transition:transform .45s cubic-bezier(.22,1,.36,1),opacity .3s ease;
+  }
+  .bottom-nav button{min-height:30px}
+  .bottom-nav svg{width:20px;height:20px}
+  .bottom-nav .bn-sell span.bn-plus{width:32px;height:32px;margin-top:-9px}
+  .bottom-nav .bn-sell span.bn-plus svg{width:18px;height:18px}
+  html.menu-open .bottom-nav{transform:translateY(240%);opacity:0;pointer-events:none}
+}
