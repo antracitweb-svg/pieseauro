@@ -2570,7 +2570,7 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .ad-fit.bad{background:#fff4e5;border:1px solid #f2d3a0;color:#7a4b00}
 
 /* =====================================================================
-   V41 — „LIQUID GLASS” gri grafit (ca bara Google), pe antet, meniul lateral și bara de jos
+   V42 — „LIQUID GLASS” gri grafit (ca bara Google), pe antet, meniul lateral și bara de jos
    Doar aspect: culori, transparență, blur, margini, umbre + butoane mai mari în antetul de TELEFON.
    Laptop/desktop/tabletă: nicio mărime schimbată, doar culorile.
    Paleta: grafit #3c4043 translucid (~72%), text crem #f4efe4, accent auriu #d4b483 / #e9d3a8
@@ -2598,17 +2598,18 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .header .nav-badge{box-shadow:0 0 0 2px rgba(56,59,62,.95)}
 .header .garage-btn{color:#f4efe4;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.24);text-shadow:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
 .header .garage-btn.on{background:rgba(212,180,131,.30);color:#fff}
-.header .menu-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.26);box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
+.header .menu-btn{background:transparent;border:0;box-shadow:none;-webkit-tap-highlight-color:transparent}
+.header .menu-btn:active{background:rgba(255,255,255,.12)}
 .header .menu-btn i{background:#f4efe4;box-shadow:0 1px 2px rgba(0,0,0,.35)}
 
 /* coșul: auriu cald, într-un chip translucid (doar culoare; fără schimbare de mărime pe laptop) */
 .header #cartBtn{
-  background:rgba(212,180,131,.20);
+  background:transparent;
   border-radius:12px;
-  box-shadow:inset 0 0 0 1px rgba(233,211,168,.55),inset 0 1px 0 rgba(255,255,255,.28);
-  filter:sepia(1) saturate(2.8) hue-rotate(-8deg) brightness(1.25) drop-shadow(0 1px 3px rgba(0,0,0,.35));
+  box-shadow:none;
+  filter:sepia(1) saturate(3) hue-rotate(-8deg) brightness(1.35) drop-shadow(0 1px 3px rgba(0,0,0,.35));
 }
-.header #cartBtn:active{background:rgba(212,180,131,.34)}
+.header #cartBtn:active{background:rgba(255,255,255,.12)}
 
 /* ---------- TELEFON: antet mai lat + butoane mai mari (meniu, lupă, inimă, coș) ---------- */
 @media(max-width:680px){
@@ -2620,8 +2621,8 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   .header .icon-btn span{font-size:9px;padding:1px 4px}
   .header #cartBtn{min-width:38px;border-radius:11px}
   .header .menu-btn{width:38px;min-width:38px;height:36px;min-height:36px;gap:3.5px;border-radius:11px;margin-left:3px}
-  .header .menu-btn i{width:17px;height:2px}
-  .header .nav-badge{top:-5px;right:-5px;min-width:16px;height:16px;font-size:9px;line-height:16px;padding:0 4px;border-radius:8px}
+  .header .menu-btn i{width:19px;height:2.4px;border-radius:2px}
+  .header .nav-badge{top:-3px;right:-3px;min-width:16px;height:16px;font-size:9px;line-height:16px;padding:0 4px;border-radius:8px}
   .page,.home-wrap{min-height:calc(100vh - 48px)}
 }
 
