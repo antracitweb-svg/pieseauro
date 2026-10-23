@@ -2688,46 +2688,178 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .mdrawer .mi-user.has-photo i{visibility:hidden}
 
 /* =====================================================================
-   CULOARE UNITARĂ #232429 (identică cu bara telefonului):
-   baner sus, meniu lateral și bara de jos plutitoare, mai aproape de margini
+   LIQUID GLASS în culoarea barei telefonului (#232429):
+   baner sus, meniu lateral și bara de jos plutitoare.
+   Nuanța e compensată (translucid peste fundalul crem ≈ #232429).
    ===================================================================== */
-:root{--bar-solid:#232429}
+:root{
+  --lg-tint:rgba(11,12,19,.90);
+  --lg-shine:linear-gradient(180deg,rgba(255,255,255,.13) 0%,rgba(255,255,255,.03) 45%,rgba(255,255,255,.07) 100%);
+  --lg-blur:blur(18px) saturate(1.7);
+  --lg-edge:rgba(255,255,255,.20);
+}
 
 /* ---------- baner sus ---------- */
 .header{
-  background:var(--bar-solid);
-  -webkit-backdrop-filter:none;backdrop-filter:none;
-  border-bottom:1px solid rgba(255,255,255,.08);
-  box-shadow:0 6px 18px rgba(0,0,0,.18);
+  background:var(--lg-shine),var(--lg-tint);
+  -webkit-backdrop-filter:var(--lg-blur);backdrop-filter:var(--lg-blur);
+  border-bottom:1px solid var(--lg-edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.05),0 8px 22px rgba(0,0,0,.20);
 }
-.header .nav-badge{box-shadow:0 0 0 2px var(--bar-solid)}
+.header .nav-badge{box-shadow:0 0 0 2px #232429}
 
 /* ---------- meniu lateral ---------- */
 .mdrawer{
-  background:var(--bar-solid);
-  -webkit-backdrop-filter:none;backdrop-filter:none;
-  border-left:1px solid rgba(255,255,255,.08);
-  box-shadow:-18px 0 44px rgba(0,0,0,.40);
+  background:
+    radial-gradient(110% 40% at 100% 10%,rgba(212,180,131,.10),transparent 62%),
+    var(--lg-shine),var(--lg-tint);
+  -webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7);
+  border-left:1px solid var(--lg-edge);
+  box-shadow:-22px 0 54px rgba(0,0,0,.42),inset 1.5px 0 0 rgba(255,255,255,.22),inset 0 1.5px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(255,255,255,.05);
 }
-.mdrawer::before{background:none}
+.mdrawer::before{background:linear-gradient(100deg,rgba(255,255,255,.14) 0,rgba(255,255,255,.03) 14%,transparent 34%)}
 
 /* ---------- bară jos: plutitoare, rotunjită, aproape de margini ---------- */
 @media(max-width:800px){
   .bottom-nav{
     left:8px;right:8px;
     bottom:calc(8px + env(safe-area-inset-bottom,0px));
-    background:var(--bar-solid);
-    -webkit-backdrop-filter:none;backdrop-filter:none;
-    border:1px solid rgba(255,255,255,.08);
-    box-shadow:0 8px 22px rgba(0,0,0,.30);
+    background:var(--lg-shine),var(--lg-tint);
+    -webkit-backdrop-filter:var(--lg-blur);backdrop-filter:var(--lg-blur);
+    border:1px solid var(--lg-edge);
+    box-shadow:0 10px 26px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.24),inset 0 -1px 0 rgba(255,255,255,.06);
   }
-  .bottom-nav::before{display:none}
-  .bottom-nav .bn-sell span.bn-plus{box-shadow:0 6px 14px rgba(184,147,90,.40),0 0 0 4px var(--bar-solid)}
+  .bottom-nav::before{display:block;background:radial-gradient(120% 90% at 18% 0%,rgba(255,255,255,.16),transparent 55%);opacity:.6}
+  .bottom-nav .bn-sell span.bn-plus{box-shadow:0 6px 14px rgba(184,147,90,.40),0 0 0 4px rgba(35,36,41,.9),inset 0 1px 0 rgba(255,255,255,.55)}
 }
+/* fără suport pentru blur / transparență redusă: culoarea plină #232429 */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .header,.mdrawer{background:var(--bar-solid)}
-  @media(max-width:800px){.bottom-nav{background:var(--bar-solid)}}
+  .header,.mdrawer{background:#232429}
+  @media(max-width:800px){.bottom-nav{background:#232429}}
 }
 @media (prefers-reduced-transparency:reduce){
-  .header,.mdrawer{background:var(--bar-solid)}
+  .header,.mdrawer{background:#232429;-webkit-backdrop-filter:none;backdrop-filter:none}
+}
+
+/* ===== v2 layout (grilă de carduri, categorii, cont pe 2 coloane) ===== */
+/* Rezultate: grilă de carduri verticale */
+#page-results .container{width:min(1240px,calc(100% - 48px))!important}
+#page-results .results-layout{grid-template-columns:250px minmax(0,1fr)!important;gap:22px!important}
+#listingGrid.ar-list,.similar-grid.ar-list{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important;max-width:none!important}
+#listingGrid .ar-row,.similar-grid .ar-row{position:relative;display:flex!important;flex-direction:column;gap:0;padding:0!important;background:#fff;border:1px solid var(--line)!important;border-radius:14px;overflow:hidden;transition:box-shadow .15s,transform .15s}
+#listingGrid .ar-row:hover,.similar-grid .ar-row:hover{background:#fff;box-shadow:0 10px 28px rgba(16,52,94,.12);transform:translateY(-2px)}
+#listingGrid .ar-list>.ar-row:first-child{border-top:1px solid var(--line)}
+#listingGrid .ar-thumb,.similar-grid .ar-thumb{width:100%!important;height:auto!important;aspect-ratio:4/3;border-radius:0}
+#listingGrid .ar-main,.similar-grid .ar-main{padding:10px 12px 0;gap:4px}
+#listingGrid .ar-title,.similar-grid .ar-title{font-size:15px!important;-webkit-line-clamp:2}
+#listingGrid .ar-meta,#listingGrid .ar-sub,.similar-grid .ar-meta,.similar-grid .ar-sub{font-size:12px}
+#listingGrid .ar-acts,.similar-grid .ar-acts{position:absolute;top:8px;right:8px;margin:0}
+#listingGrid .ar-fav,.similar-grid .ar-fav{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.18);display:grid;place-items:center;padding:0}
+#listingGrid .ar-foot,.similar-grid .ar-foot{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 12px 12px;margin-top:auto}
+#listingGrid .ar-price,.similar-grid .ar-price{order:-1;font-size:19px!important;font-weight:800;text-align:left}
+#listingGrid .ar-views,#listingGrid .ar-qty,.similar-grid .ar-views,.similar-grid .ar-qty{font-size:11px;color:var(--muted)}
+@media(max-width:1100px){#listingGrid.ar-list,.similar-grid.ar-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:800px){#page-results .container{width:calc(100% - 20px)!important}#listingGrid.ar-list,.similar-grid.ar-list{gap:10px!important}#listingGrid .ar-title,.similar-grid .ar-title{font-size:13.5px!important}#listingGrid .ar-chips,.similar-grid .ar-chips{display:none}#listingGrid .ar-price,.similar-grid .ar-price{font-size:16px!important}#listingGrid .ar-qty{display:none}}
+
+/* Start: categorii ca iconițe */
+.home-cats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;max-width:900px;margin:30px auto 0}
+.home-cats button{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;background:#fff;border:1px solid var(--line);border-radius:14px;font:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;transition:transform .12s,box-shadow .15s}
+.home-cats button:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.home-cats .hc-ico{font-size:28px;line-height:1}
+.home-cats-more{display:block;margin:14px auto 0;background:none;border:0;color:#8f6d38;font-weight:800;cursor:pointer}
+@media(max-width:800px){.home-cats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:22px}.home-cats button{padding:12px 4px;font-size:12px}}
+
+/* Cont: 2 coloane pe desktop */
+@media(min-width:900px){
+ #page-account .container.narrow{width:min(980px,calc(100% - 64px))}
+ #page-account .account-sections{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+ #page-account .account-sections>.btn.danger,#page-account .account-sections>.account-admin-compat{grid-column:1/-1}
+}
+
+/* Start: feed anunțuri */
+#homeFeed.ar-list,.similar-grid.ar-list{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important;max-width:none!important}
+#homeFeed .ar-row,.similar-grid .ar-row{position:relative;display:flex!important;flex-direction:column;gap:0;padding:0!important;background:#fff;border:1px solid var(--line)!important;border-radius:14px;overflow:hidden;transition:box-shadow .15s,transform .15s}
+#homeFeed .ar-row:hover,.similar-grid .ar-row:hover{background:#fff;box-shadow:0 10px 28px rgba(16,52,94,.12);transform:translateY(-2px)}
+#homeFeed .ar-list>.ar-row:first-child{border-top:1px solid var(--line)}
+#homeFeed .ar-thumb,.similar-grid .ar-thumb{width:100%!important;height:auto!important;aspect-ratio:4/3;border-radius:0}
+#homeFeed .ar-main,.similar-grid .ar-main{padding:10px 12px 0;gap:4px}
+#homeFeed .ar-title,.similar-grid .ar-title{font-size:15px!important;-webkit-line-clamp:2}
+#homeFeed .ar-meta,#homeFeed .ar-sub,.similar-grid .ar-meta,.similar-grid .ar-sub{font-size:12px}
+#homeFeed .ar-acts,.similar-grid .ar-acts{position:absolute;top:8px;right:8px;margin:0}
+#homeFeed .ar-fav,.similar-grid .ar-fav{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.18);display:grid;place-items:center;padding:0}
+#homeFeed .ar-foot,.similar-grid .ar-foot{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 12px 12px;margin-top:auto}
+#homeFeed .ar-price,.similar-grid .ar-price{order:-1;font-size:19px!important;font-weight:800;text-align:left}
+#homeFeed .ar-views,#homeFeed .ar-qty,.similar-grid .ar-views,.similar-grid .ar-qty{font-size:11px;color:var(--muted)}
+@media(max-width:1100px){#homeFeed.ar-list,.similar-grid.ar-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+.home-feed{width:100%;margin:36px auto 0}
+.home-feed-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+.home-feed-head h2{margin:0;font-size:26px;letter-spacing:-.6px}
+.home-feed-head button{border:0;background:none;color:#8f6d38;font-weight:800;cursor:pointer;font-size:14px}
+#homeFeed.ar-list{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+@media(max-width:1100px){#homeFeed.ar-list{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:800px){#homeFeed.ar-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}.home-feed{margin-top:26px}.home-feed-head h2{font-size:21px}}
+
+/* ===== v3: card în stil OLX (poză, titlu, preț, locație) ===== */
+.ar-sub .ar-loc+.ar-dt::before,.ar-sub .ar-dt+.ar-sl::before,.ar-sub .ar-loc+.ar-sl::before{content:" · "}
+#listingGrid .ar-row,
+#homeFeed .ar-row,
+.similar-grid .ar-row{display:flex!important;flex-direction:column}
+#listingGrid .ar-main,
+#homeFeed .ar-main,
+.similar-grid .ar-main{display:contents!important}
+#listingGrid .ar-thumb,
+#homeFeed .ar-thumb,
+.similar-grid .ar-thumb{order:0}
+#listingGrid .ar-title,
+#homeFeed .ar-title,
+.similar-grid .ar-title{order:1;margin:10px 12px 0!important;font-size:14.5px!important;font-weight:500!important;line-height:1.3;-webkit-line-clamp:2;min-height:2.6em;align-self:stretch}
+#listingGrid .ar-foot,
+#homeFeed .ar-foot,
+.similar-grid .ar-foot{order:2;padding:6px 12px 0!important;margin:0!important;display:block!important}
+#listingGrid .ar-sub,
+#homeFeed .ar-sub,
+.similar-grid .ar-sub{order:3;display:flex;flex-direction:column;gap:2px;padding:6px 12px 12px;font-size:12px!important;color:var(--muted)}
+#listingGrid .ar-meta,
+#homeFeed .ar-meta,
+.similar-grid .ar-meta,
+#listingGrid .ar-chips,
+#homeFeed .ar-chips,
+.similar-grid .ar-chips,
+#listingGrid .ar-views,
+#homeFeed .ar-views,
+.similar-grid .ar-views,
+#listingGrid .ar-qty,
+#homeFeed .ar-qty,
+.similar-grid .ar-qty,
+#listingGrid .ar-sl,
+#homeFeed .ar-sl,
+.similar-grid .ar-sl,
+#listingGrid .dt-pre,
+#homeFeed .dt-pre,
+.similar-grid .dt-pre{display:none!important}
+#listingGrid .ar-price,
+#homeFeed .ar-price,
+.similar-grid .ar-price{font-size:20px!important;font-weight:800!important;text-align:left;display:block;color:#14110c}
+#listingGrid .ar-sub .ar-dt,
+#homeFeed .ar-sub .ar-dt,
+.similar-grid .ar-sub .ar-dt{display:block}
+#listingGrid .ar-sub .ar-dt::first-letter,
+#homeFeed .ar-sub .ar-dt::first-letter,
+.similar-grid .ar-sub .ar-dt::first-letter{text-transform:uppercase}
+#listingGrid .ar-sub .ar-loc+.ar-dt::before,
+#homeFeed .ar-sub .ar-loc+.ar-dt::before,
+.similar-grid .ar-sub .ar-loc+.ar-dt::before{content:none!important}
+@media(max-width:800px){
+  #listingGrid .ar-title,
+  #homeFeed .ar-title,
+  .similar-grid .ar-title{margin:8px 9px 0!important;font-size:13px!important}
+  #listingGrid .ar-foot,
+  #homeFeed .ar-foot,
+  .similar-grid .ar-foot{padding:4px 9px 0!important}
+  #listingGrid .ar-sub,
+  #homeFeed .ar-sub,
+  .similar-grid .ar-sub{padding:4px 9px 10px;font-size:11px!important}
+  #listingGrid .ar-price,
+  #homeFeed .ar-price,
+  .similar-grid .ar-price{font-size:16px!important}
 }

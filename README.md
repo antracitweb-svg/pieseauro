@@ -1,4 +1,4 @@
-# AutoPiese – V26
+# AutoParts – V26
 
 Marketplace de piese auto (Node.js + Express + PostgreSQL), găzduit pe Render.
 
@@ -154,7 +154,7 @@ Atenție: pozele rămân în bucket și după ștergerea anunțului (curățarea
 ## V27 — carduri și pagină de anunț mai informative
 - Card de anunț: număr de poze, cod OEM, „Livrare”, cantitate, „negociabil”, stare, vânzător cu tip (Parc dezmembrări / Firmă / Particular) și număr de anunțuri active, județ și „Actualizat azi la 14:20 / ieri / la 09 oct. 2026”. Data vine din `created_at`, pe care butonul „Reactualizează” (`/bump`) îl actualizează.
 - Rezultate: contoare **Toate / Nou / Second hand** pentru căutarea curentă (`facets.condition` în `GET /api/listings`, calculate fără filtrul de stare), „Vezi și:” cu categorii și modele din rezultate, bloc „Cere oferte” sub listă și în pagina fără rezultate.
-- Pagina anunțului: chipuri cu stare/cantitate/livrare/negociabil, statistici vânzător („14 anunțuri active · pe AutoPiese din 2025”), mesaj rapid „Propune un preț” (doar la prețuri negociabile) și secțiunea „Anunțuri similare”.
+- Pagina anunțului: chipuri cu stare/cantitate/livrare/negociabil, statistici vânzător („14 anunțuri active · pe AutoParts din 2025”), mesaj rapid „Propune un preț” (doar la prețuri negociabile) și secțiunea „Anunțuri similare”.
 - Server: `image_count`, `seller_since`, `seller_ads` în listări; index `listings(user_id,status)`. Nicio coloană nouă.
 - Culorile, fonturile și identitatea vizuală au rămas neschimbate.
 

@@ -214,7 +214,7 @@ if(r.ok){location.reload();return;}fail(r.status===429?'Prea multe încercări. 
 catch(e){fail('Browserul nu a putut face verificarea. Folosește un browser actual, cu HTTPS și JavaScript activ.');}})();})();`;
 function challengePage(req){
  const c=newChallenge(req);
- return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Verificăm browserul… | AutoPiese</title><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#0e0f12;color:#e9d3a8;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;text-align:center}.bc{padding:24px;max-width:420px}.bc h1{font-size:22px;margin:18px 0 8px;font-weight:650}.bc p{margin:0;color:#a89c86;font-size:15px;line-height:1.5}.bc .bc-err{color:#f0b4b4}.bc-spin{width:42px;height:42px;margin:0 auto;border-radius:50%;border:3px solid rgba(212,180,131,.25);border-top-color:#d4b483;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.bc-spin{animation-duration:3s}}</style></head><body><main class="bc"><div class="bc-spin" aria-hidden="true"></div><h1>Verificăm browserul…</h1><p id="bc-msg" role="status">Durează câteva secunde. Pagina se reîncarcă automat.</p><noscript><p class="bc-err">Activează JavaScript pentru a continua.</p></noscript></main><script src="/bot-check.js" data-c="${c}" data-b="${BOT_BITS}" defer></script></body></html>`;
+ return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Verificăm browserul… | AutoParts</title><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#0e0f12;color:#e9d3a8;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;text-align:center}.bc{padding:24px;max-width:420px}.bc h1{font-size:22px;margin:18px 0 8px;font-weight:650}.bc p{margin:0;color:#a89c86;font-size:15px;line-height:1.5}.bc .bc-err{color:#f0b4b4}.bc-spin{width:42px;height:42px;margin:0 auto;border-radius:50%;border:3px solid rgba(212,180,131,.25);border-top-color:#d4b483;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.bc-spin{animation-duration:3s}}</style></head><body><main class="bc"><div class="bc-spin" aria-hidden="true"></div><h1>Verificăm browserul…</h1><p id="bc-msg" role="status">Durează câteva secunde. Pagina se reîncarcă automat.</p><noscript><p class="bc-err">Activează JavaScript pentru a continua.</p></noscript></main><script src="/bot-check.js" data-c="${c}" data-b="${BOT_BITS}" defer></script></body></html>`;
 }
 app.get('/bot-check.js',(req,res)=>{res.set('Cache-Control','public, max-age=3600').type('application/javascript').send(BOT_JS);});
 app.post('/api/botcheck',(req,res)=>{
@@ -740,7 +740,7 @@ async function sendVerificationEmail(req,user){
  await pool.query("INSERT INTO email_verifications(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '24 hours')",[user.id,hashToken(raw)]);
  const link=`${appBaseUrl(req)}/#/verify-email?token=${encodeURIComponent(raw)}`;
  try{
-  await sendMail(user.email,'AutoPiese – confirmă adresa de email',`Salut, ${user.name||''}\n\nConfirmă adresa de email deschizând linkul (valabil 24 de ore):\n${link}\n\nDacă nu ți-ai creat cont pe AutoPiese, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(user.name||'')}!</p><p>Confirmă adresa de email apăsând pe link:</p><p><a href="${link}">Confirmă emailul</a></p><p>Linkul este valabil 24 de ore.</p><p>Dacă nu ți-ai creat cont pe AutoPiese, ignoră acest mesaj.</p>`);
+  await sendMail(user.email,'AutoParts – confirmă adresa de email',`Salut, ${user.name||''}\n\nConfirmă adresa de email deschizând linkul (valabil 24 de ore):\n${link}\n\nDacă nu ți-ai creat cont pe AutoParts, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(user.name||'')}!</p><p>Confirmă adresa de email apăsând pe link:</p><p><a href="${link}">Confirmă emailul</a></p><p>Linkul este valabil 24 de ore.</p><p>Dacă nu ți-ai creat cont pe AutoParts, ignoră acest mesaj.</p>`);
  }catch(e){await pool.query('DELETE FROM email_verifications WHERE user_id=$1',[user.id]).catch(()=>{});throw e;}
 }
 
@@ -760,7 +760,7 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[userId,hashToken(raw)]);
   const link=`${appBaseUrl(req)}/#/reset-password?token=${encodeURIComponent(raw)}`;
   try{
-   const sent=await sendMail(em,'AutoPiese – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href=\"${link}\">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
+   const sent=await sendMail(em,'AutoParts – resetare parolă',`Salut, ${r.rows[0].name||''}\n\nPentru a schimba parola, deschide linkul (valabil 30 de minute):\n${link}\n\nDacă nu ai cerut resetarea parolei, ignoră acest mesaj.`,`<p>Salut, ${escapeHtml(r.rows[0].name||'')}!</p><p>Pentru a schimba parola, apasă pe buton:</p><p><a href=\"${link}\">Resetează parola</a></p><p>Linkul este valabil 30 de minute.</p><p>Dacă nu ai cerut resetarea, ignoră acest mesaj.</p>`);
    console.log('Recovery: Resend a acceptat emailul pentru',maskEmail(em),'id:',(sent&&sent.id)||'?');
   }catch(mailErr){
    // Never leave a valid reset token behind when delivery failed.
@@ -876,8 +876,8 @@ app.post('/api/account/email-change',requireDb,auth,async(req,res)=>{
   await pool.query('DELETE FROM email_change_requests WHERE user_id=$1 OR expires_at<NOW()',[req.user.id]);
   await pool.query("INSERT INTO email_change_requests(user_id,new_email,token_hash,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '30 minutes')",[req.user.id,em,hashToken(raw)]);
   const link=`${appBaseUrl(req)}/#/verify-email-change?token=${encodeURIComponent(raw)}`;
-  try{ await sendMail(em,'AutoPiese – confirmă noua adresă de email',`Ai cerut schimbarea adresei de email pentru contul AutoPiese. Confirmă în 30 de minute: ${link}`,
-   `<p>Ai cerut schimbarea adresei de email pentru contul AutoPiese.</p><p><a href="${link}">Confirmă noua adresă de email</a></p><p>Linkul este valabil 30 de minute.</p>`);
+  try{ await sendMail(em,'AutoParts – confirmă noua adresă de email',`Ai cerut schimbarea adresei de email pentru contul AutoParts. Confirmă în 30 de minute: ${link}`,
+   `<p>Ai cerut schimbarea adresei de email pentru contul AutoParts.</p><p><a href="${link}">Confirmă noua adresă de email</a></p><p>Linkul este valabil 30 de minute.</p>`);
   }catch(mailErr){ await pool.query('DELETE FROM email_change_requests WHERE user_id=$1',[req.user.id]); throw mailErr; }
   res.json({ok:true,message:'Ți-am trimis un link de confirmare pe noua adresă de email.'});
  }catch(e){console.error(e);const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SEND_FAILED'];if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});res.status(500).json({error:'SERVER_ERROR'});}
@@ -1195,7 +1195,7 @@ app.get('/api/account/export',requireDb,auth,ah(async(req,res)=>{
     q('SELECT label,qs,alerts,created_at FROM saved_searches WHERE user_id=$1 ORDER BY id')
   ]);
   const data={exported_at:new Date().toISOString(),note:'Pozele nu sunt incluse (doar numărul lor). Parola nu se exportă.',account:account[0]||null,phones,listings,favorites:favorites.map(f=>f.listing_id),requests,offers,orders,messages,notifications,reports,blocked_users:blocked,saved_searches:saved};
-  res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="autopiese-date-cont-'+uid+'.json"','Cache-Control':'no-store'});
+  res.set({'Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="autoparts-date-cont-'+uid+'.json"','Cache-Control':'no-store'});
   res.send(JSON.stringify(data,null,2));
 }));
 app.post('/api/account/delete',requireDb,auth,ah(async(req,res)=>{
@@ -1499,7 +1499,7 @@ async function mailNotify(uid,kind,text){
     mailGate.set(k,now);
     const t=String(text).replace(/[\r\n]+/g,' ').slice(0,300);
     const base=String(process.env.APP_URL||process.env.RENDER_EXTERNAL_URL||'').replace(/\/+$/,'');
-    await sendMail(u.email,'AutoPiese: '+t.slice(0,80),t+(base?'\n\nVezi detalii: '+base+'/#/account-tool':'')+'\n\nPoți opri aceste emailuri din Setări cont → Notificări pe email.');
+    await sendMail(u.email,'AutoParts: '+t.slice(0,80),t+(base?'\n\nVezi detalii: '+base+'/#/account-tool':'')+'\n\nPoți opri aceste emailuri din Setări cont → Notificări pe email.');
   }catch(e){console.error('mailNotify',e.message);}
 }
 const notify=(uid,text,kind)=>{if(!uid)return null;if(kind)mailNotify(uid,kind,text);return pool.query('INSERT INTO notifications(user_id,text,kind) VALUES($1,$2,$3)',[uid,String(text).slice(0,300),kind||null]).catch(()=>{});};
@@ -2027,7 +2027,7 @@ async function getSeoIndex(){
 function seoShell(req,{title,desc,canonical,robots,ld,body,prev,next}){
  const ldTags=(ld||[]).map(o=>`<script type="application/ld+json">${JSON.stringify(o).replace(/</g,'\\u003c')}</script>`).join('');
  const links=(prev?`<link rel="prev" href="${escapeHtml(prev)}">`:'')+(next?`<link rel="next" href="${escapeHtml(next)}">`:'');
- return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(desc)}">${robots?`<meta name="robots" content="${robots}">`:''}<link rel="canonical" href="${escapeHtml(canonical)}">${links}<meta property="og:type" content="website"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(desc)}"><meta property="og:url" content="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css">${ldTags}</head><body class="ssr-body"><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Piese</span></a><nav class="ssr-nav"><a href="/piese-auto">Categorii</a><a href="/#/rezultate">Caută piese</a></nav></div></header><main class="container ssr-page">${body}</main><footer class="ssr-foot container"><a href="/">AutoPiese</a> · <a href="/piese-auto">Piese auto pe categorii și mărci</a></footer></body></html>`;
+ return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(desc)}">${robots?`<meta name="robots" content="${robots}">`:''}<link rel="canonical" href="${escapeHtml(canonical)}">${links}<meta property="og:type" content="website"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(desc)}"><meta property="og:url" content="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css">${ldTags}</head><body class="ssr-body"><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Parts</span></a><nav class="ssr-nav"><a href="/piese-auto">Categorii</a><a href="/#/rezultate">Caută piese</a></nav></div></header><main class="container ssr-page">${body}</main><footer class="ssr-foot container"><a href="/">AutoParts</a> · <a href="/piese-auto">Piese auto pe categorii și mărci</a></footer></body></html>`;
 }
 const seoCrumbs=(items)=>`<nav class="crumbs" aria-label="Navigare">${items.map((c,i)=>i===items.length-1?`<span>${escapeHtml(c[0])}</span>`:`<a href="${escapeHtml(c[1])}">${escapeHtml(c[0])}</a>`).join(' › ')}</nav>`;
 const seoCrumbLd=(base,items)=>({'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:items.map((c,i)=>({'@type':'ListItem',position:i+1,name:c[0],item:base+c[1]}))});
@@ -2052,8 +2052,8 @@ async function seoListingPage(req,res,o){
  const url=p=>base+o.path+(p>1?`?p=${p}`:'');
  const a=agg.rows[0], pmin=Number(a.pmin||0), pmax=Number(a.pmax||0), fmt=n=>new Intl.NumberFormat('ro-RO').format(n);
  const intro=`${o.intro} Găsești ${seoPlural(total,'anunț','anunțuri')} de la vânzători din ${a.counties>1?seoPlural(a.counties,'județ','județe'):'România'}${pmin?`, cu prețuri între ${fmt(pmin)} și ${fmt(pmax)} lei`:''}. Contactezi direct vânzătorul, fără comision.`;
- const title=`${o.h1}${page>1?` – pagina ${page}`:''} | AutoPiese`;
- const desc=`${o.h1}: ${seoPlural(total,'anunț','anunțuri')}${pmin?` de la ${fmt(pmin)} lei`:''}. Piese noi și second hand, contact direct cu vânzătorul pe AutoPiese.`.slice(0,158);
+ const title=`${o.h1}${page>1?` – pagina ${page}`:''} | AutoParts`;
+ const desc=`${o.h1}: ${seoPlural(total,'anunț','anunțuri')}${pmin?` de la ${fmt(pmin)} lei`:''}. Piese noi și second hand, contact direct cu vânzătorul pe AutoParts.`.slice(0,158);
  const pager=pages>1?`<nav class="ssr-pager" aria-label="Pagini">${page>1?`<a rel="prev" href="${escapeHtml(o.path+(page>2?`?p=${page-1}`:''))}">‹ Înapoi</a>`:'<span></span>'}<span>Pagina ${page} din ${pages}</span>${page<pages?`<a rel="next" href="${escapeHtml(o.path+`?p=${page+1}`)}">Înainte ›</a>`:'<span></span>'}</nav>`:'';
  const ld=[seoCrumbLd(base,o.crumbs),{'@context':'https://schema.org','@type':'CollectionPage',name:o.h1,url:url(page),description:desc,mainEntity:{'@type':'ItemList',numberOfItems:total,itemListElement:rows.rows.map((x,i)=>({'@type':'ListItem',position:offset+i+1,url:`${base}/piese/${x.id}-${slugify(x.title)}`,name:x.title}))}}];
  const body=`${seoCrumbs(o.crumbs)}<h1>${escapeHtml(o.h1)}</h1><p class="ssr-intro">${escapeHtml(intro)}</p>${o.extra||''}<ul class="ssr-list">${rows.rows.map(seoRow).join('')}</ul>${pager}<p class="ssr-cta"><a class="btn primary" href="${escapeHtml(o.spa)}">Filtrează și caută în rezultate</a> <a class="btn ghost" href="/#/cerere-noua">Primește oferte piese</a></p>`;
@@ -2061,7 +2061,7 @@ async function seoListingPage(req,res,o){
 }
 function seoNotFound(req,res){
  const body=`<h1>Nu am găsit anunțuri aici</h1><p class="ssr-intro">Momentan nu există anunțuri active pentru această pagină. Încearcă o altă categorie sau marcă.</p><p class="ssr-cta"><a class="btn primary" href="/piese-auto">Vezi toate categoriile</a></p>`;
- res.status(404).set('Cache-Control','no-store').type('html').send(seoShell(req,{title:'Pagină indisponibilă | AutoPiese',desc:'Pagina nu mai are anunțuri active.',canonical:appBaseUrl(req)+'/piese-auto',robots:'noindex,follow',body}));
+ res.status(404).set('Cache-Control','no-store').type('html').send(seoShell(req,{title:'Pagină indisponibilă | AutoParts',desc:'Pagina nu mai are anunțuri active.',canonical:appBaseUrl(req)+'/piese-auto',robots:'noindex,follow',body}));
 }
 const topN=(map,n)=>[...map.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name,'ro')).slice(0,n);
 
@@ -2070,9 +2070,9 @@ app.get('/piese-auto',ah(async(req,res,next)=>{
  if(!pool)return next();
  const ix=await getSeoIndex(),base=appBaseUrl(req);
  if(!ix.catBySlug.size&&!ix.makeBySlug.size)return seoNotFound(req,res);
- const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto']];
+ const crumbs=[['AutoParts','/'],['Piese auto','/piese-auto']];
  const body=`${seoCrumbs(crumbs)}<h1>Piese auto second hand și noi</h1><p class="ssr-intro">Răsfoiește anunțurile pe categorie de piese sau pe marca mașinii tale.</p><h2>Categorii</h2>${seoChips(topN(ix.catBySlug,60).map(e=>[e.name,`/piese-auto/${e.slug}`,e.n]))}<h2>Mărci auto</h2>${seoChips(topN(ix.makeBySlug,300).map(e=>[e.name,`/piese-auto/${e.slug}`,e.n]))}`;
- res.set('Cache-Control','public, max-age=300').type('html').send(seoShell(req,{title:'Piese auto pe categorii și mărci | AutoPiese',desc:'Piese auto noi și second hand, pe categorii și mărci. Contact direct cu vânzătorul.',canonical:base+'/piese-auto',ld:[seoCrumbLd(base,crumbs)],body}));
+ res.set('Cache-Control','public, max-age=300').type('html').send(seoShell(req,{title:'Piese auto pe categorii și mărci | AutoParts',desc:'Piese auto noi și second hand, pe categorii și mărci. Contact direct cu vânzătorul.',canonical:base+'/piese-auto',ld:[seoCrumbLd(base,crumbs)],body}));
 }));
 // Categorie sau marcă (categoria are prioritate la același slug).
 app.get('/piese-auto/:slug',ah(async(req,res,next)=>{
@@ -2086,13 +2086,13 @@ app.get('/piese-auto/:slug',ah(async(req,res,next)=>{
   const mkByKey=new Map([...ix.makeBySlug.values()].map(m=>[m.key,m]));
   for(const row of r.rows){const m=mkByKey.get(seoKey(row.make));if(m)byMake.set(m.slug,{name:m.name,slug:m.slug,n:(byMake.get(m.slug)?.n||0)+row.n});}
   const makes=topN(byMake,24);
-  const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[cat.name,`/piese-auto/${cat.slug}`]];
+  const crumbs=[['AutoParts','/'],['Piese auto','/piese-auto'],[cat.name,`/piese-auto/${cat.slug}`]];
   const extra=makes.length?`<h2>${escapeHtml(cat.name)} după marcă</h2>${seoChips(makes.map(m=>[m.name,`/piese-auto/${m.slug}`,m.n]))}`:'';
   return seoListingPage(req,res,{filter:{category:cat.name},path:`/piese-auto/${cat.slug}`,spa:`/#/rezultate?category=${encodeURIComponent(cat.name)}`,h1:`${cat.name} – piese auto second hand și noi`,intro:`Anunțuri pentru ${cat.name.toLowerCase()} de la vânzători din toată țara.`,crumbs,extra});
  }
  const mk=ix.makeBySlug.get(slug);
  if(!mk)return seoNotFound(req,res);
- const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`]];
+ const crumbs=[['AutoParts','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`]];
  const extra=mk.models.size?`<h2>Modele ${escapeHtml(mk.name)}</h2>${seoChips(topN(mk.models,60).map(m=>[`${mk.name} ${m.name}`,`/piese-auto/${mk.slug}/${m.slug}`,m.n]))}`:'';
  return seoListingPage(req,res,{filter:{make:mk.name},path:`/piese-auto/${mk.slug}`,spa:`/#/rezultate?make=${encodeURIComponent(mk.name)}`,h1:`Piese auto ${mk.name} – second hand și noi`,intro:`Piese pentru mașini ${mk.name}: caroserie, motor, suspensie, frâne și altele.`,crumbs,extra});
 }));
@@ -2105,7 +2105,7 @@ app.get('/piese-auto/:make/:model',ah(async(req,res,next)=>{
  if(!md)return seoNotFound(req,res);
  const r=await pool.query(`SELECT l.category,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${flat('l.make')}=$1 AND ${flat('l.model')}=$2 AND COALESCE(l.category,'')<>'' GROUP BY l.category ORDER BY n DESC`,[mk.key,md.key]);
  const full=`${mk.name} ${md.name}`;
- const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`],[md.name,`/piese-auto/${mk.slug}/${md.slug}`]];
+ const crumbs=[['AutoParts','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`],[md.name,`/piese-auto/${mk.slug}/${md.slug}`]];
  const extra=r.rows.length?`<h2>Categorii de piese pentru ${escapeHtml(full)}</h2>${seoChips(r.rows.map(x=>{const cs=slugify(x.category),ce=md.cats.get(cs);return [x.category,ce&&ce.n>=SEO_MIN_COMBO?`/piese-auto/${mk.slug}/${md.slug}/${cs}`:`/#/rezultate?make=${encodeURIComponent(mk.name)}&model=${encodeURIComponent(md.name)}&category=${encodeURIComponent(x.category)}`,x.n];}))}`:'';
  return seoListingPage(req,res,{filter:{make:mk.name,model:md.name},path:`/piese-auto/${mk.slug}/${md.slug}`,spa:`/#/rezultate?make=${encodeURIComponent(mk.name)}&model=${encodeURIComponent(md.name)}`,h1:`Piese auto ${full} – second hand și noi`,intro:`Piese pentru ${full}, de la parcuri de dezmembrări, firme și persoane fizice.`,crumbs,extra});
 }));
@@ -2118,7 +2118,7 @@ app.get('/piese-auto/:make/:model/:cat',ah(async(req,res,next)=>{
  const ix=await getSeoIndex(),mk=ix.makeBySlug.get(ms),md=mk&&mk.models.get(ds),ce=md&&md.cats.get(cs);
  if(!ce||ce.n<SEO_MIN_COMBO)return seoNotFound(req,res);
  const full=`${mk.name} ${md.name}`, base=`/piese-auto/${mk.slug}/${md.slug}`;
- const crumbs=[['AutoPiese','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`],[md.name,base],[ce.name,`${base}/${ce.slug}`]];
+ const crumbs=[['AutoParts','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`],[md.name,base],[ce.name,`${base}/${ce.slug}`]];
  const others=topN(md.cats,30).filter(c=>c.slug!==ce.slug&&c.n>=SEO_MIN_COMBO).map(c=>[`${c.name} ${full}`,`${base}/${c.slug}`,c.n]);
  const extra=`<p class="ssr-intro"><a href="${escapeHtml(base)}">Toate piesele pentru ${escapeHtml(full)}</a> · <a href="${escapeHtml('/piese-auto/'+ce.slug)}">${escapeHtml(ce.name)} pentru alte mărci</a></p>${others.length?`<h2>Alte piese pentru ${escapeHtml(full)}</h2>${seoChips(others)}`:''}`;
  return seoListingPage(req,res,{filter:{make:mk.name,model:md.name,category:ce.name},path:`${base}/${ce.slug}`,spa:`/#/rezultate?make=${encodeURIComponent(mk.name)}&model=${encodeURIComponent(md.name)}&category=${encodeURIComponent(ce.name)}`,h1:`${ce.name} ${full} – second hand și noi`,intro:`${ce.name} pentru ${full}, de la parcuri de dezmembrări, firme și persoane fizice.`,crumbs,extra});
@@ -2135,7 +2135,7 @@ app.get('/piese/:idSlug',async(req,res,next)=>{
   const product={'@context':'https://schema.org','@type':'Product',name:x.title,description:x.description||x.title,sku:x.oem||String(x.id),brand:x.make?{'@type':'Brand',name:x.make}:undefined,itemCondition:x.condition==='Nouă'?'https://schema.org/NewCondition':'https://schema.org/UsedCondition',offers:{'@type':'Offer',price:Number(x.price||0),priceCurrency:'RON',availability:x.on_vac?'https://schema.org/OutOfStock':'https://schema.org/InStock',url:canonical}};
   const clean=JSON.stringify(product).replace(/</g,'\\u003c');
   const price=Number(x.price||0)>0?new Intl.NumberFormat('ro-RO').format(Number(x.price))+' lei':'La cerere';
-  res.set('Cache-Control','public, max-age=300').type('html').send(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(x.title)} | AutoPiese</title><meta name="description" content="${escapeHtml((x.description||x.title).slice(0,155))}"><link rel="canonical" href="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css"><script type="application/ld+json">${clean}</script></head><body><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Piese</span></a></div></header><main class="container ssr-page"><p class="crumbs"><a href="/">AutoPiese</a> › ${escapeHtml(x.category||'Piese auto')}</p><h1>${escapeHtml(x.title)}</h1><p class="ssr-meta">${escapeHtml([x.make,x.model,x.year].filter(Boolean).join(' · '))}</p><p class="ssr-price">${price}</p><p>${escapeHtml(x.description||'')}</p><dl class="ssr-dl"><dt>Stare</dt><dd>${escapeHtml(x.condition||'—')}</dd><dt>Cod OEM</dt><dd>${escapeHtml(x.oem||'—')}</dd><dt>Județ</dt><dd>${escapeHtml(x.county||'—')}</dd><dt>Vânzător</dt><dd>${escapeHtml(x.seller_name||'—')}</dd></dl><p><a class="btn primary" href="/#/rezultate">Vezi toate anunțurile</a></p></main></body></html>`);
+  res.set('Cache-Control','public, max-age=300').type('html').send(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(x.title)} | AutoParts</title><meta name="description" content="${escapeHtml((x.description||x.title).slice(0,155))}"><link rel="canonical" href="${escapeHtml(canonical)}"><link rel="stylesheet" href="/style.css"><script type="application/ld+json">${clean}</script></head><body><header class="topbar"><div class="container topbar-in"><a class="logo" href="/"><span class="logo-a">Auto</span><span class="logo-b">Parts</span></a></div></header><main class="container ssr-page"><p class="crumbs"><a href="/">AutoParts</a> › ${escapeHtml(x.category||'Piese auto')}</p><h1>${escapeHtml(x.title)}</h1><p class="ssr-meta">${escapeHtml([x.make,x.model,x.year].filter(Boolean).join(' · '))}</p><p class="ssr-price">${price}</p><p>${escapeHtml(x.description||'')}</p><dl class="ssr-dl"><dt>Stare</dt><dd>${escapeHtml(x.condition||'—')}</dd><dt>Cod OEM</dt><dd>${escapeHtml(x.oem||'—')}</dd><dt>Județ</dt><dd>${escapeHtml(x.county||'—')}</dd><dt>Vânzător</dt><dd>${escapeHtml(x.seller_name||'—')}</dd></dl><p><a class="btn primary" href="/#/rezultate">Vezi toate anunțurile</a></p></main></body></html>`);
  }catch(e){console.error(e);return next();}
 });
 
@@ -2147,7 +2147,7 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
  try{
   if(pool)await dbReady();
   if(pool)await loadRateState();
-  const server=app.listen(PORT,()=>console.log(`AutoPiese V26 running on ${PORT}`));
+  const server=app.listen(PORT,()=>console.log(`AutoParts V26 running on ${PORT}`));
   if(pool){ensureVehicleDb();setInterval(ensureVehicleDb,12*3600*1000).unref();}
   /* anti-adormire: se apeleaza singur pe adresa publica, ca Render sa vada trafic (dezactivare: KEEP_AWAKE=0) */
   const selfUrl=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;

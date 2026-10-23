@@ -1,5 +1,5 @@
 'use strict';
-/* AutoPiese V26 — frontend (fără handlere inline, compatibil cu CSP) */
+/* AutoParts V26 — frontend (fără handlere inline, compatibil cu CSP) */
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
@@ -213,7 +213,7 @@ function route(){
     return;
   }
   showPage(id); setBottomNav(name);
-  if(name==='home'){ $('#topSearchInput').value=''; $('#homeSearchInput').value=''; }
+  if(name==='home'){ $('#topSearchInput').value=''; $('#homeSearchInput').value=''; loadHome(); }
   else if(name==='rezultate') enterResults(params);
   else if(name==='cerere') safe(enterCarPick)();
   else if(name==='cerere-noua') safe(enterRequestForm)(params.get('from'),params.get('edit'));
@@ -326,7 +326,7 @@ function renderAccount(){
 function renderAccountTool(view, withId, refId){
   const data = {
     cart:{title:'Coșul meu',text:'Anunțurile pe care vrei să le ții la îndemână.',action:'rezultate',label:'Vezi piesele'},
-    offers:{title:'Oferte la cereri',text:'Aici vei putea trimite și gestiona ofertele pentru cererile de piese.',action:'requests',label:'Vezi cererile disponibile'},
+    offers:{title:'Răspunsuri la cereri',text:'Aici vei putea trimite și gestiona ofertele pentru cererile de piese.',action:'requests',label:'Vezi cererile disponibile'},
     'orders-seller':{title:'Comenzi primite',text:'Comenzile primite din anunțurile tale și din ofertele acceptate vor apărea aici.',action:null,label:null},
     'offers-received':{title:'Ofertele primite',text:'Ofertele primite la cererile tale vor apărea aici.',action:'requests?t=mine',label:'Vezi cererile mele'},
     orders:{title:'Comenzile mele',text:'Comenzile tale vor apărea aici după ce comanzi o piesă sau după ce o ofertă este acceptată.',action:null,label:null},
@@ -336,7 +336,7 @@ function renderAccountTool(view, withId, refId){
     transactions:{title:'Tranzacții',text:'Comenzile tale, ca cumpărător și ca vânzător.',action:null,label:null},
     invoices:{title:'Facturi',text:'Facturile emise pentru contul tău.',action:null,label:null},
     stats:{title:'Statistici',text:'Statistici pe cont (pe zile și luni) și pe fiecare anunț.',action:null,label:null},
-    'offer-questions':{title:'Întrebări pe oferte',text:'Întrebările cumpărătorilor despre ofertele tale.',action:null,label:null},
+    'offer-questions':{title:'Întrebări de la cumpărători',text:'Întrebările cumpărătorilor despre ofertele tale.',action:null,label:null},
     'bulk-price':{title:'Actualizare prețuri',text:'Modifici dintr-o dată prețurile anunțurilor tale active.',action:null,label:null},
     generator:{title:'Generator de anunțuri',text:'Completezi câteva date și primești titlul și descrierea gata de folosit.',action:null,label:null},
     b2b:{title:'B2B',text:'Instrumente pentru parcuri de dezmembrări, service-uri și magazine cu stoc mare.',action:null,label:null},
@@ -1007,7 +1007,8 @@ function adRowHtml(x){
     ...(isDism && x.parts_avail ? String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).slice(0,3).map(t=>`<span class="lchip">${esc(t)}</span>`) : [])
   ].join('');
   const sType = SELLER_SHORT[x.seller_type] || '';
-  const sub = [`📍 ${esc(x.county||'România')}`, esc(fmtUpdated(x.created_at)), x.seller_name ? esc(x.seller_name)+(sType?' ('+esc(sType)+')':'') : ''].filter(Boolean).join(' · ');
+  const dtRaw = fmtUpdated(x.created_at).replace(/^Actualizat /,'');
+  const sub = [`<span class="ar-loc">📍 ${esc(x.county||'România')}</span>`, dtRaw ? `<span class="ar-dt"><span class="dt-pre">Actualizat </span>${esc(dtRaw)}</span>` : '', x.seller_name ? `<span class="ar-sl">${esc(x.seller_name)+(sType?' ('+esc(sType)+')':'')}</span>` : ''].filter(Boolean).join('');
   const hasPrice = Number(x.price)>0;
   return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}">
     <div class="ar-thumb">${thumb}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
@@ -1019,6 +1020,20 @@ function adRowHtml(x){
     </div>
     <div class="ar-acts"><button type="button" class="ar-btn ar-fav${fav?' on':''}" data-fav="${x.id}" title="Favorite" aria-label="Favorite">${fav?'♥':'♡'}</button></div>
     <div class="ar-foot"><span class="ar-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${esc(money(x.price))}${hasPrice&&x.negotiable?'<small>negociabil</small>':''}</span></div></article>`;
+}
+
+/* Anunțuri noi pe pagina de start */
+async function loadHome(){
+  const box=$('#homeFeed'), wrap=$('#homeFeedWrap'); if(!box||!wrap) return;
+  if(!box.dataset.loaded){ wrap.classList.remove('hidden'); box.innerHTML=SKEL; }
+  try{
+    const r=await api('/api/listings?limit=12&offset=0');
+    const list=(r&&r.listings)||[];
+    if(!list.length){ wrap.classList.add('hidden'); box.innerHTML=''; return; }
+    wrap.classList.remove('hidden');
+    box.innerHTML=list.map(x=>card(x)).join(''); box.dataset.loaded='1';
+    updateFavUI();
+  }catch(e){ if(!box.dataset.loaded){ wrap.classList.add('hidden'); box.innerHTML=''; } }
 }
 function card(x, o={}){
   if(o.mine) return cardMine(x);
@@ -1329,7 +1344,7 @@ function detailHtml(x, phones, canContact){
     </div>
     <div class="ad-card">
       <div class="seller-head">${avatarSpan(x.user_id,x.seller_name||'V','seller-avatar')}<div><b>${x.user_id?`<button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">${seller}</button>`:seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small><div class="rate-line">${ratingLine({avg:x.seller_rating_avg,count:x.seller_rating_n},x.user_id,'seller')}</div></div></div>
-      ${x.seller_ads?`<p class="seller-stats">${adsLabel(x.seller_ads)} active${x.seller_since?` · pe AutoPiese din ${new Date(x.seller_since).getFullYear()}`:''}${x.user_id?` · <button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">Vezi toate</button>`:''}</p>`:''}
+      ${x.seller_ads?`<p class="seller-stats">${adsLabel(x.seller_ads)} active${x.seller_since?` · pe AutoParts din ${new Date(x.seller_since).getFullYear()}`:''}${x.user_id?` · <button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">Vezi toate</button>`:''}</p>`:''}
       ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
     <div class="contact-row">
@@ -1381,7 +1396,7 @@ async function sendReport(id){
 }
 async function copyLink(id){
   const x = $('#detailContent h2'); const url = `${location.origin}/piese/${id}-${slug(x?x.textContent:'')}`;
-  const ttl = x ? x.textContent : 'Anunț AutoPiese';
+  const ttl = x ? x.textContent : 'Anunț AutoParts';
   if(navigator.share){ try{ await navigator.share({title:ttl,url}); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
   try{ await navigator.clipboard.writeText(url); toast('Linkul a fost copiat.'); }catch{ toast(url); }
 }
@@ -2159,7 +2174,7 @@ async function exportMyData(){
     const r=await fetch('/api/account/export',{credentials:'same-origin'});
     if(!r.ok){ let m='Nu am putut genera exportul.'; try{ const d=await r.json(); if(d&&d.error&&ERR[d.error]) m=ERR[d.error]; }catch{} throw new Error(m); }
     const url=URL.createObjectURL(await r.blob()), a=document.createElement('a');
-    a.href=url; a.download='autopiese-datele-mele.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+    a.href=url; a.download='autoparts-datele-mele.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
     setMsg(msg,'Fișierul a fost descărcat.','ok');
   }catch(err){ setMsg(msg,err.message,'error'); }
   btn.disabled=false;
