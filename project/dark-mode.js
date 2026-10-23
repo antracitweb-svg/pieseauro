@@ -1,0 +1,20 @@
+const darkBtn=document.createElement('button');
+darkBtn.id='darkModeBtn';
+darkBtn.textContent='🌙';
+darkBtn.title='Toggle dark mode';
+darkBtn.style.position='fixed';
+darkBtn.style.bottom='20px';
+darkBtn.style.right='20px';
+darkBtn.style.zIndex='1000';
+darkBtn.style.padding='8px';
+darkBtn.style.borderRadius='50%';
+darkBtn.style.backgroundColor='rgba(0,0,0,0.5)';
+darkBtn.style.color='white';
+darkBtn.style.border='none';
+darkBtn.style.cursor='pointer';
+darkBtn.addEventListener('click',()=>{
+  document.body.classList.toggle('dark');
+  localStorage.setItem('dark',document.body.classList.contains('dark')?'on':'off');
+});
+document.body.appendChild(darkBtn);
+if(localStorage.getItem('dark')==='on') document.body.classList.add('dark');
