@@ -404,9 +404,6 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS login_attempts_key_idx ON login_attempts(key,at)',
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_reason TEXT',
-  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS buyer_seen_status TEXT',
-  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS awb TEXT',
-  'ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_note TEXT',
   'CREATE TABLE IF NOT EXISTS rate_state (map TEXT NOT NULL, key TEXT NOT NULL, data TEXT NOT NULL, exp BIGINT NOT NULL, PRIMARY KEY(map,key))',
   'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS kind TEXT',
   'CREATE TABLE IF NOT EXISTS seller_ratings (id SERIAL PRIMARY KEY, order_id INTEGER UNIQUE REFERENCES orders(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, stars SMALLINT NOT NULL CHECK(stars BETWEEN 1 AND 5), comment TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ)',
@@ -1673,9 +1670,7 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  res.status(201).json({ok:true,order_id:r.rows[0].id});
 }));
 app.get('/api/orders',auth,requireDb,ah(async(req,res)=>{
- // Cumpărătorul a deschis „Comenzile mele”: marcăm starea curentă ca văzută (insigna dispare până la următoarea schimbare de status).
- if(req.query.seen==='buyer')await pool.query('UPDATE orders SET buyer_seen_status=status WHERE buyer_id=$1 AND buyer_seen_status IS DISTINCT FROM status',[req.user.id]);
- const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.recipient_name,o.recipient_phone,o.status_reason,o.awb,CASE WHEN o.seller_id=$1 THEN o.seller_note END seller_note,(COALESCE(array_length(l.images,1),0)>0) has_thumb,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) other_has_avatar,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id LEFT JOIN listings l ON l.id=o.listing_id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
+ const r=await pool.query("SELECT o.id,o.title,o.price,o.status,o.created_at,o.quantity,o.listing_id,o.ship_county,o.ship_city,o.ship_address,o.note,o.recipient_name,o.recipient_phone,o.status_reason,CASE WHEN o.buyer_id=$1 THEN 'buyer' ELSE 'seller' END role,CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END other_id,COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) other_name,NULLIF(u.bill_company,'') other_company,u.name other_person,(u.store_logo IS NOT NULL) other_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) other_has_avatar,CASE WHEN o.buyer_id=$1 THEN sr.stars ELSE br.stars END given_stars,CASE WHEN o.buyer_id=$1 THEN sr.comment ELSE br.comment END given_comment,CASE WHEN o.buyer_id=$1 THEN br.stars ELSE sr.stars END got_stars,CASE WHEN o.buyer_id=$1 THEN br.comment ELSE sr.comment END got_comment,CASE WHEN o.buyer_id=$1 THEN (SELECT ROUND(AVG(stars),1)::float FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT ROUND(AVG(stars),1)::float FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_avg,CASE WHEN o.buyer_id=$1 THEN (SELECT COUNT(*)::int FROM seller_ratings WHERE seller_id=o.seller_id) ELSE (SELECT COUNT(*)::int FROM buyer_ratings WHERE buyer_id=o.buyer_id) END other_rating_n FROM orders o LEFT JOIN users u ON u.id=(CASE WHEN o.buyer_id=$1 THEN o.seller_id ELSE o.buyer_id END) LEFT JOIN seller_ratings sr ON sr.order_id=o.id LEFT JOIN buyer_ratings br ON br.order_id=o.id WHERE o.buyer_id=$1 OR o.seller_id=$1 ORDER BY o.created_at DESC LIMIT 200",[req.user.id]);
  const ids=[...new Set(r.rows.map(x=>x.other_id).filter(Boolean))];
  const ph=ids.length?(await pool.query('SELECT user_id,phone,is_whatsapp FROM user_phones WHERE user_id=ANY($1::int[]) ORDER BY id',[ids])).rows:[];
  res.json({orders:r.rows.map(x=>({...x,phones:ph.filter(p=>p.user_id===x.other_id).map(p=>({phone:p.phone,is_whatsapp:p.is_whatsapp}))}))});
@@ -1711,43 +1706,6 @@ app.patch('/api/orders/:id/status',auth,requireDb,ah(async(req,res)=>{
  await notify(seller?o.buyer_id:o.seller_id,'Comanda pentru „'+(o.title||'piesă')+'” a fost '+L[to]+(seller?' de vânzător':'')+'.'+(reason&&['suspended','cancelled','completed'].includes(to)?' Mesaj: '+reason:''),'order');
  res.json({ok:true,status:to});
 }));
-app.get('/api/orders/:id(\\d+)/thumb',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query('SELECT l.images[1] img FROM orders o JOIN listings l ON l.id=o.listing_id WHERE o.id=$1 AND (o.buyer_id=$2 OR o.seller_id=$2)',[req.params.id,req.user.id]);
- const img=r.rows[0]&&r.rows[0].img;
- if(!img)return res.status(404).end();
- const m=/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+\/=]+)$/.exec(img);
- res.set('Cache-Control','private, max-age=3600');
- if(m){res.type('image/'+m[1]);return res.send(Buffer.from(m[2],'base64'));}
- if(/^https?:\/\//.test(img))return res.redirect(302,img);
- res.status(404).end();
-}));
-app.get('/api/orders/:id(\\d+)/listing',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query(`SELECT l.*,${SELLER_COLS},u.show_phone seller_show_phone,${VAC_SQL('u')} seller_vacation,CASE WHEN ${VAC_SQL('u')} THEN u.vacation_until::text END seller_vacation_until FROM orders o JOIN listings l ON l.id=o.listing_id LEFT JOIN users u ON u.id=l.user_id WHERE o.id=$1 AND (o.buyer_id=$2 OR o.seller_id=$2)`,[req.params.id,req.user.id]);
- if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
- const x=r.rows[0]; let phones=[];
- if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id LIMIT 4',[x.user_id])).rows;
- delete x.seller_show_phone;
- res.json({listing:x,phones});
-}));
-app.patch('/api/orders/:id(\\d+)/details',auth,requireDb,ah(async(req,res)=>{
- const o=(await pool.query('SELECT id,buyer_id,seller_id,title,awb FROM orders WHERE id=$1 AND seller_id=$2',[req.params.id,req.user.id])).rows[0];
- if(!o)return res.status(404).json({error:'NOT_FOUND'});
- const b=req.body||{}, sets=[], vals=[o.id];
- let newAwb=null;
- if(Object.prototype.hasOwnProperty.call(b,'awb')){
-  const awb=(clip(b.awb,40)||'').replace(/\s+/g,'');
-  if(awb&&!/^[A-Za-z0-9._-]{3,40}$/.test(awb))return res.status(400).json({error:'AWB_INVALID'});
-  vals.push(awb||null);sets.push('awb=$'+vals.length);
-  if(awb&&awb!==o.awb)newAwb=awb;
- }
- if(Object.prototype.hasOwnProperty.call(b,'seller_note')){
-  vals.push(clip(b.seller_note,1000)||null);sets.push('seller_note=$'+vals.length);
- }
- if(!sets.length)return res.status(400).json({error:'NIMIC_DE_SALVAT'});
- await pool.query('UPDATE orders SET '+sets.join(',')+' WHERE id=$1',vals);
- if(newAwb&&o.buyer_id)await notify(o.buyer_id,'Comanda pentru „'+(o.title||'piesă')+'” are AWB: '+newAwb+'.','order');
- res.json({ok:true});
-}));
 app.get('/api/notifications',auth,requireDb,ah(async(req,res)=>{
  const r=await pool.query('SELECT id,text,is_read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.id]);
  res.json({notifications:r.rows});
@@ -1781,12 +1739,10 @@ app.put('/api/orders/:id(\\d+)/rating',auth,requireDb,ah(async(req,res)=>{
 // Public: media și ultimele calificative ale unui utilizator, separat ca vânzător și ca cumpărător.
 app.get('/api/sellers/:id(\\d+)/ratings',requireDb,ah(async(req,res)=>{
  const id=Number(req.params.id);
- const lim=req.query.all==='1'?200:20;
  const pack=async(tbl,rated,rater)=>{
   const sum=(await pool.query(`SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM ${tbl} WHERE ${rated}=$1`,[id])).rows[0];
-  const list=(await pool.query(`SELECT r.stars,r.comment,r.created_at,COALESCE(NULLIF(u.nickname,''),split_part(u.name,' ',1),'Utilizator') who FROM ${tbl} r LEFT JOIN users u ON u.id=r.${rater} WHERE r.${rated}=$1 ORDER BY r.created_at DESC LIMIT ${lim}`,[id])).rows;
-  const dist={};(await pool.query(`SELECT stars,COUNT(*)::int n FROM ${tbl} WHERE ${rated}=$1 GROUP BY stars`,[id])).rows.forEach(x=>{dist[x.stars]=x.n;});
-  return {avg:sum.avg,count:sum.n,ratings:list,dist};
+  const list=(await pool.query(`SELECT r.stars,r.comment,r.created_at,COALESCE(NULLIF(u.nickname,''),split_part(u.name,' ',1),'Utilizator') who FROM ${tbl} r LEFT JOIN users u ON u.id=r.${rater} WHERE r.${rated}=$1 ORDER BY r.created_at DESC LIMIT 20`,[id])).rows;
+  return {avg:sum.avg,count:sum.n,ratings:list};
  };
  res.set('Cache-Control','no-store');
  res.json({seller:await pack('seller_ratings','seller_id','buyer_id'),buyer:await pack('buyer_ratings','buyer_id','seller_id')});
@@ -1883,7 +1839,7 @@ app.get('/api/counts',auth,requireDb,ah(async(req,res)=>{
  const r=(await pool.query(`SELECT
   (SELECT COUNT(*)::int FROM messages m WHERE m.recipient_id=$1 AND NOT m.arch_r AND NOT m.is_read AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=m.sender_id)) AS messages,
   (SELECT COUNT(*)::int FROM orders WHERE seller_id=$1 AND status='new') AS orders_seller,
-  (SELECT COUNT(*)::int FROM orders WHERE buyer_id=$1 AND status IN ('confirmed','shipped') AND buyer_seen_status IS DISTINCT FROM status) AS orders_buyer,
+  (SELECT COUNT(*)::int FROM orders WHERE buyer_id=$1 AND status IN ('confirmed','shipped')) AS orders_buyer,
   (SELECT COUNT(*)::int FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE q.user_id=$1 AND q.status='open' AND o.status='pending') AS offers_received,
   (SELECT COUNT(*)::int FROM notifications WHERE user_id=$1 AND NOT is_read AND kind='alert') AS alerts,
   (SELECT COUNT(*)::int FROM listings WHERE user_id=$1 AND status='approved' AND created_at < NOW() - INTERVAL '30 days') AS expire`,[req.user.id])).rows[0];
