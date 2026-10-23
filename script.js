@@ -1007,7 +1007,7 @@ function adRowHtml(x){
     ...(isDism && x.parts_avail ? String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).slice(0,3).map(t=>`<span class="lchip">${esc(t)}</span>`) : [])
   ].join('');
   const sType = SELLER_SHORT[x.seller_type] || '';
-  const dtRaw = fmtUpdated(x.created_at).replace(/^Actualizat /,'');
+  const dtRaw = fmtUpdated(x.created_at).replace(/^Actualizat /,'').replace(/^la /,'');
   const sub = [`<span class="ar-loc">📍 ${esc(x.county||'România')}</span>`, dtRaw ? `<span class="ar-dt"><span class="dt-pre">Actualizat </span>${esc(dtRaw)}</span>` : '', x.seller_name ? `<span class="ar-sl">${esc(x.seller_name)+(sType?' ('+esc(sType)+')':'')}</span>` : ''].filter(Boolean).join('');
   const hasPrice = Number(x.price)>0;
   return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}">

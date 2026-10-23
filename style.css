@@ -2911,3 +2911,23 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 #page-account .account-sections button[data-account="settings"]::before{content:"⚙️"}
 #page-account .account-sections button[data-csv-import]::before{content:"📄"}
 @media(min-width:900px){#page-account .account-sections{display:block!important}#page-account .account-sections details{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* v5b: plăcuțe pe 2 coloane fără grid pe <details> (nesigur în browsere) */
+#page-account .account-sections details{display:block!important}
+#page-account .account-sections summary{display:block!important;margin:0 0 10px!important}
+#page-account .account-sections details>button{display:inline-flex!important;vertical-align:top;width:calc(50% - 5px)!important;margin:0 10px 10px 0!important}
+#page-account .account-sections details>button:nth-of-type(even){margin-right:0!important}
+@media(min-width:900px){
+ #page-account .account-sections details>button{width:calc(25% - 7.5px)!important;margin:0 10px 10px 0!important}
+ #page-account .account-sections details>button:nth-of-type(4n){margin-right:0!important}
+}
+
+/* v3b: prețul în stânga, ca la OLX */
+#listingGrid .ar-foot,
+#homeFeed .ar-foot,
+.similar-grid .ar-foot{text-align:left!important}
+#listingGrid .ar-foot .ar-price,
+#homeFeed .ar-foot .ar-price,
+.similar-grid .ar-foot .ar-price{text-align:left!important;justify-self:start!important;margin:0!important;width:100%;font-family:var(--font-sans,inherit)!important;font-size:19px!important;font-weight:800!important}
+#listingGrid .ar-foot .ar-price small,
+#homeFeed .ar-foot .ar-price small,
+.similar-grid .ar-foot .ar-price small{display:block;font-size:11px!important;font-weight:500!important;margin-top:1px}
