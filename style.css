@@ -3027,45 +3027,49 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   padding:7px 10px!important;
 }
 
-/* v8: pagina de cont (mobil) — butoane mai înguste cu 3 mm, bare VÂND/CUMPĂR/... egale cu un buton, iconițe în culorile site-ului */
+/* v8: pagina de cont (mobil) — butoanele mici simetrice, la 3 mm de margini; barele principale pe toată lățimea */
 @media(max-width:899px){
-  #page-account .account-sections details>button{width:calc(50% - 5px - 1.5mm)!important}
-  #page-account .account-sections details>button:nth-of-type(odd){margin-right:10px!important}
-  #page-account .account-sections details>button:nth-of-type(even){margin-right:0!important}
-  #page-account .account-sections summary{width:calc(50% - 5px - 1.5mm)!important}
+  #page-account .account-sections details>button{width:calc(50% - 5px - 3mm)!important}
+  #page-account .account-sections details>button:nth-of-type(odd){margin-left:3mm!important;margin-right:10px!important}
+  #page-account .account-sections details>button:nth-of-type(even){margin-left:0!important;margin-right:0!important}
+  #page-account .account-sections summary{width:100%!important}
 }
 
 /* v10: butonul "Ieșire din cont" mai jos, departe de butoanele de meniu, ca să nu fie apăsat din greșeală */
 #page-account #logoutBtn{margin-top:90px!important;margin-bottom:110px!important}
 
-/* v11: pagina de cont în stilul real al site-ului: graphit + auriu (ca antetul și butonul "Publică anunțul"), crem pentru butoanele secundare */
+/* v11: pagina de cont luminoasă, ca restul paginilor (fundal crem, carduri albe, butoane crem cu auriu) */
 #page-account .acc-user{
-  background:linear-gradient(180deg,#34302a 0%,#1b1914 52%,#0e0f12 100%)!important;
-  border:1px solid #070708!important;border-bottom:4px solid #b8935a!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 4px 0 #6e5428,0 12px 22px rgba(10,8,4,.3)!important;
+  background:#fffefb!important;border:1px solid #e8e2d6!important;border-bottom:3px solid #b8935a!important;
+  box-shadow:0 1px 2px rgba(40,30,10,.05),0 4px 14px rgba(40,30,10,.05)!important;
 }
-#page-account .acc-user::before{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0))}
-#page-account .acc-user::after{background:radial-gradient(circle,rgba(233,211,168,.2),rgba(233,211,168,0) 70%)}
-#page-account .acc-user b#accountHello{background:linear-gradient(180deg,#fff 20%,#e9d3a8)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
-#page-account .acc-user small{color:rgba(233,211,168,.85)!important}
-#page-account .acc-user small b{color:#fff!important}
-#page-account .acc-user #accountHello+small{color:#e9d3a8!important;border:1px solid rgba(233,211,168,.55)!important;background:rgba(184,147,90,.16)!important}
-#page-account .acc-user .text-btn{color:#e9d3a8!important}
+#page-account .acc-user::before,#page-account .acc-user::after{display:none!important}
+#page-account .acc-user b#accountHello{background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;color:#17181b!important}
+#page-account .acc-user small{color:#77746c!important}
+#page-account .acc-user small b{color:#17181b!important}
+#page-account .acc-user #accountHello+small{color:#7a5a28!important;border:1px solid #d8c9aa!important;background:#f6eedb!important}
+#page-account .acc-user .text-btn{color:#7a5a28!important}
 #page-account .acc-notif{
-  background:linear-gradient(180deg,#f3dfae,#b8935a)!important;color:#2a1f0a!important;border:1px solid #e9d3a8!important;
-  box-shadow:0 3px 0 #6e5428,0 8px 14px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.7)!important;
+  background:linear-gradient(180deg,#fffdf8,#f6eedb)!important;color:#7a5a28!important;border:1px solid #d8c9aa!important;
+  box-shadow:inset 0 1px 0 #fff,0 2px 0 #e0d2b2,0 6px 12px rgba(40,30,10,.07)!important;
 }
-#page-account .acc-notif:active{box-shadow:0 0 0 #6e5428,0 3px 6px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.5)!important}
-/* barele de secțiune = stilul butonului principal al site-ului */
+#page-account .acc-notif:active{box-shadow:inset 0 1px 0 #fff,0 0 0 #e0d2b2,0 2px 4px rgba(40,30,10,.07)!important}
+/* barele de secțiune: crem cu auriu, ca butoanele secundare ale site-ului */
 #page-account .account-sections summary{
-  background:linear-gradient(180deg,#34302a 0%,#1b1914 52%,#0e0f12 100%)!important;
-  border:1px solid #070708!important;color:#e9d3a8!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 #050506,0 4px 8px rgba(10,8,4,.25)!important;
+  background:linear-gradient(180deg,#fffdf8,#f6eedb)!important;border:1px solid #d8c9aa!important;color:#5a431c!important;
+  box-shadow:inset 0 1px 0 #fff,0 2px 0 #e0d2b2,0 6px 12px rgba(40,30,10,.07)!important;
 }
 #page-account .account-sections summary .acc-ico{background:linear-gradient(180deg,#f3dfae,#b8935a)!important;color:#2a1f0a!important}
-#page-account .account-sections summary .acc-caret{color:#e9d3a8!important}
-/* butoanele de dedesubt = stilul butonului secundar al site-ului */
+#page-account .account-sections summary .acc-caret{color:#8f6d38!important}
+/* butoanele mici: carduri albe cu margine fină */
 #page-account .account-sections details>button{
-  background:linear-gradient(180deg,#fffdf8,#f6eedb)!important;border:1px solid #d8c9aa!important;color:#7a5a28!important;
-  box-shadow:inset 0 1px 0 #fff,0 3px 0 #d8c9aa,0 8px 12px rgba(60,45,20,.12)!important;
+  background:#fffefb!important;border:1px solid #e8e2d6!important;color:#3a352a!important;
+  box-shadow:0 1px 2px rgba(40,30,10,.05),0 4px 14px rgba(40,30,10,.06)!important;
 }
+#page-account .account-sections details>button:active{box-shadow:0 1px 2px rgba(40,30,10,.05)!important}
+
+/* v12: calificativele în cardul de cont, sub "Credite în cont" (pe rânduri scurte) */
+#page-account .acc-user .acc-rating{display:block}
+#page-account .acc-user .acc-rating .text-btn{display:block;padding:0;text-align:left;font-size:13px;font-weight:700;line-height:1.35;color:#7a5a28!important;white-space:nowrap}
+#page-account .acc-user .acc-rating .acc-rate-row{display:block}
+#page-account .acc-user .acc-rating .stars{font-size:13px}

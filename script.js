@@ -312,9 +312,20 @@ function syncBillType(){
   const t=(document.querySelector('input[name="billType"]:checked')||{}).value;
   $('#billPfBox').classList.toggle('hidden',t==='pj'); $('#billPjBox').classList.toggle('hidden',t!=='pj');
 }
+function renderAccountRatings(){
+  const el=$('#accRating'); if(!el||!currentUser) return;
+  el.innerHTML='';
+  api('/api/sellers/'+currentUser.id+'/ratings').then(r=>{
+    if(!currentUser||!el.isConnected) return;
+    const part=(label,p)=>p&&p.count?`<span class="acc-rate-row">${label} ${starsHtml(p.avg)} <b>${esc(String(p.avg).replace('.',','))}</b> (${p.count})</span>`:'';
+    const parts=[part('Vânzător',r.seller),part('Cumpărător',r.buyer)].filter(Boolean);
+    el.innerHTML=parts.length?parts.join(''):'<span class="acc-rate-row">Calificative: încă niciunul</span>';
+  }).catch(()=>{});
+}
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
   renderAccountAvatar();
+  renderAccountRatings();
   api('/api/account/settings').then(r=>{ if(currentUser&&r.user){ currentUser.has_avatar=!!r.user.has_avatar; renderAccountAvatar(); } }).catch(()=>{});
   renderHeader();
   /* pe telefon pornește cu o singură secțiune deschisă */
