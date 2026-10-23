@@ -2678,3 +2678,11 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .mdrawer .mi-green{color:#a6cdb2}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.mdrawer{background:linear-gradient(165deg,#44484c,#323538)}}
 @media (prefers-reduced-transparency:reduce){.mdrawer{background:linear-gradient(165deg,#44484c,#323538);-webkit-backdrop-filter:none;backdrop-filter:none}}
+
+/* Meniu: ridicat ~2mm față de marginea de jos + poză profil la „Contul meu” */
+.mdrawer{bottom:calc(8px + env(safe-area-inset-bottom,0px));padding-bottom:0}
+.mdrawer-body{padding-bottom:20px}
+.mdrawer .mi-user{position:relative;overflow:hidden;padding:0}
+.mdrawer .mi-user i{font-style:normal}
+.mdrawer .mi-user img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.mdrawer .mi-user.has-photo i{visibility:hidden}

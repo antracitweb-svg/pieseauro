@@ -240,7 +240,7 @@
 <div class="info-pop hidden" id="infoPop" role="status"></div>
 
 <div class="mdrawer-scrim" id="menuScrim" aria-hidden="true"></div>
-<aside class="mdrawer" id="menuDrawer" role="dialog" aria-modal="true" aria-label="Meniu" aria-hidden="true" inert><div class="mdrawer-head"><span class="mdrawer-title">Meniu</span><button class="close-menu" id="closeMenu" type="button" aria-label="Închide meniul">×</button></div><div class="mdrawer-body"><div class="menu-card"><button data-action="account"><span class="mi mi-user">👤</span><div><b>Contul meu <em class="cnt" data-cnt="total"></em></b><small id="menuAccountText">Intră în cont</small></div><i>›</i></button></div><div class="menu-card"><button data-action="request"><span class="mi mi-orange">✎</span><div><b>Primește oferte piese</b></div><i>›</i></button><button data-action="sell"><span class="mi mi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="5.8" r=".5"/><circle cx="12" cy="18.2" r=".5"/><circle cx="5.8" cy="12" r=".5"/><circle cx="18.2" cy="12" r=".5"/></svg></span><div><b>Adaugă o piesă</b></div><i>›</i></button><button data-action="sell-dism"><span class="mi mi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16H3.5v-4L5.5 7h13l2 5v4H19"/><path d="M3.5 12h17"/><circle cx="7.5" cy="16.5" r="2"/><circle cx="16.5" cy="16.5" r="2"/></svg></span><div><b>Adaugă o mașină la dezmembrat</b></div><i>›</i></button></div><div class="menu-card"><button data-action="requests"><div><b>Piese căutate de cumpărători</b></div><i>›</i></button><button data-action="parks"><div><b>Parcuri partenere</b></div><i>›</i></button><button data-action="stores"><div><b>Magazine și vânzători</b></div><i>›</i></button><button data-action="dism"><div><b>Dezmembrări auto</b></div><i>›</i></button><button data-action="services"><div><b>Ateliere și montaj</b></div><i>›</i></button><button data-action="match"><div><b>Verifică dacă se potrivește</b></div><i>›</i></button></div><div class="menu-card admin-menu hidden" id="adminMenu"><button data-action="admin"><span class="mi mi-blue">⚙</span><div><b>Administrare</b><small>Dashboard și moderare</small></div><i>›</i></button></div></div></aside>
+<aside class="mdrawer" id="menuDrawer" role="dialog" aria-modal="true" aria-label="Meniu" aria-hidden="true" inert><div class="mdrawer-head"><span class="mdrawer-title">Meniu</span><button class="close-menu" id="closeMenu" type="button" aria-label="Închide meniul">×</button></div><div class="mdrawer-body"><div class="menu-card"><button data-action="account"><span class="mi mi-user" id="menuAvatar"><i>👤</i></span><div><b>Contul meu <em class="cnt" data-cnt="total"></em></b><small id="menuAccountText">Intră în cont</small></div><i>›</i></button></div><div class="menu-card"><button data-action="request"><span class="mi mi-orange">✎</span><div><b>Primește oferte piese</b></div><i>›</i></button><button data-action="sell"><span class="mi mi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="5.8" r=".5"/><circle cx="12" cy="18.2" r=".5"/><circle cx="5.8" cy="12" r=".5"/><circle cx="18.2" cy="12" r=".5"/></svg></span><div><b>Adaugă o piesă</b></div><i>›</i></button><button data-action="sell-dism"><span class="mi mi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16H3.5v-4L5.5 7h13l2 5v4H19"/><path d="M3.5 12h17"/><circle cx="7.5" cy="16.5" r="2"/><circle cx="16.5" cy="16.5" r="2"/></svg></span><div><b>Adaugă o mașină la dezmembrat</b></div><i>›</i></button></div><div class="menu-card"><button data-action="requests"><div><b>Piese căutate de cumpărători</b></div><i>›</i></button><button data-action="parks"><div><b>Parcuri partenere</b></div><i>›</i></button><button data-action="stores"><div><b>Magazine și vânzători</b></div><i>›</i></button><button data-action="dism"><div><b>Dezmembrări auto</b></div><i>›</i></button><button data-action="services"><div><b>Ateliere și montaj</b></div><i>›</i></button><button data-action="match"><div><b>Verifică dacă se potrivește</b></div><i>›</i></button></div><div class="menu-card admin-menu hidden" id="adminMenu"><button data-action="admin"><span class="mi mi-blue">⚙</span><div><b>Administrare</b><small>Dashboard și moderare</small></div><i>›</i></button></div></div></aside>
 <nav class="bottom-nav" id="bottomNav" aria-label="Navigare principală">
 <button type="button" data-go="home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Acasă</span></button>
 <button type="button" data-go="rezultate" data-tab="rezultate"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.6 15.6L21 21"/></svg><span>Caută</span></button>
@@ -270,4 +270,24 @@
   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
 </div>
 <script src="script.js?v=prestige2027e" defer></script>
+<script>
+(function(){
+  var btn=document.getElementById('avatarBtn'),box=document.getElementById('menuAvatar');
+  if(!btn||!box)return;
+  function sync(){
+    var src=btn.querySelector('img'); src=src&&src.getAttribute('src');
+    var cur=box.querySelector('img');
+    if(src){
+      if(!cur){cur=document.createElement('img');cur.alt='';box.appendChild(cur);}
+      if(cur.getAttribute('src')!==src)cur.setAttribute('src',src);
+      box.classList.add('has-photo');
+    }else{
+      if(cur)cur.remove();
+      box.classList.remove('has-photo');
+    }
+  }
+  new MutationObserver(sync).observe(btn,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+  sync();
+})();
+</script>
 </body></html>
