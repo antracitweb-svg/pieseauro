@@ -2871,3 +2871,43 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 #page-home .home-links{margin-top:8px}
 #page-home .home-feed{margin-top:18px}
 @media(max-width:800px){#page-home .home-wrap{padding:12px 0 30px!important}#page-home .home-feed{margin-top:14px}}
+
+/* ===== v5: Contul meu ca panou cu plăcuțe (nu acordeoane) ===== */
+#page-account .container{padding-bottom:120px}
+#page-account .acc-user{background:linear-gradient(135deg,var(--navy),var(--navy2))!important;color:#fff;border:0!important;border-radius:18px!important;padding:18px!important;gap:14px!important;box-shadow:0 12px 30px rgba(7,20,37,.25)!important;align-items:center}
+#page-account .acc-user b#accountHello{color:#fff;font-size:20px!important}
+#page-account .acc-user small{color:rgba(255,255,255,.72)}
+#page-account .acc-user small b{color:#fff}
+#page-account .acc-user .text-btn{color:#e8d3a8;padding:2px 0;text-align:left;font-size:12px}
+#page-account .acc-notif{background:rgba(255,255,255,.12)!important;color:#fff!important;border:1px solid rgba(255,255,255,.3)!important;border-radius:999px;margin-left:auto}
+#page-account .account-sections details{background:transparent!important;border:0!important;box-shadow:none!important;overflow:visible!important;margin:18px 0 0!important;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+#page-account .account-sections summary{grid-column:1/-1;pointer-events:none;padding:0 2px!important;font-size:12px!important;letter-spacing:1.6px;color:var(--muted)!important;background:none;cursor:default}
+#page-account .account-sections summary .acc-ico,#page-account .account-sections summary .acc-caret{display:none!important}
+#page-account .account-sections summary .sec-cnt{display:none}
+#page-account .account-sections details>button{position:relative;display:flex!important;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:10px;min-height:84px;padding:14px!important;background:#fff!important;border:1px solid var(--line)!important;border-radius:14px;font-size:14px;font-weight:700;line-height:1.25;text-align:left;box-shadow:0 2px 8px rgba(16,52,94,.05)}
+#page-account .account-sections details>button:hover{box-shadow:0 8px 20px rgba(16,52,94,.12)}
+#page-account .account-sections details>button>i{display:none!important}
+#page-account .account-sections details>button::before{font-size:22px;line-height:1;font-style:normal;content:"•"}
+#page-account .account-sections details>button .cnt{position:absolute;top:10px;right:10px;margin:0}
+#page-account .account-sections button[data-account="listings"]::before{content:"📦"}
+#page-account .account-sections button[data-account="offers"]::before{content:"💬"}
+#page-account .account-sections button[data-account="orders-seller"]::before{content:"🧾"}
+#page-account .account-sections button[data-account="offer-questions"]::before{content:"❓"}
+#page-account .account-sections button[data-account="requests"]::before{content:"📝"}
+#page-account .account-sections button[data-account="offers-received"]::before{content:"📥"}
+#page-account .account-sections button[data-account="favorites"]::before{content:"♥"}
+#page-account .account-sections button[data-account="orders"]::before{content:"🛒"}
+#page-account .account-sections button[data-account="saved"]::before{content:"🔖"}
+#page-account .account-sections button[data-account="messages"]::before{content:"✉️"}
+#page-account .account-sections button[data-account="notifications"]::before{content:"🔔"}
+#page-account .account-sections button[data-account="bulk-price"]::before{content:"🏷️"}
+#page-account .account-sections button[data-account="generator"]::before{content:"✨"}
+#page-account .account-sections button[data-account="stats"]::before{content:"📊"}
+#page-account .account-sections button[data-account="b2b"]::before{content:"🤝"}
+#page-account .account-sections button[data-account="credits"]::before{content:"🪙"}
+#page-account .account-sections button[data-account="transactions"]::before{content:"💳"}
+#page-account .account-sections button[data-account="invoices"]::before{content:"🧾"}
+#page-account .account-sections button[data-account="ratings"]::before{content:"⭐"}
+#page-account .account-sections button[data-account="settings"]::before{content:"⚙️"}
+#page-account .account-sections button[data-csv-import]::before{content:"📄"}
+@media(min-width:900px){#page-account .account-sections{display:block!important}#page-account .account-sections details{grid-template-columns:repeat(4,minmax(0,1fr))}}
