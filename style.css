@@ -2686,3 +2686,48 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .mdrawer .mi-user i{font-style:normal}
 .mdrawer .mi-user img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
 .mdrawer .mi-user.has-photo i{visibility:hidden}
+
+/* =====================================================================
+   CULOARE UNITARĂ #232429 (identică cu bara telefonului):
+   baner sus, meniu lateral și bara de jos plutitoare, mai aproape de margini
+   ===================================================================== */
+:root{--bar-solid:#232429}
+
+/* ---------- baner sus ---------- */
+.header{
+  background:var(--bar-solid);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  box-shadow:0 6px 18px rgba(0,0,0,.18);
+}
+.header .nav-badge{box-shadow:0 0 0 2px var(--bar-solid)}
+
+/* ---------- meniu lateral ---------- */
+.mdrawer{
+  background:var(--bar-solid);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  border-left:1px solid rgba(255,255,255,.08);
+  box-shadow:-18px 0 44px rgba(0,0,0,.40);
+}
+.mdrawer::before{background:none}
+
+/* ---------- bară jos: plutitoare, rotunjită, aproape de margini ---------- */
+@media(max-width:800px){
+  .bottom-nav{
+    left:8px;right:8px;
+    bottom:calc(8px + env(safe-area-inset-bottom,0px));
+    background:var(--bar-solid);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 8px 22px rgba(0,0,0,.30);
+  }
+  .bottom-nav::before{display:none}
+  .bottom-nav .bn-sell span.bn-plus{box-shadow:0 6px 14px rgba(184,147,90,.40),0 0 0 4px var(--bar-solid)}
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .header,.mdrawer{background:var(--bar-solid)}
+  @media(max-width:800px){.bottom-nav{background:var(--bar-solid)}}
+}
+@media (prefers-reduced-transparency:reduce){
+  .header,.mdrawer{background:var(--bar-solid)}
+}
