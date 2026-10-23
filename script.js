@@ -289,6 +289,48 @@ function avatarToDataUrl(file){
     rd.onerror=()=>reject(new Error('Fișierul nu a putut fi citit.')); rd.readAsDataURL(file);
   });
 }
+/* Poza de profil: 1 secundă apăsat = poza mărită; 4 secunde apăsat (și ridici degetul) = schimbă poza */
+function setupAvatarHold(){
+  const btn=$('#avatarBtn'); if(!btn||btn.dataset.hold) return; btn.dataset.hold='1';
+  const SHOW_MS=1000, CHANGE_MS=4000;
+  let ov=null, tShow=0, tChange=0, shown=false, ready=false, sx=0, sy=0, down=false;
+  const hint='Ține apăsat 4 secunde pentru a schimba poza';
+  function closePreview(){ if(ov){ ov.remove(); ov=null; } shown=false; }
+  function openPreview(){
+    const img=btn.querySelector('img[data-av]'); if(!img) return;
+    closePreview(); shown=true;
+    ov=document.createElement('div'); ov.className='avatar-preview'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-label','Poza de profil');
+    const big=document.createElement('img'); big.src=img.src; big.alt='Poza de profil';
+    const cap=document.createElement('p'); cap.textContent=hint;
+    ov.append(big,cap); ov._cap=cap; ov._t=Date.now();
+    ov.addEventListener('click',()=>{ if(Date.now()-ov._t>400) closePreview(); });
+    document.body.appendChild(ov);
+  }
+  function reset(){ clearTimeout(tShow); clearTimeout(tChange); tShow=tChange=0; ready=false; down=false; }
+  btn.addEventListener('pointerdown',e=>{
+    if(e.button>0) return;
+    reset(); down=true; sx=e.clientX; sy=e.clientY;
+    try{ btn.setPointerCapture(e.pointerId); }catch(_){}
+    tShow=setTimeout(()=>{ openPreview(); },SHOW_MS);
+    tChange=setTimeout(()=>{
+      ready=true; if(ov&&ov._cap) ov._cap.textContent='Ridică degetul pentru a schimba poza';
+      try{ if(navigator.vibrate) navigator.vibrate(40); }catch(_){}
+    },CHANGE_MS);
+  });
+  btn.addEventListener('pointermove',e=>{ if(down&&!shown&&Math.hypot(e.clientX-sx,e.clientY-sy)>12) reset(); });
+  btn.addEventListener('pointercancel',()=>{ reset(); });
+  btn.addEventListener('pointerup',e=>{
+    if(!down) return;
+    const wasReady=ready; reset();
+    if(wasReady){ closePreview(); $('#avatarFile').click(); return; }
+    if(shown) return; /* poza mărită rămâne deschisă până apeși pe ea */
+    if(!(currentUser&&currentUser.has_avatar===true)){ $('#avatarFile').click(); return; } /* fără poză: alegi una direct */
+    toast('Ține apăsat 1 secundă pentru a mări poza, 4 secunde pentru a o schimba.');
+  });
+  btn.addEventListener('contextmenu',e=>e.preventDefault());
+  btn.addEventListener('click',e=>{ if(e.detail===0) $('#avatarFile').click(); }); /* tastatură: Enter / Space */
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePreview(); });
+}
 function renderAccountAvatar(bust){
   const b=$('#avatarBtn'); if(!b||!currentUser) return;
   const has=currentUser.has_avatar===true;
@@ -2881,7 +2923,7 @@ function wire(){
   $('#phoneAddForm').addEventListener('submit', addPhone);
   $('#detailsForm').addEventListener('submit', saveDetails);
   $$('input[name="billType"]').forEach(r=>r.addEventListener('change', syncBillType));
-  $('#avatarBtn').addEventListener('click', ()=>$('#avatarFile').click());
+  setupAvatarHold();
   $('#avatarFile').addEventListener('change', onAvatarPick);
   $('#avatarRemove').addEventListener('click', removeAvatar);
   $('#storeForm').addEventListener('submit', saveStore);

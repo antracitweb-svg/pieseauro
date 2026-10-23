@@ -3112,3 +3112,9 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   }
   .mine-tools .mine-tool:first-child{margin-left:3mm!important}
 }
+
+/* v16: poza de profil mărită (ține apăsat 1 secundă) */
+#avatarBtn{touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.avatar-preview{position:fixed;inset:0;z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(15,12,6,.78);padding:24px;-webkit-user-select:none;user-select:none}
+.avatar-preview img{width:min(72vw,300px);height:min(72vw,300px);object-fit:cover;border-radius:50%;box-shadow:0 0 0 4px #b8935a,0 0 0 8px rgba(232,211,168,.35),0 18px 40px rgba(0,0,0,.5);background:#e6e0d4;-webkit-touch-callout:none;pointer-events:none}
+.avatar-preview p{margin:0;max-width:300px;text-align:center;color:#f3e6c6;font-size:14px;font-weight:700;line-height:1.35}
