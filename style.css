@@ -2863,3 +2863,11 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   #homeFeed .ar-price,
   .similar-grid .ar-price{font-size:16px!important}
 }
+
+/* ===== v4: start compact, un singur rând de titlu, anunțurile sus ===== */
+#page-home .home-wrap{min-height:0!important;justify-content:flex-start!important;padding:18px 0 40px!important}
+#page-home .home-center h1{white-space:nowrap;font-size:clamp(26px,8vw,48px)!important;letter-spacing:-1.2px!important;margin:0 0 14px!important;line-height:1.1}
+#page-home .hero-vehicle-compat{margin-top:10px}
+#page-home .home-links{margin-top:8px}
+#page-home .home-feed{margin-top:18px}
+@media(max-width:800px){#page-home .home-wrap{padding:12px 0 30px!important}#page-home .home-feed{margin-top:14px}}
