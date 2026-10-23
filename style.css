@@ -3084,3 +3084,31 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 #page-account .acc-user .acc-rating .stars{font-size:12px!important}
 #page-account .acc-user .acc-avatar-wrap{flex:0 0 44px!important;width:44px!important;height:44px!important;align-self:flex-start;margin-top:2px}
 #page-account .acc-notif{position:absolute!important;top:9px!important;right:12px!important;margin:0!important;padding:4px 10px!important;font-size:12px!important}
+
+/* v14: pagina de rezultate — inima pentru salvarea căutării în bara de căutare, "Filtrare" și "Cele mai noi" mici, pe același rând */
+.result-search .heart-btn{
+  background:transparent!important;border:0!important;box-shadow:none!important;color:#8f6d38!important;
+  width:38px;height:38px;min-height:0!important;padding:0!important;margin:0 4px 0 0!important;border-radius:50%!important;
+  font-size:24px;line-height:1;display:grid;place-items:center;flex:0 0 38px;cursor:pointer;
+}
+.result-search .heart-btn:hover{background:#f6eedb!important;color:#8f6d38!important}
+.result-search .heart-btn:active{transform:scale(.9)}
+@media(max-width:800px){
+  .results-actions{display:flex!important;flex-wrap:wrap!important;gap:8px 10px!important;align-items:center}
+  .results-actions .result-search{flex:1 0 100%}
+  .results-actions .filter-toggle,.results-actions select{
+    flex:0 0 calc(50% - 5px - 3mm)!important;width:calc(50% - 5px - 3mm)!important;min-width:0;
+    height:40px!important;min-height:40px!important;padding:0 12px!important;font-size:14px!important;
+  }
+  .results-actions .filter-toggle{margin-left:3mm!important}
+}
+
+/* v15: "Anunțurile mele" și "Mesagerie" — butoanele Filtrare/Afișare mici, la fel ca în pagina de rezultate (jumătate de lățime, la 3 mm de margini) */
+@media(max-width:800px){
+  .mine-tools,#page-mine .mine-tools{display:flex!important;flex-wrap:wrap;gap:8px 10px!important;margin:0 0 10px!important}
+  .mine-tools .mine-tool,#page-mine .mine-tools .mine-tool{
+    flex:0 0 calc(50% - 5px - 3mm)!important;width:calc(50% - 5px - 3mm)!important;min-width:0;
+    height:40px!important;min-height:40px!important;padding:0 10px!important;font-size:14px!important;
+  }
+  .mine-tools .mine-tool:first-child{margin-left:3mm!important}
+}
