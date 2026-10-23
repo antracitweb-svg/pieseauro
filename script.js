@@ -839,7 +839,7 @@ function myRequestHtml(x, offers){
     const canRate=won&&o.order_id&&o.order_status==='completed';
     const rateBtn=canRate?`<button type="button" class="btn ${o.given_stars?'ghost':'primary'} small" data-rate-order="${o.order_id}" data-stars="${o.given_stars||0}" data-comment="${esc(o.given_comment||'')}" data-seller-name="${esc(o.seller_name||'vânzător')}">${o.given_stars?'★ '+o.given_stars+' · Modifică calificativul':'☆ Dă calificativ vânzătorului'}</button>`:'';
     const rateHint=(won&&o.order_id&&['suspended','cancelled'].includes(o.order_status))?`<p class="order-reason req-rate-hint"><b>Comanda a fost ${o.order_status==='suspended'?'suspendată':'anulată'} de vânzător.</b>${o.order_reason?' Mesaj: '+esc(o.order_reason):''}</p>`:((won&&o.order_id&&!canRate)?`<p class="muted req-rate-hint">Poți da calificativul după ce comanda este marcată ca finalizată.</p>`:'');
-    return `<article class="info-card req-offer${won?' is-won':''}${lost?' is-lost':''}">${won?'<div class="req-win-ribbon">🏆 Oferta câștigătoare</div>':''}<div class="req-offer-head">${slogo}<div class="req-offer-who">${sname}${o.company?' <span class="badge">Firmă</span>':''}${o.seller_person&&o.seller_person!==o.seller_name?`<div class="req-offer-person">👤 Persoană: <b>${esc(o.seller_person)}</b></div>`:''}${o.company&&o.seller_nick?`<small class="muted"> · cont: ${esc(o.seller_nick)}</small>`:''}<div class="rate-line">${ratingLine({avg:o.seller_rating_avg,count:o.seller_rating_n},o.seller_id,'seller')}</div></div><div class="req-offer-price">${mn(o.price)}</div></div>
+    return `<article class="info-card req-offer${won?' is-won':''}${lost?' is-lost':''}">${won?`<div class="req-win-ribbon"><span class="rw-ico">🏆</span><div><b>Ofertă câștigătoare</b><small>Acceptată: ${esc(fmtDateTime(o.updated_at||o.created_at))}</small></div></div>`:''}<div class="req-offer-pricerow"><div class="req-offer-price"><small>Preț:</small> <b>${mn(o.price)}</b></div></div><div class="req-offer-head rq-seller">${slogo}<div class="req-offer-who">${sname}${o.company?' <span class="badge">Firmă</span>':''}${o.seller_person&&o.seller_person!==o.seller_name?`<div class="req-offer-person">👤 Persoană: <b>${esc(o.seller_person)}</b></div>`:''}${o.company&&o.seller_nick?`<small class="muted"> · cont: ${esc(o.seller_nick)}</small>`:''}<div class="rate-line">${ratingLine({avg:o.seller_rating_avg,count:o.seller_rating_n},o.seller_id,'seller')}</div></div></div>
       <p class="muted"><span class="badge ${o.status==='accepted'?'new':(o.status==='rejected'?'bad':'pending')}">${esc(OFFER_ST[o.status]||o.status)}</span> · ${fmtDate(o.created_at)}${o.updated_at?' · modificată '+fmtDate(o.updated_at):''}</p>
       ${o.message?`<p class="req-offer-msg">${esc(o.message)}</p>`:''}
       ${imgGalleryHtml(o.images,'Poză ofertă')}
@@ -913,11 +913,11 @@ function publicRequestHtml(x){
   </aside>
   </div>${callbar}`;
 }
-async function openRequestModal(id, mode){
+async function openRequestModal(id, mode, focusWin){
   const modal=$('#requestModal'), box=$('#requestContent');
   box.innerHTML='<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden'); currentRequestModal={id,mode};
   try{
-    if(mode==='mine'){ const r=await api('/api/requests/mine/'+id); box.innerHTML=myRequestHtml(r.request,r.offers); }
+    if(mode==='mine'){ const r=await api('/api/requests/mine/'+id); box.innerHTML=myRequestHtml(r.request,r.offers); if(focusWin){ const w=box.querySelector('.req-offer.is-won'); if(w) requestAnimationFrame(()=>w.scrollIntoView({block:'center'})); } }
     else if(mode==='offer'){ offersMine=(await api('/api/offers/mine?id='+id)).offers; const o=offersMine.find(x=>x.id===id); box.innerHTML=o?myOfferHtml(o):'<p>Oferta nu mai există.</p>'; }
     else { let x=requestsCache.get(id); try{ const f=await api('/api/requests/'+id); x={...(x||{}),...f.request}; }catch{} box.innerHTML=x?publicRequestHtml(x):'<p>Cererea nu mai este disponibilă.</p>'; }
   }catch(e){ box.innerHTML=`<p>${esc(e.message)}</p>`; }
@@ -1429,6 +1429,34 @@ function reqRowHtml(x, mine){
     <div class="ar-acts${mine?'':' contact-slot'}">${acts}</div>
     <div class="ar-foot"><span class="ar-views">${mine?`💬 ${n} ${n===1?'ofertă':'oferte'}${np?` (${np} noi)`:''}`:esc(REQ_KIND[x.kind]||'Cerere piesă')}</span><span class="ar-qty">${esc(fmtDate(x.created_at))}</span><span class="ar-price ar-state">${mine?esc(REQ_ST[x.status]||x.status):'Deschisă'}</span></div></article>`;
 }
+/* „Cererile mele de piese”: tab-uri Active / Inactive / Rezolvate + căutare după titlu */
+const rqMine={tab:'open',q:'',list:[]};
+function reqMineRowHtml(x){
+  const n=Number(x.offers_count)||0, np=Number(x.offers_pending)||0;
+  const car=[x.make,x.model].filter(Boolean).join(' ')||'Orice mașină';
+  const im=x.images&&x.images[0]?x.images[0]:'';
+  const win=x.status==='matched'?`<button type="button" class="rq-win" data-open-request="${x.id}" data-mode="mine" data-focus-win="1">🏆 Oferta câștigătoare ›</button>`:'';
+  const edit=Number(x.edit_secs)>0?`<button type="button" class="ar-btn ar-edit" data-edit-request="${x.id}" data-edit-until="${Date.now()+Number(x.edit_secs)*1000}" title="Modifică (mai ai ${Math.ceil(Number(x.edit_secs)/60)} min)" aria-label="Modifică cererea">✎</button>`:'';
+  return `<article class="rq-row" data-request="${x.id}" data-open-request="${x.id}" data-mode="mine" tabindex="0" role="link" aria-label="${esc(x.title)}">
+    ${im?`<div class="rq-thumb"><img src="${esc(im)}" alt="" loading="lazy" decoding="async"></div>`:''}
+    <div class="rq-body">
+      <h3 class="rq-title">${esc(x.title)}</h3>
+      <div class="rq-car">${esc(car)}</div>
+      <div class="rq-meta"><span class="rq-offers${np?' has-new':''}">${n} ${n===1?'ofertă':'oferte'}${np?` · ${np} în așteptare`:''}</span><time>${esc(fmtDateTime(x.created_at))}</time></div>
+      <div class="rq-acts">${win}${edit}<button type="button" class="ar-btn ar-del" data-del-request="${x.id}" title="Șterge" aria-label="Șterge cererea">🗑</button></div>
+    </div></article>`;
+}
+function drawMineRequests(){
+  const tabs=$('#rqTabs'), list=$('#rqList'), cnt=$('#rqCount'); if(!tabs||!list||!cnt) return;
+  const T=[['open','Active'],['closed','Inactive'],['matched','Rezolvate']];
+  const inTab=k=>rqMine.list.filter(x=>x.status===k);
+  const q=rqMine.q.trim().toLowerCase();
+  tabs.innerHTML=T.map(([k,l])=>`<button type="button" role="tab" class="mine-tab ${rqMine.tab===k?'on':''}" data-rq-tab="${k}">${l} <small>${inTab(k).length}</small></button>`).join('');
+  const rows=inTab(rqMine.tab).filter(x=>!q||String(x.title||'').toLowerCase().includes(q));
+  cnt.textContent=rows.length?`Cereri (1 - ${rows.length} din ${rows.length})`:'Cereri (0)';
+  list.innerHTML=rows.length?rows.map(reqMineRowHtml).join(''):`<p class="muted rq-empty">${q?'Nicio cerere nu se potrivește căutării.':(rqMine.list.length?'Nu ai cereri în această listă.':'Nu ai publicat încă nicio cerere.')}</p>`;
+}
+document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rqSearch'){ rqMine.q=e.target.value; drawMineRequests(); } });
 async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
   $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
@@ -1439,8 +1467,15 @@ async function loadRequests(mine){
   try{
     const r = await api(mine ? '/api/requests/mine' : '/api/requests');
     requestsCache=new Map(r.requests.map(x=>[x.id,x]));
-    grid.innerHTML = r.requests.map(x=>reqRowHtml(x,mine)).join('');
-    $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0);
+    if(mine){
+      rqMine.list=r.requests;
+      grid.innerHTML=`<div class="mine-card rq-mine"><h2 class="mine-title">Cererile mele de piese</h2><div class="mine-tabs" id="rqTabs" role="tablist"></div><div class="mine-search"><input id="rqSearch" type="search" placeholder="Caută în titlul cererii ..." autocomplete="off" aria-label="Caută în titlul cererii" value="${esc(rqMine.q)}"><button type="button" aria-label="Caută" tabindex="-1">⌕</button></div><div class="mine-head"><b id="rqCount"></b></div><div id="rqList" class="rq-list"></div></div>`;
+      drawMineRequests();
+      $('#requestsEmpty').classList.add('hidden');
+    } else {
+      grid.innerHTML = r.requests.map(x=>reqRowHtml(x,mine)).join('');
+      $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0);
+    }
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 async function requestContact(id, btn){
@@ -2619,6 +2654,7 @@ document.addEventListener('click', e=>{
   })(); return; }
   if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); { const dm=$('#detailModal'); if(dm&&!dm.classList.contains('hidden')) openDetail(id,true); } toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); { const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); } toast('Anunțul a fost șters.'); })(); return; }
+  if((el=t.closest('[data-rq-tab]'))){ rqMine.tab=el.dataset.rqTab; drawMineRequests(); return; }
   if((el=t.closest('[data-edit-request]'))){ if(Date.now()>Number(el.dataset.editUntil||0)){ toast('Au trecut cele 10 minute în care puteai modifica cererea.'); loadRequests(true); return; } navigate('cerere-noua?edit='+el.dataset.editRequest); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); { const rm=$('#requestModal'); if(rm) rm.classList.add('hidden'); } toast('Cererea a fost ștearsă.'); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
@@ -2647,7 +2683,7 @@ document.addEventListener('click', e=>{
     const inner=t.closest('button,a');
     if(!(inner && inner!==el && el.contains(inner))){
       if(el.dataset.offerOpen) openRequestModal(Number(el.dataset.offerOpen),'offer');
-      else openRequestModal(Number(el.dataset.openRequest), el.dataset.mode||'public');
+      else openRequestModal(Number(el.dataset.openRequest), el.dataset.mode||'public', el.dataset.focusWin==='1');
       return;
     }
   }

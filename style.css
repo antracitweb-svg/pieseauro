@@ -2686,3 +2686,48 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .mdrawer .mi-user i{font-style:normal}
 .mdrawer .mi-user img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
 .mdrawer .mi-user.has-photo i{visibility:hidden}
+
+/* ===== Cererile mele de piese: tab-uri, căutare, listă și oferte (aspect ca pe PieseAuto.ro, culorile site-ului) ===== */
+#page-requests.req-mine .page-head>div{display:none}
+#page-requests.req-mine .page-head{margin-bottom:8px}
+.rq-mine .mine-head{border-bottom:1px solid var(--line);padding:14px 2px 12px}
+.rq-mine .mine-head b{font-size:17px}
+.rq-list{display:flex;flex-direction:column}
+.rq-row{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:16px 2px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s ease}
+.rq-row:has(.rq-thumb){grid-template-columns:88px minmax(0,1fr)}
+.rq-row:hover{background:rgba(184,147,90,.07)}
+.rq-row:focus-visible{outline:2px solid var(--gold,#b8935a);outline-offset:-2px}
+.rq-thumb{width:88px;height:88px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--ivory,#f7f5f0)}
+.rq-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.rq-body{min-width:0;display:flex;flex-direction:column;gap:6px}
+.rq-title{margin:0;font-family:var(--font-sans);font-weight:600;font-size:17px;line-height:1.3;color:var(--gold-ink,#7a5a28);overflow-wrap:anywhere}
+.rq-row:hover .rq-title{text-decoration:underline;text-underline-offset:3px}
+.rq-car{font-size:16px;color:var(--ink)}
+.rq-meta{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:6px;font-size:15px;color:var(--ink)}
+.rq-meta time{color:var(--muted);font-size:14px;white-space:nowrap}
+.rq-offers.has-new{font-weight:700}
+.rq-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px}
+.rq-win{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:6px 14px;border:1.5px solid #1c6d42;border-radius:10px;background:#f1faf4;color:#1c6d42;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.rq-win:hover{background:#e3f4ea}
+.rq-empty{padding:26px 4px;text-align:center}
+@media(max-width:520px){.rq-row:has(.rq-thumb){grid-template-columns:72px minmax(0,1fr)}.rq-thumb{width:72px;height:72px}.rq-meta{flex-wrap:wrap}}
+
+/* oferte primite: cardul ofertei câștigătoare, preț, chenarul vânzătorului */
+.req-offer.is-won{padding-top:0;overflow:hidden}
+.req-win-ribbon{display:flex;align-items:center;gap:12px;margin:0 -16px 12px;padding:10px 16px;border-radius:0;background:#1c6d42;color:#fff;font-size:inherit;letter-spacing:0}
+.req-win-ribbon .rw-ico{font-size:26px;line-height:1}
+.req-win-ribbon b{display:block;font-size:17px;font-weight:800}
+.req-win-ribbon small{display:block;font-size:13px;font-weight:500;opacity:.92}
+.req-offer-pricerow{margin:0 0 10px}
+.req-offer-price{margin-left:0;font-size:16px}
+.req-offer-price small{font-size:inherit;color:var(--ink);font-weight:500}
+.req-offer-price b{color:#d9480f;font-weight:800;font-size:20px}
+.req-offer-head.rq-seller{padding:12px;border:1px solid #e3dccb;border-radius:10px;background:#faf6ec;margin:0 0 10px;align-items:center}
+
+/* ===== Culoare închisă la antet și meniul de jos (înlocuiește sticla gri translucidă) ===== */
+.header{background:#0e0f12;-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid rgba(212,180,131,.4);box-shadow:0 8px 26px rgba(0,0,0,.28)}
+@media(max-width:800px){
+  .bottom-nav{background:rgba(14,15,18,.96);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(212,180,131,.28);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .bottom-nav::before{display:none}
+  .bottom-nav button.on:not(.bn-sell){background:rgba(212,180,131,.16);box-shadow:none}
+}
