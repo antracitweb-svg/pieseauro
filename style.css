@@ -2983,3 +2983,40 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 #page-account .account-sections summary .acc-ico{width:24px!important;height:24px!important;flex:0 0 24px!important;font-size:12px!important;background:linear-gradient(180deg,#f3dfae,#b8935a)!important;color:#2a1f0a!important}
 #page-account .account-sections summary .acc-caret{color:#8f6d38!important;font-size:12px!important}
 #page-account .account-sections details>button:nth-of-type(-n+2){margin-top:10px!important}
+
+/* v7b: bare foarte mici, cât înălțimea textului */
+#page-account .account-sections details{margin:6px 0 0!important}
+#page-account .account-sections summary{
+  min-height:0!important;height:auto!important;padding:3px 10px!important;gap:8px!important;
+  border-radius:9px!important;font-size:12px!important;line-height:1.15!important;letter-spacing:1.2px!important;
+  box-shadow:inset 0 1px 0 #fff,0 1px 0 #d3bf92,0 2px 4px rgba(60,45,20,.10)!important;
+}
+#page-account .account-sections summary b{font-size:12px!important;line-height:1.15!important}
+#page-account .account-sections summary .acc-ico{width:16px!important;height:16px!important;flex:0 0 16px!important;font-size:9px!important;line-height:16px!important}
+#page-account .account-sections summary .acc-caret{font-size:10px!important;line-height:1!important}
+#page-account .account-sections summary .sec-cnt{font-size:10px!important;line-height:1!important;padding:1px 6px!important}
+#page-account .account-sections details>button:nth-of-type(-n+2){margin-top:8px!important}
+
+/* v7c: culoare puțin mai închisă */
+#page-account .account-sections summary{
+  background:linear-gradient(180deg,#e4d1a6 0%,#c9ac74 100%)!important;
+  border:1px solid #b8975a!important;color:#2f2210!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 0 #9c7d44,0 2px 4px rgba(60,45,20,.18)!important;
+}
+#page-account .account-sections summary .acc-ico{background:linear-gradient(180deg,#8a6a35,#5e4620)!important;color:#f3e2b8!important}
+#page-account .account-sections summary .acc-caret{color:#5e4620!important}
+
+/* v7d: insigna roșie nu mai mărește bara */
+#page-account .account-sections summary .sec-cnt{
+  min-width:16px!important;height:16px!important;line-height:16px!important;padding:0 5px!important;
+  font-size:10px!important;margin:0 4px 0 auto!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  border-radius:8px!important;box-sizing:border-box!important;transform:none!important;position:static!important;
+}
+#page-account .account-sections summary .sec-cnt:empty{display:none!important}
+#page-account .account-sections summary .acc-caret{margin-left:auto!important}
+#page-account .account-sections summary .sec-cnt:not(:empty)+.acc-caret{margin-left:0!important}
+
+/* v7e: pe desktop (4 coloane) primele 4 butoane stau pe același rând */
+@media(min-width:900px){
+  #page-account .account-sections details>button:nth-of-type(-n+4){margin-top:8px!important}
+}
