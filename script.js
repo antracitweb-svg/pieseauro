@@ -1314,6 +1314,7 @@ function detailHtml(x, phones, canContact){
     <div class="ad-price-m">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
     <p class="ad-sub">${[x.county,fmtUpdated(x.created_at)].filter(Boolean).map(esc).join(' · ')}</p>
     <div class="ad-chips">${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}${Number(x.quantity)>1?`<span class="lchip">${Number(x.quantity)} buc. disponibile</span>`:''}${x.delivery?'<span class="lchip lchip-ship">🚚 Livrare</span>':''}${x.negotiable&&Number(x.price)>0?'<span class="lchip">Preț negociabil</span>':''}</div>
+    ${garageFitHtml(x)}
     ${spec.length?`<div class="ad-car"><small>Compatibil cu</small><div class="ad-spec">${spec.map(r=>`<div><span>${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('')}</div></div>`:''}
     ${x.type==='dezmembrari'&&x.parts_avail?`<h3 class="ad-h">Piese disponibile</h3><div class="part-chips big">${String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<b>${esc(t)}</b>`).join('')}</div>`:''}
     ${x.description?`<h3 class="ad-h">Descriere</h3><p class="detail-desc">${esc(x.description)}</p>`:''}
@@ -1432,6 +1433,7 @@ async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
   $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
   $('#requestsCrumb').textContent = $('#requestsTitle').textContent;
+  { const pg=$('#page-requests'), pc=pg&&pg.querySelector('.container'); if(pg) pg.classList.toggle('req-mine',!!mine); if(pc) pc.classList.toggle('narrow',!!mine); }
   $('#requestsSub').textContent = mine ? 'Cererile publicate de tine.' : 'Cereri publicate de cumpărători. Ai piesa? Contactează-l.';
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
@@ -1887,6 +1889,14 @@ async function loadSavedCars(){
     savedCars.push({id:x.id,make:x.make,model:x.model,year:x.year||'',variant:x.variant||'',engine:x.engine||'',vin:x.vin||''});
   }
   return savedCars;
+}
+/* Compatibilitate cu mașina activă din garaj (după marcă și model) */
+function garageFitHtml(x){
+  const g = garageActive(); if(!g || !x || !x.make || x.type==='dezmembrari') return '';
+  const nm = esc(garageName(g)), noModel = !x.model || /^alt model$/i.test(x.model);
+  if(x.make!==g.make || (!noModel && x.model!==g.model)) return `<div class="ad-fit bad">⚠ Piesa este pentru ${esc([x.make,noModel?'':x.model].filter(Boolean).join(' '))}, nu pentru mașina ta activă (${nm}).</div>`;
+  if(noModel) return '';
+  return `<div class="ad-fit ok">✓ Aceeași marcă și același model ca mașina ta: <b>${nm}</b>. Verifică anul și codul OEM înainte de comandă.</div>`;
 }
 function carLabel(c){ return [c.make,c.model,c.year,c.engine].filter(Boolean).join(' '); }
 async function enterCarPick(){
@@ -2460,7 +2470,7 @@ function updateGarageUI(){
 }
 function renderGarageList(){
   const g = garageData(), box = $('#garageList');
-  box.innerHTML = g.cars.length ? g.cars.map(c=>`<div class="garage-item${c.id===g.active?' active':''}"><button type="button" class="garage-pick" data-garage-use="${esc(c.id)}"><b>${esc(garageName(c))}</b><small>${c.id===g.active?'Mașina activă':'Folosește această mașină'}</small></button><button type="button" class="garage-del" data-garage-del="${esc(c.id)}" aria-label="Șterge">×</button></div>`).join('')
+  box.innerHTML = g.cars.length ? g.cars.map(c=>`<div class="garage-item${c.id===g.active?' active':''}"><button type="button" class="garage-pick" data-garage-use="${esc(c.id)}"><b>${esc(garageName(c))}</b><small>${c.id===g.active?'Mașina activă':'Folosește această mașină'}</small></button><button type="button" class="garage-see" data-garage-parts="${esc(c.id)}">Vezi piese</button><button type="button" class="garage-del" data-garage-del="${esc(c.id)}" aria-label="Șterge">×</button></div>`).join('')
     + (g.active ? '<button type="button" class="text-btn" data-garage-off>Fără mașină activă</button>' : '')
     : '<p class="muted">Garajul e gol. Adaugă prima mașină mai jos.</p>';
 }
@@ -2482,7 +2492,7 @@ function garageSave(e){
   const id = 'c'+Date.now().toString(36);
   g.cars.push({id,make,model,year}); g.active = id; writeJSON('autopiese_garage',g);
   $('#garageForm').reset(); resetCarAutoFor('garage'); loadModels('','garageModel'); renderGarageList(); updateGarageUI();
-  setMsg(msg,'Mașina a fost salvată în garaj.','ok');
+  setMsg(msg,'Mașina a fost salvată în garaj. Apasă „Vezi piese” lângă ea ca să vezi piesele potrivite.','ok');
 }
 function garageUse(id){ const g=garageData(); g.active=id; writeJSON('autopiese_garage',g); renderGarageList(); updateGarageUI(); toast('Mașina activă: '+garageName(garageActive())); }
 function garageDelete(id){ const g=garageData(); g.cars=g.cars.filter(c=>c.id!==id); if(g.active===id) g.active=null; writeJSON('autopiese_garage',g); renderGarageList(); updateGarageUI(); }
@@ -2760,8 +2770,9 @@ function wire(){
   $('#garageBtn').addEventListener('click', openGarage);
   $('#garageForm').addEventListener('submit', garageSave);
   $('#garageModal').addEventListener('click', e=>{
-    const u=e.target.closest('[data-garage-use]'), d=e.target.closest('[data-garage-del]'), o=e.target.closest('[data-garage-off]');
-    if(u) garageUse(u.dataset.garageUse); else if(d) garageDelete(d.dataset.garageDel); else if(o) garageOff();
+    const u=e.target.closest('[data-garage-use]'), d=e.target.closest('[data-garage-del]'), o=e.target.closest('[data-garage-off]'), p=e.target.closest('[data-garage-parts]');
+    if(p){ const car=garageData().cars.find(c=>c.id===p.dataset.garageParts); if(car){ garageUse(car.id); $('#garageModal').classList.add('hidden'); openSearch({make:car.make, model:car.model}); } }
+    else if(u) garageUse(u.dataset.garageUse); else if(d) garageDelete(d.dataset.garageDel); else if(o) garageOff();
   });
   $('#garageBanner').addEventListener('click', async e=>{ if(e.target.closest('[data-garage-all]')){ $('#filterMake').value=''; await loadModels('','filterModel','Toate modelele'); state.extra.g='0'; onFilterChange(); } });
   updateGarageUI();

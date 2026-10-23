@@ -2533,3 +2533,38 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   .bottom-nav .bn-sell span.bn-plus svg{width:18px;height:18px}
   html.menu-open .bottom-nav{transform:translateY(240%);opacity:0;pointer-events:none}
 }
+
+/* ===== „Alege mașina ta” — același antet și aceleași elemente ca pagina „Primește oferte piese” ===== */
+#page-request-pick .cp-card{padding:18px 16px 20px}
+#page-request-pick .cp-list{padding:0}
+#page-request-pick .cp-item{font-size:16px;padding:14px 4px}
+#page-request-pick .cp-item i{color:#b8935a;font-size:24px}
+#page-request-pick .cp-or{font-size:14px;font-weight:600;color:var(--muted);margin:16px 0 12px}
+
+/* ===== Design unitar: „Cererile mele”, mesaje de succes, elemente mărunte (doar aspect) ===== */
+/* Cererile mele — aceeași lățime și același antet ca restul contului (breadcrumb-ul public rămâne pe pagina publică) */
+#page-requests.req-mine .crumbs{display:none}
+/* mesaje de succes (cele de eroare erau deja roșii) */
+.ok-message{color:#1b6b3a!important;font-weight:700}
+/* notificări: iconița aliniată */
+.notif-row .nr-ico{flex:0 0 28px;width:28px;text-align:center;font-size:18px;line-height:1}
+/* anunțurile mele: vizualizările pe un singur rând */
+.mr-foot .mr-views{white-space:nowrap}
+/* ofertele primite: mesajul și telefoanele */
+.req-offer-msg{margin:8px 0;padding:9px 12px;border-left:3px solid #b8935a;background:var(--pale,#f7f5f0);border-radius:8px;line-height:1.45;overflow-wrap:anywhere}
+.req-offer-phones{margin:10px 0}
+/* piese căutate în plus */
+.req-extra{margin:6px 0 0;padding-left:20px;display:grid;gap:8px;line-height:1.4}
+/* butoane de contact pe cerere */
+.req-actions{margin:10px 0 0}
+/* comenzi: rând clicabil + persoană de contact */
+.ord-row:focus-visible{outline:2px solid #b8935a;outline-offset:2px;border-radius:8px}
+.ord-prod-main{flex:1;min-width:0}
+.ord-line{font-size:14px;color:var(--muted)}
+
+/* ===== Garaj: „Vezi piese” + indicator de compatibilitate în anunț ===== */
+.garage-see{border:0;border-left:1px solid var(--line);background:#fff;padding:0 12px;color:#8f6d38;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap}
+.garage-see:active{background:#f6efe0}
+.ad-fit{margin:10px 0;padding:9px 12px;border-radius:10px;font-size:14px;line-height:1.4}
+.ad-fit.ok{background:#ecf9f1;border:1px solid #bfe7cd;color:#14532d}
+.ad-fit.bad{background:#fff4e5;border:1px solid #f2d3a0;color:#7a4b00}
