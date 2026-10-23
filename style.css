@@ -2969,3 +2969,17 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 /* v6c: ambele butoane de pe primul rând au același spațiu sus */
 #page-account .account-sections details>summary+button{margin-top:0!important}
 #page-account .account-sections details>button:nth-of-type(-n+2){margin-top:12px!important}
+
+/* ===== v7: bare de secțiune (VÂND / CUMPĂR / ...) mai scurte și mai deschise ===== */
+#page-account .account-sections details{margin:8px 0 0!important}
+#page-account .account-sections summary{
+  min-height:0!important;padding:6px 12px!important;gap:10px!important;border-radius:12px!important;
+  color:#4a3a1c!important;font-size:13px!important;letter-spacing:1.4px!important;
+  background:linear-gradient(180deg,#fffdf8 0%,#f1e7d0 100%)!important;
+  border:1px solid #dccaa0!important;
+  box-shadow:inset 0 1px 0 #fff,0 2px 0 #d3bf92,0 5px 9px rgba(60,45,20,.12)!important;
+}
+#page-account .account-sections summary:active{transform:translateY(2px);box-shadow:inset 0 1px 0 #fff,0 0 0 #d3bf92,0 2px 4px rgba(60,45,20,.12)!important}
+#page-account .account-sections summary .acc-ico{width:24px!important;height:24px!important;flex:0 0 24px!important;font-size:12px!important;background:linear-gradient(180deg,#f3dfae,#b8935a)!important;color:#2a1f0a!important}
+#page-account .account-sections summary .acc-caret{color:#8f6d38!important;font-size:12px!important}
+#page-account .account-sections details>button:nth-of-type(-n+2){margin-top:10px!important}
