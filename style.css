@@ -2493,7 +2493,7 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   .page,.home-wrap{min-height:calc(100vh - 54px)}
 }
 @media(max-width:680px){
-  .header .nav{min-height:26px;gap:3px}
+  .header .nav{min-height:34px;gap:3px}
   .header .brand{gap:3px}
   .header .brand-mark{width:16px;height:12px}
   .header .brand-mark:before{top:2px;height:8px;border-top-width:2px}
@@ -2508,7 +2508,7 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   .header .menu-btn i{width:11px;height:1.5px}
   .header .garage-btn{min-height:20px;padding:2px 7px;font-size:9.5px;max-width:82px}
   .header .nav-badge{top:-4px;right:-4px;min-width:14px;height:14px;font-size:8px;line-height:14px;padding:0 3px;border-radius:7px}
-  .page,.home-wrap{min-height:calc(100vh - 26px)}
+  .page,.home-wrap{min-height:calc(100vh - 34px)}
 }
 @media(max-width:360px){
   .header .garage-btn{max-width:56px;padding:2px 5px}
