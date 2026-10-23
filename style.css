@@ -3020,3 +3020,9 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 @media(min-width:900px){
   #page-account .account-sections details>button:nth-of-type(-n+4){margin-top:8px!important}
 }
+
+/* v7f: bare cu lungime fixă (cât CALIFICATIVE) și mai groase */
+#page-account .account-sections summary{
+  width:var(--bar-w,192px)!important;max-width:100%!important;justify-self:start!important;
+  padding:7px 10px!important;
+}
