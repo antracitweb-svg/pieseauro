@@ -319,7 +319,7 @@ function renderAccount(){
   renderHeader();
   /* pe telefon pornește cu o singură secțiune deschisă */
   if(window.matchMedia('(max-width:800px)').matches){
-    $$('#page-account .account-sections details').forEach(d=>d.setAttribute('open',''));
+    $$('#page-account .account-sections details[open]').forEach((d,i)=>{ if(i>0) d.removeAttribute('open'); });
   }
 }
 

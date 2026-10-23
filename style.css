@@ -2931,3 +2931,41 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 #listingGrid .ar-foot .ar-price small,
 #homeFeed .ar-foot .ar-price small,
 .similar-grid .ar-foot .ar-price small{display:block;font-size:11px!important;font-weight:500!important;margin-top:1px}
+
+/* ===== v6: cont 3D, secțiuni pliabile, butoane joase ===== */
+/* Card profil */
+#page-account .acc-user{position:relative;overflow:hidden;background:linear-gradient(150deg,#34343a 0%,#17171a 42%,#050506 100%)!important;border:1px solid rgba(232,211,168,.4)!important;border-bottom:4px solid #b8935a!important;border-radius:20px!important;padding:18px 16px!important;box-shadow:0 1px 0 rgba(255,255,255,.22) inset,0 -18px 30px rgba(0,0,0,.45) inset,0 16px 30px rgba(10,8,4,.35),0 4px 0 #6e5428!important}
+#page-account .acc-user::before{content:"";position:absolute;left:0;right:0;top:0;height:52%;background:linear-gradient(180deg,rgba(255,255,255,.17),rgba(255,255,255,0));pointer-events:none;border-radius:20px 20px 0 0}
+#page-account .acc-user::after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(232,211,168,.28),rgba(232,211,168,0) 70%);pointer-events:none}
+#page-account .acc-user>*{position:relative;z-index:1}
+#page-account .acc-avatar-wrap .acc-avatar,#page-account .acc-avatar{box-shadow:0 0 0 3px #b8935a,0 0 0 5px rgba(232,211,168,.35),0 8px 18px rgba(0,0,0,.5)!important}
+#page-account .acc-user b#accountHello{font-size:22px!important;letter-spacing:-.3px;background:linear-gradient(180deg,#fff 20%,#e8d3a8);-webkit-background-clip:text;background-clip:text;color:transparent!important;text-shadow:none}
+#page-account .acc-user #accountHello+small{display:inline-block;align-self:flex-start;margin-top:3px;padding:2px 10px;border:1px solid rgba(232,211,168,.55);border-radius:999px;color:#e8d3a8!important;font-weight:700;font-size:12px!important;background:rgba(184,147,90,.14)}
+#page-account .acc-notif{background:linear-gradient(180deg,#f3dfae,#b8935a)!important;color:#2a1f0a!important;font-weight:800;border:1px solid #e8d3a8!important;box-shadow:0 3px 0 #6e5428,0 8px 14px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.7)!important;transition:transform .08s,box-shadow .08s}
+#page-account .acc-notif:active{transform:translateY(3px);box-shadow:0 0 0 #6e5428,0 3px 6px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.5)!important}
+/* Titluri de secțiune: bare 3D închise, cu auriu, pliabile */
+#page-account .account-sections details{margin:12px 0 0!important}
+#page-account .account-sections summary{pointer-events:auto!important;cursor:pointer;display:flex!important;align-items:center;gap:12px;margin:0!important;padding:11px 14px!important;border-radius:14px;color:#f3e6c6!important;font-size:14px!important;letter-spacing:1.8px!important;font-weight:900;background:linear-gradient(180deg,#34343a,#151518 55%,#0a0a0c)!important;border:1px solid rgba(232,211,168,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 4px 0 #050506,0 9px 16px rgba(10,8,4,.28);transition:transform .08s,box-shadow .08s;list-style:none}
+#page-account .account-sections summary:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 1px 0 #050506,0 3px 6px rgba(10,8,4,.28)}
+#page-account .account-sections summary .acc-ico{display:grid!important;width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:linear-gradient(180deg,#f3dfae,#b8935a)!important;color:#2a1f0a!important;font-size:15px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 2px 4px rgba(0,0,0,.5)}
+#page-account .account-sections summary b{flex:1}
+#page-account .account-sections summary .sec-cnt{display:inline-block!important;margin:0}
+#page-account .account-sections summary .acc-caret{display:inline-block!important;color:#e8d3a8;transition:transform .2s}
+#page-account .account-sections details[open]>summary .acc-caret{transform:rotate(180deg)}
+#page-account .account-sections details>summary+button{margin-top:12px!important}
+/* Butoane: joase, 3D, ca „Retrimite emailul” */
+#page-account .account-sections details>button{flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;min-height:50px!important;padding:8px 12px!important;font-size:13.5px!important;font-weight:800!important;color:#4a3a1c!important;background:linear-gradient(180deg,#fffdf8,#f2e8d2)!important;border:1px solid #e0d0aa!important;border-radius:13px!important;box-shadow:inset 0 1px 0 #fff,0 3px 0 #d3bf92,0 8px 12px rgba(60,45,20,.16)!important;transition:transform .08s,box-shadow .08s}
+#page-account .account-sections details>button:active{transform:translateY(3px);box-shadow:inset 0 1px 0 #fff,0 0 0 #d3bf92,0 2px 4px rgba(60,45,20,.16)!important}
+#page-account .account-sections details>button::before{font-size:19px!important;flex:0 0 auto}
+#page-account .account-sections details>button .cnt{top:6px!important;right:8px!important}
+#page-account .account-sections details>button:nth-of-type(even){margin-right:0!important}
+#page-account .account-sections details>button{margin-bottom:12px!important}
+#page-account .acc-ico{font-size:15px}
+/* v6b */
+#page-account .account-sections summary .sec-cnt:empty,#page-account .account-sections details>button .cnt:empty{display:none!important}
+#page-account .account-sections details>button{height:56px!important;min-height:56px!important;overflow:visible}
+#page-account .account-sections details>button .cnt{top:-8px!important;right:-5px!important;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+#page-account .account-sections details>button>span,#page-account .account-sections details>button>b{min-width:0}
+/* v6c: ambele butoane de pe primul rând au același spațiu sus */
+#page-account .account-sections details>summary+button{margin-top:0!important}
+#page-account .account-sections details>button:nth-of-type(-n+2){margin-top:12px!important}
