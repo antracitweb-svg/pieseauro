@@ -2568,3 +2568,98 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .ad-fit{margin:10px 0;padding:9px 12px;border-radius:10px;font-size:14px;line-height:1.4}
 .ad-fit.ok{background:#ecf9f1;border:1px solid #bfe7cd;color:#14532d}
 .ad-fit.bad{background:#fff4e5;border:1px solid #f2d3a0;color:#7a4b00}
+
+/* =====================================================================
+   V40 — „LIQUID GLASS” cald (crem + auriu) pe antet, meniul lateral și bara de jos
+   Doar aspect: culori, transparență, blur, margini, umbre.
+   Butoanele și structura nu se schimbă. Singura diferență de mărime:
+   antetul pe TELEFON (≤680px) e puțin mai înalt (34 → 44px).
+   Laptop/desktop/tabletă: aceleași înălțimi ca înainte.
+   Paleta: crem #fffcf5, maro închis #2a1d0b (text), auriu #9a6b1f / #c9972f (accent)
+   ===================================================================== */
+
+/* ---------- ANTET ---------- */
+.header{
+  background:linear-gradient(180deg,rgba(255,252,245,.70) 0%,rgba(248,241,227,.52) 100%);
+  -webkit-backdrop-filter:blur(20px) saturate(1.8) brightness(1.04);
+  backdrop-filter:blur(20px) saturate(1.8) brightness(1.04);
+  border-bottom:1px solid rgba(184,147,90,.34);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85),inset 0 -1px 0 rgba(255,255,255,.35),0 8px 26px rgba(60,40,10,.12);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.header{background:rgba(251,247,238,.97)}}
+@media (prefers-reduced-transparency:reduce){.header{background:rgba(251,247,238,.97);-webkit-backdrop-filter:none;backdrop-filter:none}}
+
+.header .brand{color:#2a1d0b}
+.header .brand-copy strong{color:#2a1d0b;text-shadow:none}
+.header .brand-copy strong span{color:#9a6b1f}
+.header .brand-copy small{color:#7a6a4c;text-shadow:none}
+.header .brand-mark:before{border-top-color:#9a6b1f}
+.header .brand-mark i{background:#b8935a;box-shadow:-14px 2px 0 #9a6b1f}
+.header .icon-btn{color:#4a3513;filter:none}
+.header .icon-btn span{background:#c9972f;color:#2a1d0b}
+.header .nav-badge{box-shadow:0 0 0 2px rgba(255,250,240,.95)}
+.header .garage-btn{color:#2a1d0b;background:rgba(255,255,255,.5);border-color:rgba(184,147,90,.45);text-shadow:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 8px rgba(60,40,10,.08)}
+.header .garage-btn.on{background:rgba(201,151,47,.28);color:#2a1d0b}
+.header .menu-btn{background:rgba(255,255,255,.5);border:1px solid rgba(184,147,90,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 2px 8px rgba(60,40,10,.08)}
+.header .menu-btn i{background:#3a2a10;box-shadow:none}
+
+/* ---------- TELEFON: antet puțin mai lat (34 → 44px) ---------- */
+@media(max-width:680px){
+  .header .nav{min-height:44px}
+  .header .brand-mark i{box-shadow:-9px 1px 0 #9a6b1f}
+  .page,.home-wrap{min-height:calc(100vh - 44px)}
+}
+
+/* ---------- BARA DE JOS (telefon): aceeași sticlă caldă ---------- */
+@media(max-width:800px){
+  .bottom-nav{
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.18) 100%),
+      rgba(250,243,230,.46);
+    -webkit-backdrop-filter:blur(22px) saturate(1.8) brightness(1.04);
+    backdrop-filter:blur(22px) saturate(1.8) brightness(1.04);
+    border:1px solid rgba(255,255,255,.7);
+    box-shadow:0 10px 30px rgba(60,40,10,.16),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(184,147,90,.18);
+  }
+  .bottom-nav::before{background:radial-gradient(120% 90% at 18% 0%,rgba(255,255,255,.55),transparent 55%);opacity:.6}
+  .bottom-nav button{color:#4a3513}
+  .bottom-nav svg{filter:none}
+  .bottom-nav button.on{color:#8a5a10}
+  .bottom-nav button.on:not(.bn-sell){background:rgba(184,147,90,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
+  .bottom-nav .bn-sell{color:#8a5a10}
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  @media(max-width:800px){.bottom-nav{background:rgba(251,247,238,.97)}}
+}
+
+/* ---------- MENIU LATERAL (iese / intră): sticlă cremă cu accente aurii ---------- */
+.mdrawer-scrim{background:rgba(48,34,12,.30);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.mdrawer{
+  --gl-text:#2a1d0b;
+  --gl-muted:rgba(42,29,11,.68);
+  --gl-accent:#8f6a24;
+  --gl-accent-soft:#8f6a24;
+  --gl-line:rgba(143,106,36,.16);
+  --gl-chip-bg:rgba(184,147,90,.18);
+  --gl-chip-bd:rgba(184,147,90,.40);
+  --gl-hover:rgba(184,147,90,.10);
+  --gl-press:rgba(184,147,90,.22);
+  background:
+    radial-gradient(110% 45% at 100% 12%,rgba(233,211,168,.50),transparent 62%),
+    radial-gradient(90% 50% at 0% 100%,rgba(201,151,47,.14),transparent 65%),
+    linear-gradient(165deg,rgba(255,252,245,.78),rgba(246,238,222,.60));
+  -webkit-backdrop-filter:blur(24px) saturate(1.8) brightness(1.04);
+  backdrop-filter:blur(24px) saturate(1.8) brightness(1.04);
+  border-left:1px solid rgba(184,147,90,.40);
+  box-shadow:-24px 0 60px rgba(60,40,10,.24),inset 1.5px 0 0 rgba(255,255,255,.85),inset 0 1.5px 0 rgba(255,255,255,.7),inset 0 -1px 0 rgba(255,255,255,.35);
+}
+.mdrawer::before{background:linear-gradient(100deg,rgba(255,255,255,.55) 0,rgba(255,255,255,.14) 14%,transparent 34%),linear-gradient(180deg,rgba(255,255,255,.35),transparent 22%)}
+.mdrawer .close-menu{background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.85)}
+.mdrawer .close-menu:hover{background:rgba(255,255,255,.8)}
+.mdrawer .menu-card{background:rgba(255,255,255,.46)!important;border:1px solid rgba(255,255,255,.75)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 4px 16px rgba(60,40,10,.06)!important}
+.mdrawer .mi{box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
+.mdrawer .mi-orange{color:#a8582a}
+.mdrawer .mi-blue{color:#6b5a3a}
+.mdrawer .mi-green{color:#3f7a55}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.mdrawer{background:linear-gradient(165deg,#fbf6ea,#f2e8d2)}}
+@media (prefers-reduced-transparency:reduce){.mdrawer{background:linear-gradient(165deg,#fbf6ea,#f2e8d2);-webkit-backdrop-filter:none;backdrop-filter:none}}
