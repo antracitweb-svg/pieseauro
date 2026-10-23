@@ -3073,3 +3073,14 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 #page-account .acc-user .acc-rating .text-btn{display:block;padding:0;text-align:left;font-size:13px;font-weight:700;line-height:1.35;color:#7a5a28!important;white-space:nowrap}
 #page-account .acc-user .acc-rating .acc-rate-row{display:block}
 #page-account .acc-user .acc-rating .stars{font-size:13px}
+
+/* v13: cardul de cont mai mic (mai puțin înalt), cu butonul Notificări în colțul din dreapta sus */
+#page-account .acc-user{padding:9px 12px!important;gap:10px!important;flex-wrap:nowrap!important;border-radius:14px!important;margin:2px 0 8px!important;border-bottom-width:3px!important}
+#page-account .acc-user>div{gap:0!important;min-width:0}
+#page-account .acc-user b#accountHello{font-size:17px!important;line-height:1.2!important}
+#page-account .acc-user small{font-size:12px!important;line-height:1.3!important}
+#page-account .acc-user #accountHello+small{margin-top:1px!important;padding:0 8px!important;font-size:11px!important}
+#page-account .acc-user .acc-rating .text-btn{font-size:12px!important;line-height:1.3!important}
+#page-account .acc-user .acc-rating .stars{font-size:12px!important}
+#page-account .acc-user .acc-avatar-wrap{flex:0 0 44px!important;width:44px!important;height:44px!important;align-self:flex-start;margin-top:2px}
+#page-account .acc-notif{position:absolute!important;top:9px!important;right:12px!important;margin:0!important;padding:4px 10px!important;font-size:12px!important}
