@@ -3607,3 +3607,99 @@ function addSwipe(el, onSwipe){
     hide();
   },true);
 })();
+
+/* === Ferestre ca pe desktop: _ □ X + mutare (doar laptop / ecrane mari, peste 820px) === */
+(function(){
+  const TITLES={detailModal:'Anunț',requestModal:'Cerere de piesă',adminListingModal:'Anunț (admin)',csvModal:'Import anunțuri CSV'};
+  const mq=window.matchMedia('(min-width:821px)');
+  const I_MIN='<svg viewBox="0 0 14 14"><path d="M2 10h10"/></svg>';
+  const I_MAX='<svg viewBox="0 0 14 14"><rect x="2.5" y="2.5" width="9" height="9"/></svg>';
+  const I_RES='<svg viewBox="0 0 14 14"><rect x="2.5" y="4.5" width="7" height="7"/><path d="M4.5 4.5V2.5h7v7h-2"/></svg>';
+  const I_X='<svg viewBox="0 0 14 14"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9"/></svg>';
+
+  function setup(modal){
+    const card=modal.querySelector('.modal-card'); if(!card) return;
+    const st={x:0,y:0,min:false,max:false};
+    let drag=null, lastTitle='', wasOpen=!modal.classList.contains('hidden');
+
+    const bar=document.createElement('div'); bar.className='wc-bar';
+    bar.innerHTML='<div class="wc-title"></div><div class="wc-btns">'+
+      '<button type="button" class="wc-btn" data-wc="min" aria-label="Minimizează" title="Minimizează">'+I_MIN+'</button>'+
+      '<button type="button" class="wc-btn" data-wc="max" aria-label="Mărește" title="Mărește">'+I_MAX+'</button>'+
+      '<button type="button" class="wc-btn" data-close aria-label="Închide" title="Închide">'+I_X+'</button></div>';
+    card.insertBefore(bar,card.firstChild);
+    modal.classList.add('wc-on');
+    const titleEl=bar.querySelector('.wc-title'), maxBtn=bar.querySelector('[data-wc="max"]'), minBtn=bar.querySelector('[data-wc="min"]');
+
+    function paint(){
+      modal.classList.toggle('wc-min',st.min);
+      modal.classList.toggle('wc-max',st.max&&!st.min);
+      card.style.setProperty('--wc-x',st.x+'px'); card.style.setProperty('--wc-y',st.y+'px');
+      maxBtn.innerHTML=st.max?I_RES:I_MAX;
+      const lbl=st.max?'Readu la mărimea mică':'Mărește'; maxBtn.title=lbl; maxBtn.setAttribute('aria-label',lbl);
+      const l2=st.min?'Restaurează':'Minimizează'; minBtn.title=l2; minBtn.setAttribute('aria-label',l2);
+    }
+    function reset(){ st.x=0; st.y=0; st.min=false; st.max=false; paint(); }
+
+    function updateTitle(){
+      const h=card.querySelector('h2');
+      const t=(h&&h.textContent.trim())||TITLES[modal.id]||'';
+      if(t===lastTitle) return;
+      if(st.min&&lastTitle&&h){ st.min=false; paint(); }   // s-a deschis alt anunț cât era minimizată
+      lastTitle=t; titleEl.textContent=t;
+    }
+
+    bar.addEventListener('click',e=>{
+      const b=e.target.closest('[data-wc]'); if(!b) return;
+      if(b.dataset.wc==='min') st.min=!st.min;
+      else if(st.min) st.min=false;
+      else st.max=!st.max;
+      paint();
+    });
+    bar.addEventListener('dblclick',e=>{
+      if(e.target.closest('.wc-btn')||st.min||!mq.matches) return;
+      st.max=!st.max; paint();
+    });
+
+    bar.addEventListener('pointerdown',e=>{
+      if(e.button!==0||e.target.closest('.wc-btn')||st.max||st.min||!mq.matches) return;
+      const r=card.getBoundingClientRect();
+      drag={sx:e.clientX,sy:e.clientY,x0:st.x,y0:st.y,r:r,s:(r.width/card.offsetWidth)||1};
+      try{ bar.setPointerCapture(e.pointerId); }catch(_){}
+      bar.classList.add('wc-drag'); e.preventDefault();
+    });
+    bar.addEventListener('pointermove',e=>{
+      if(!drag) return;
+      let dx=e.clientX-drag.sx, dy=e.clientY-drag.sy; const r=drag.r;
+      dx=Math.min(Math.max(dx,150-r.right),window.innerWidth-r.right);      // butoanele _ □ X rămân mereu pe ecran
+      dy=Math.min(Math.max(dy,-r.top),window.innerHeight-40-r.top);         // bara nu iese sus/jos din ecran
+      st.x=drag.x0+dx/drag.s; st.y=drag.y0+dy/drag.s; paint();
+    });
+    const endDrag=()=>{ drag=null; bar.classList.remove('wc-drag'); };
+    bar.addEventListener('pointerup',endDrag);
+    bar.addEventListener('pointercancel',endDrag);
+    bar.addEventListener('lostpointercapture',endDrag);
+
+    window.addEventListener('resize',()=>{
+      if(modal.classList.contains('hidden')||st.max||st.min||(!st.x&&!st.y)) return;
+      const r=bar.getBoundingClientRect();
+      if(r.top<0||r.top>window.innerHeight-40||r.right<150||r.right>window.innerWidth+1){ st.x=0; st.y=0; paint(); }
+    });
+
+    // la deschidere / închidere: pornește mereu din centru, mărime mică
+    new MutationObserver(()=>{
+      const open=!modal.classList.contains('hidden');
+      if(open!==wasOpen){ wasOpen=open; reset(); lastTitle=''; }
+      if(open) updateTitle();
+    }).observe(modal,{attributes:true,attributeFilter:['class']});
+    // titlul urmează conținutul anunțului (se încarcă după deschidere)
+    new MutationObserver(muts=>{
+      if(muts.every(m=>bar.contains(m.target))) return;
+      updateTitle();
+    }).observe(card,{childList:true,subtree:true,characterData:true});
+
+    paint(); updateTitle();
+  }
+
+  ['detailModal','requestModal','adminListingModal','csvModal'].forEach(id=>{ const m=document.getElementById(id); if(m) setup(m); });
+})();

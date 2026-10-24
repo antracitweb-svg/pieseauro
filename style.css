@@ -3393,3 +3393,31 @@ body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .p
 @media(min-width:1600px){
   :is(#page-results,#page-account,#page-request-pick,#page-request,#page-sell,#page-dism,#page-services,#page-match,#page-requests,#page-stores,#page-mine,#page-messages,#page-saved,#page-privacy,#page-cookies,#page-rules,#page-contact,#page-terms,#page-reset-password,#page-admin,#page-account-tool,#page-settings,#page-verify-email-change,#page-verify-email)>.container{width:min(1360px,calc(100% - 96px))!important}
 }
+
+/* === Ferestre ca pe desktop: _ □ X + mutare (doar laptop / ecrane mari, peste 820px) ===
+   Se aplică la: detailModal, requestModal, adminListingModal, csvModal. Pe telefon nu se schimbă nimic. */
+.wc-bar{display:none}
+@media(min-width:821px){
+  .modal.wc-on .close{display:none!important}
+  .modal.wc-on .modal-card.wide{padding:0 22px 22px!important;translate:var(--wc-x,0px) var(--wc-y,0px)}
+  .modal.wc-on .wc-bar{display:flex;position:sticky;top:0;z-index:40;align-items:stretch;height:38px;margin:0 -22px 14px;background:#0e0f12;color:#e9d3a8;cursor:grab;-webkit-user-select:none;user-select:none;touch-action:none}
+  .modal.wc-on .wc-bar.wc-drag{cursor:grabbing}
+  .wc-title{flex:1;min-width:0;padding:0 14px;font-size:13px;font-weight:600;line-height:38px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wc-btns{display:flex;flex:none}
+  .wc-btn{width:46px;padding:0;border:0;background:transparent;color:#e9d3a8;display:grid;place-items:center;cursor:pointer}
+  .wc-btn:hover{background:rgba(255,255,255,.14)}
+  .wc-btn[data-close]:hover{background:#c42b1c;color:#fff}
+  .wc-btn:focus-visible{outline:2px solid #b8935a;outline-offset:-2px}
+  .wc-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.4;pointer-events:none}
+
+  /* pe tot ecranul */
+  .modal.wc-on.wc-max{padding:0;place-items:stretch}
+  .modal.wc-on.wc-max .modal-card.wide{width:100%!important;max-width:none!important;height:100%!important;max-height:none!important;border-radius:0!important;translate:none!important;zoom:1!important}
+  .modal.wc-on.wc-max .wc-bar{cursor:default}
+
+  /* minimizată: bară jos în stânga, pagina din spate rămâne folosibilă */
+  .modal.wc-on.wc-min{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;pointer-events:none}
+  .modal.wc-on.wc-min .modal-card.wide{position:fixed;left:18px;bottom:18px;width:340px!important;max-width:calc(100vw - 36px)!important;height:auto!important;max-height:none!important;overflow:hidden;padding:0!important;pointer-events:auto;translate:none!important;zoom:1!important;animation:none;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .modal.wc-on.wc-min .modal-card.wide>:not(.wc-bar){display:none!important}
+  .modal.wc-on.wc-min .wc-bar{margin:0;cursor:default}
+}
