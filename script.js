@@ -151,18 +151,29 @@ let catalogMakes = [];
 const state = { mode:'search', filters:{}, loaded:[], total:0, offset:0, token:0, extra:{}, sellImages:[], reqImages:[], offerImages:[] };
 
 async function api(url, opt={}){
-  let r;
-  try{
-    r = await fetch(url,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});
-  }catch{ throw new Error('Nu mă pot conecta la server. Verifică internetul.'); }
-  let d = {};
-  try{ d = await r.json(); }catch{}
+  const isGet = !opt.method || String(opt.method).toUpperCase()==='GET';
+  let r, txt='', d = {}, tries = 0;
+  for(;;){
+    try{
+      r = await fetch(url,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});
+    }catch{
+      if(isGet && tries++<2){ await new Promise(s=>setTimeout(s,2500)); continue; }
+      throw new Error('Nu mă pot conecta la server. Verifică internetul.');
+    }
+    // Serverul gratuit Render se trezește greu: 502/503/504 la GET se reîncearcă automat.
+    if(isGet && [502,503,504].includes(r.status) && tries++<2){ await new Promise(s=>setTimeout(s,2500)); continue; }
+    break;
+  }
+  try{ txt = await r.text(); }catch{}
+  let badJson = false;
+  if(txt){ try{ d = JSON.parse(txt); }catch{ badJson = true; d = {}; } }
   if(!r.ok){
     if(r.status===401 && d.error==='AUTH_REQUIRED' && currentUser){ currentUser=null; renderHeader(); }
     if(r.status===403 && d.error==='BOT_CHECK'){ try{ const last=Number(sessionStorage.getItem('bc_reload'))||0; if(Date.now()-last>60000){ sessionStorage.setItem('bc_reload',String(Date.now())); location.reload(); } }catch{} }
-    const e = new Error(ERR[d.error] || d.message || 'A apărut o eroare.');
+    const e = new Error(ERR[d.error] || d.message || (badJson ? 'Serverul nu a răspuns corect (pornește sau este suprasolicitat). Încearcă din nou în câteva secunde.' : 'A apărut o eroare.'));
     e.code = d.error; e.status = r.status; throw e;
   }
+  if(badJson){ const e = new Error('Serverul a trimis un răspuns invalid. Reîncarcă pagina și încearcă din nou.'); e.code='BAD_JSON'; e.status=r.status; throw e; }
   if(currentUser && !/^\/api\/counts/.test(url) && (/^\/api\/(messages|notifications|orders|offers|requests|listings\/mine)/.test(url) || (opt.method && opt.method!=='GET'))) scheduleCounts();
   return d;
 }
@@ -1043,12 +1054,12 @@ function cardMine(x){
     <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${money(x.price)}</b></div></article>`;
 }
 /* Format compact (ca în „Anunțurile mele”): poză stânga, titlu, butoane, apoi vizualizări · bucăți · preț. Folosit peste tot unde apar anunțuri. */
-function adRowHtml(x){
+function adRowHtml(x, eager){
   const fav = favorites.includes(x.id);
   const isDism = x.type==='dezmembrari';
   const im = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
   const nImg = Number(x.image_count)||0;
-  const thumb = im ? `<img src="${esc(im)}" alt="" loading="lazy" decoding="async">` : `<span class="ar-ph">${isDism?'🚗':'⚙️'}</span>`;
+  const thumb = im ? `<img src="${esc(im)}" alt="" ${eager?'fetchpriority="high"':'loading="lazy"'} decoding="async">` : `<span class="ar-ph">${isDism?'🚗':'⚙️'}</span>`;
   const compat = [x.make,x.model,x.year].filter(Boolean).join(' ') + (x.engine?' · '+x.engine:'');
   const meta = [compat || x.category || 'Piesă auto'];
   if(compat && x.category && !isDism) meta.push(x.category);
@@ -1076,7 +1087,7 @@ function adRowHtml(x){
 }
 
 /* Anunțuri noi pe pagina de start */
-async function loadHome(){
+async function loadHome(attempt=0){
   const box=$('#homeFeed'), wrap=$('#homeFeedWrap'); if(!box||!wrap) return;
   if(!box.dataset.loaded){ wrap.classList.remove('hidden'); box.innerHTML=SKEL; }
   try{
@@ -1084,13 +1095,17 @@ async function loadHome(){
     const list=(r&&r.listings)||[];
     if(!list.length){ wrap.classList.add('hidden'); box.innerHTML=''; return; }
     wrap.classList.remove('hidden');
-    box.innerHTML=list.map(x=>card(x)).join(''); box.dataset.loaded='1';
+    box.innerHTML=list.map((x,i)=>card(x,{eager:i<3})).join(''); box.dataset.loaded='1';
     updateFavUI();
-  }catch(e){ if(!box.dataset.loaded){ wrap.classList.add('hidden'); box.innerHTML=''; } }
+  }catch(e){
+    if(box.dataset.loaded) return;
+    if(attempt<3){ setTimeout(()=>loadHome(attempt+1), 4000); return; }
+    wrap.classList.add('hidden'); box.innerHTML='';
+  }
 }
 function card(x, o={}){
   if(o.mine) return cardMine(x);
-  return adRowHtml(x);
+  return adRowHtml(x, o.eager);
 }
 
 function updateFavUI(){

@@ -1002,7 +1002,7 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,ah(async(req,res)=>{
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.images[1:1] AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
+const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
 // Media calificativelor: ca vânzător (de la cumpărători) și ca cumpărător (de la vânzători).
 const RATE_SQL=(tbl,col,uid,al)=>`(SELECT ROUND(AVG(stars),1)::float FROM ${tbl} WHERE ${col}=${uid}) ${al}_avg,(SELECT COUNT(*)::int FROM ${tbl} WHERE ${col}=${uid}) ${al}_n`;
 const SELLER_RATE=(uid,al)=>RATE_SQL('seller_ratings','seller_id',uid,al);
@@ -1059,7 +1059,7 @@ function buildListingFilter(query){
  if(delivery==='true')where.push('l.delivery=true');
  return {where,vals,condClause};
 }
-app.get('/api/listings',requireDb,async(req,res)=>{
+app.get('/api/listings',requireDb,ah(async(req,res)=>{
  const ckey=req.originalUrl,hit=LIST_CACHE.get(ckey);
  if(hit&&Date.now()-hit.at<LIST_CACHE_TTL)return res.json(hit.body);
  // Public: doar anunțuri aprobate. Statusul NU este controlat din query string.
@@ -1075,7 +1075,17 @@ app.get('/api/listings',requireDb,async(req,res)=>{
  if(LIST_CACHE.size>=LIST_CACHE_MAX)LIST_CACHE.clear();
  LIST_CACHE.set(ckey,{at:Date.now(),body});
  res.json(body);
-});
+}));
+// Poza unui anunț ca fișier (cache în browser). Pozele vechi sunt base64 în DB; listele trimit doar acest URL scurt.
+app.get('/api/listings/:id/img/:n(\\d{1,2})',requireDb,ah(async(req,res)=>{
+ const n=Math.max(0,Math.floor(Number(req.params.n))||0);
+ const r=await pool.query("SELECT images[$2::int] img FROM listings WHERE id=$1 AND status NOT IN ('blocked','rejected')",[req.params.id,n+1]);
+ const img=r.rowCount?(r.rows[0].img||''):'';
+ if(/^https?:\/\//.test(img))return res.redirect(302,img);
+ const m=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/.exec(img);
+ if(!m)return res.status(404).end();
+ res.set({'Content-Type':m[1],'Cache-Control':'public, max-age=86400'}).send(Buffer.from(m[2],'base64'));
+}));
 app.get('/api/listings/:id',requireDb,async(req,res)=>{
  const r=await pool.query(`SELECT l.*,${SELLER_COLS},u.show_phone seller_show_phone,${VAC_SQL('u')} seller_vacation,CASE WHEN ${VAC_SQL('u')} THEN u.vacation_until::text END seller_vacation_until FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'`,[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
