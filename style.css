@@ -3301,3 +3301,33 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .promo-plan{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 6px;min-height:0}
 .promo-plan span{font-size:13px;opacity:.85}
 .promo-plan[disabled]{opacity:.5;cursor:default}
+
+/* ===== Antete de pagină în chenar (stil "Contul meu") ===== */
+body .page-head:has(>div>h2){flex-direction:column;align-items:stretch;gap:4px;border:0;padding:0;margin:0 0 12px}
+body .page-head:has(>div>h2)>.back{align-self:flex-start;padding:4px 0}
+body .page-head>div:has(>h2){display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:12px;row-gap:1px;align-items:center;padding:10px 14px;margin:2px 0 0;background:#fffefb;border:1px solid #e8e2d6;border-bottom:3px solid #b8935a;border-radius:14px;box-shadow:0 1px 2px rgba(40,30,10,.05),0 4px 14px rgba(40,30,10,.05);min-width:0}
+body .page-head>div:has(>h2)::before{content:"📄";grid-column:1;grid-row:1 / span 2;width:48px;height:48px;border-radius:50%;background:#f6eedb;display:grid;place-items:center;font-size:22px;line-height:1;box-shadow:0 0 0 3px #b8935a,0 0 0 5px rgba(232,211,168,.35),0 6px 14px rgba(40,30,10,.25);margin:3px 0}
+body .page-head>div:has(>h2)>.eyebrow{display:none}
+body .page-head>div:has(>h2)>h2{grid-column:2;grid-row:1;margin:0;font-size:20px;line-height:1.2;letter-spacing:-.01em;color:#17181b;align-self:end}
+body .page-head>div:has(>h2)>h2::after{display:none}
+body .page-head>div:has(>h2)>p{grid-column:2;grid-row:2;margin:0;font-size:13px;line-height:1.35;color:#77746c;align-self:start}
+body .page-head>div:has(>h2)>p:empty{display:none}
+body .page-head>div:has(>h2)>:not(.eyebrow):not(h2):not(p){grid-column:1 / -1}
+@media(max-width:700px){body .page-head>div:has(>h2){padding:9px 12px;column-gap:10px}}
+/* iconițe pe pagini */
+#page-requests .page-head>div::before{content:"🔎"}
+#page-requests.req-mine .page-head>div::before{content:"📝"}
+#page-request-pick .page-head>div::before,#page-request .page-head>div::before{content:"📝"}
+#page-sell .page-head>div::before{content:"🏷️"}
+#page-dism .page-head>div::before{content:"🚗"}
+#page-stores .page-head>div::before{content:"🏪"}
+#page-saved .page-head>div::before{content:"🔖"}
+#page-match .page-head>div::before{content:"✅"}
+#page-services .page-head>div::before{content:"🔧"}
+#page-results .page-head>div::before{content:"🔍"}
+#page-account-tool .page-head>div::before{content:"⚙️"}
+#page-reset-password .page-head>div::before{content:"🔑"}
+#page-verify-email .page-head>div::before,#page-verify-email-change .page-head>div::before{content:"✉️"}
+.seller-view .page-head>div::before{display:none}
+.seller-view .page-head>div:has(>h2){grid-template-columns:minmax(0,1fr)}
+.seller-view .page-head>div:has(>h2)>p{grid-column:1}
