@@ -3331,3 +3331,44 @@ body .page-head>div:has(>h2)>:not(.eyebrow):not(h2):not(p){grid-column:1 / -1}
 .seller-view .page-head>div::before{display:none}
 .seller-view .page-head>div:has(>h2){grid-template-columns:minmax(0,1fr)}
 .seller-view .page-head>div:has(>h2)>p{grid-column:1}
+
+/* ===== Chenar de antet compact (ca „Cererile mele”): Anunțurile mele, Mesagerie, Setări cont ===== */
+body .page-head.hd-compact{position:relative;margin:0 0 6px;padding:0}
+body .page-head.hd-compact>.back{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:1;min-height:0;margin:0;padding:6px 2px;align-self:auto}
+body .page-head.hd-compact>div:has(>h2){margin:0;padding:6px 84px 6px 12px;grid-template-columns:36px minmax(0,1fr);column-gap:10px}
+body .page-head.hd-compact>div:has(>h2)::before{width:36px;height:36px;font-size:17px;margin:0;box-shadow:0 0 0 2px #b8935a,0 0 0 4px rgba(232,211,168,.35),0 4px 9px rgba(40,30,10,.22)}
+body .page-head.hd-compact>div:has(>h2)>h2{font-size:18px}
+body .page-head.hd-compact>div:has(>h2)>p{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#page-mine .page-head>div::before{content:"📦"}
+#page-messages .page-head>div::before{content:"💬"}
+#page-settings .page-head>div::before{content:"⚙️"}
+body .page-head.hd-compact{margin-top:3px}
+#page-mine .page-head.hd-compact{margin-top:3px;margin-bottom:-1px}
+
+/* ===== Cererile mele: listă compactă (tab-uri, căutare, rânduri) ===== */
+#page-requests.req-mine .page-head.hd-compact{margin:3px 0 4px}
+#page-requests.req-mine>.container{padding-top:0}
+#page-requests .rq-mine-bar{margin:0}
+#page-requests .rq-mine-bar .mine-tabs{margin:0 0 8px;padding:0 2px}
+#page-requests .rq-mine-bar .mine-tab{padding:9px 9px 7px;font-size:15px;font-weight:500;color:#b8935a;border-bottom-width:3px}
+#page-requests .rq-mine-bar .mine-tab small{font-size:13px;font-weight:500;color:var(--muted)}
+#page-requests .rq-mine-bar .mine-tab.on{font-weight:700;color:#b8935a;border-bottom-color:#b8935a}
+#page-requests .rq-mine-bar .mine-search{border-radius:8px;margin:0 0 6px;border:1px solid #ddd3bf}
+#page-requests .rq-mine-bar .mine-search input{padding:9px 12px;font-size:15px;min-height:0}
+#page-requests .rq-mine-bar .mine-search button{font-size:20px;padding:0 12px;color:#8f6d38}
+#page-requests .rq-mine-bar .mine-head{padding:4px 0;border-bottom:1px solid var(--line)}
+#page-requests .rq-mine-bar .mine-head b{font-size:15px}
+.rq-list{display:block;gap:0}
+.rq-row{display:block;padding:10px 2px 12px;border-bottom:1px solid var(--line);cursor:pointer;font-family:var(--font-sans,inherit)}
+.rq-row:hover{background:rgba(184,147,90,.07)}
+.rq-title{margin:0 0 2px;font-family:inherit;font-size:15px;font-weight:600;line-height:1.25;letter-spacing:0;color:#8f6d38}
+.rq-car{font-size:14px;color:var(--ink)}
+.rq-line{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:8px 0;font-size:14px;color:var(--ink)}
+.rq-line span:last-child{text-align:right}
+.rq-acts{display:flex;align-items:center;gap:8px}
+.rq-btn{border:1.5px solid #ddd3bf;background:#fff;color:#3b3224;border-radius:7px;padding:5px 10px;font:inherit;font-size:13.5px;cursor:pointer}
+.rq-icon{width:34px;padding:5px 0;text-align:center}
+.rq-win{border-color:#1c6d42;color:#1c6d42;background:#f1faf4;font-weight:600}
+
+/* Oferta câștigătoare (verde) cu data rezolvării */
+.req-win-date{margin:-4px 0 10px;font-size:13px;color:#1c6d42}
