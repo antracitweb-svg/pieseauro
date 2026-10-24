@@ -3235,10 +3235,13 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 #page-mine .mine-bar .mine-tools .mine-tool{
   flex:0 0 auto!important;width:auto!important;margin:0!important;height:40px!important;min-height:40px!important;
   padding:0 10px!important;font-size:13px!important;font-weight:600!important;white-space:nowrap;
-  background:#fffdf8!important;box-shadow:none!important;border:1.5px solid #b8935a!important;border-radius:8px!important;
+  background:linear-gradient(180deg,#fffdf8 0%,#f6eedb 100%)!important;
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #d8c39a,0 7px 12px rgba(40,30,10,.08)!important;
+  border:1.5px solid #b8935a!important;border-radius:8px!important;
 }
 #page-mine .mine-bar .mine-tools .mine-tool:first-child{margin-left:0!important}
-#page-mine .mine-bar .mine-tools .mine-tool:active{transform:scale(.97)!important}
+#page-mine .mine-bar .mine-tools .mine-tool:active{transform:translateY(3px)!important;box-shadow:inset 0 2px 4px rgba(40,30,10,.16),0 0 0 transparent!important}
+#page-mine .mine-bar{padding-bottom:4px}
 #page-mine .mine-bar .mine-search{flex:1 1 0;min-width:0;margin:0!important;height:40px;border-radius:8px}
 #page-mine .mine-bar .mine-search input{padding:0 4px 0 10px;font-size:14px;height:100%;text-overflow:ellipsis}
 #page-mine .mine-bar .mine-search button{font-size:18px;padding:0 9px}
@@ -3246,3 +3249,13 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   #page-mine .mine-bar{gap:6px}
   #page-mine .mine-bar .mine-tools .mine-tool{padding:0 7px!important;font-size:12px!important}
 }
+
+/* iconițe cu relief ușor + muchie fină sub buton */
+#page-mine .mine-list>.mine-row .mine-acts .mine-act,#page-mine .mine-act{
+  background:linear-gradient(180deg,#fff 0%,#faf5e8 100%)!important;
+  box-shadow:inset 0 1px 0 #fff,0 1.5px 0 #e0d3b6!important;
+}
+#page-mine .mine-act svg{
+  filter:drop-shadow(0 1px 0 rgba(255,255,255,.95)) drop-shadow(0 1.5px 1px rgba(70,48,12,.38));
+}
+#page-mine .mine-act:active{transform:translateY(1px)!important;box-shadow:inset 0 1px 2px rgba(40,30,10,.15)!important}
