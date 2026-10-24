@@ -3163,3 +3163,56 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 /* v15b: poza vânzătorului se poate deschide */
 .seller-avatar img[data-av]{cursor:zoom-in}
 .avatar-preview{z-index:2000}
+
+/* ===== v16: butoane ușor 3D peste tot (aceleași culori, doar relief: lumină sus, muchie jos, apăsare) ===== */
+/* — casetă proprietar anunț (Promovează, Editează, UP, Vândut, Șterge) — */
+.ad-owner .btn,.ad-owner .btn.small,.ad-owner .btn.ghost{
+  background:linear-gradient(180deg,#ffffff 0%,#f5f0e4 100%)!important;
+  border:1px solid var(--line,#e6e0d4)!important;
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #ddd2b8,0 7px 12px rgba(40,30,10,.08)!important;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+.ad-owner .btn.ad-promo{
+  background:linear-gradient(180deg,#cfab70 0%,#b8935a 58%,#a8834b 100%)!important;
+  border:1px solid #8f6d38!important;color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -1px 0 rgba(90,64,24,.25),0 3px 0 #7a5a28,0 7px 12px rgba(184,147,90,.3)!important;
+}
+.ad-owner .btn.danger,.ad-owner [data-del-listing]{
+  background:linear-gradient(180deg,#ffffff 0%,#fbf0ee 100%)!important;
+  border:1px solid #e6cfcb!important;
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #e8c9c4,0 7px 12px rgba(166,42,54,.08)!important;
+}
+/* — iconițe din lista „Anunțurile mele" — */
+#page-mine .mine-list>.mine-row .mine-acts .mine-act,.mine-act{
+  background:linear-gradient(180deg,#ffffff 0%,#f6f0e2 100%)!important;
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #d9ccb0,0 6px 10px rgba(40,30,10,.08)!important;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+/* — Filtrare / Afișare / Sortare — */
+.mine-tools .mine-tool,#page-mine .mine-tools .mine-tool{
+  background:linear-gradient(180deg,#fffdf8 0%,#f6eedb 100%)!important;
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #d8c39a,0 7px 12px rgba(40,30,10,.08)!important;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+/* — bara de jos din pagina anunțului (Contact / Adaugă în coș) — */
+.ad-callbar .btn,.ad-callbar .btn.ghost{
+  background:linear-gradient(180deg,#ffffff 0%,#f3eee2 100%)!important;
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #14110c,0 8px 14px rgba(0,0,0,.2)!important;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+.ad-callbar .btn.primary,.ad-callbar.own .btn.primary{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 0 #000,0 8px 14px rgba(0,0,0,.25)!important;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+/* — butoanele din meniul Contul meu — */
+#page-account .account-sections details>button{
+  background:linear-gradient(180deg,#fffefb 0%,#f8f3e8 100%)!important;
+  box-shadow:inset 0 1px 0 #fff,0 3px 0 #e3d9c3,0 7px 12px rgba(40,30,10,.06)!important;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+/* — apăsare: butonul coboară spre muchie — */
+.ad-owner .btn:active,#page-mine .mine-act:active,.mine-act:active,.mine-tools .mine-tool:active,.ad-callbar .btn:active,#page-account .account-sections details>button:active{
+  transform:translateY(3px);
+  box-shadow:inset 0 2px 4px rgba(40,30,10,.16),0 0 0 transparent!important;
+}
+@media (prefers-reduced-motion:reduce){.ad-owner .btn,.mine-act,.mine-tools .mine-tool,.ad-callbar .btn,#page-account .account-sections details>button{transition:none}}
