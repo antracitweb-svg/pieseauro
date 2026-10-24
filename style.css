@@ -3216,3 +3216,33 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   box-shadow:inset 0 2px 4px rgba(40,30,10,.16),0 0 0 transparent!important;
 }
 @media (prefers-reduced-motion:reduce){.ad-owner .btn,.mine-act,.mine-tools .mine-tool,.ad-callbar .btn,#page-account .account-sections details>button{transition:none}}
+
+
+/* v-fine: butoane de acțiune subțiri în „Anunțurile mele” + căutarea pe același rând cu Filtrare / Afișare */
+#page-mine .mine-list>.mine-row .mine-acts{gap:8px!important}
+#page-mine .mine-list>.mine-row .mine-acts .mine-act,#page-mine .mine-act{
+  width:30px!important;height:28px!important;border-radius:8px!important;
+  background:#fff!important;border:1px solid #e3d9c3!important;color:#6b5a3a!important;
+  box-shadow:none!important;filter:none!important;
+}
+#page-mine .mine-list>.mine-row .mine-acts .mine-act svg,#page-mine .mine-act svg{width:15px!important;height:15px!important}
+#page-mine .mine-list>.mine-row .mine-acts .mine-act:hover{background:#faf6ec!important;color:#14110c!important}
+#page-mine .mine-list>.mine-row .mine-acts .mine-act:last-child{color:#a3322b!important;border-color:#ecd5d1!important}
+#page-mine .mine-act:active{transform:scale(.94)!important;box-shadow:none!important}
+
+#page-mine .mine-bar{display:flex;align-items:stretch;gap:8px;margin:0 0 10px}
+#page-mine .mine-bar .mine-tools{display:flex!important;flex:0 0 auto;flex-wrap:nowrap!important;gap:8px!important;margin:0!important}
+#page-mine .mine-bar .mine-tools .mine-tool{
+  flex:0 0 auto!important;width:auto!important;margin:0!important;height:40px!important;min-height:40px!important;
+  padding:0 10px!important;font-size:13px!important;font-weight:600!important;white-space:nowrap;
+  background:#fffdf8!important;box-shadow:none!important;border:1.5px solid #b8935a!important;border-radius:8px!important;
+}
+#page-mine .mine-bar .mine-tools .mine-tool:first-child{margin-left:0!important}
+#page-mine .mine-bar .mine-tools .mine-tool:active{transform:scale(.97)!important}
+#page-mine .mine-bar .mine-search{flex:1 1 0;min-width:0;margin:0!important;height:40px;border-radius:8px}
+#page-mine .mine-bar .mine-search input{padding:0 4px 0 10px;font-size:14px;height:100%;text-overflow:ellipsis}
+#page-mine .mine-bar .mine-search button{font-size:18px;padding:0 9px}
+@media(max-width:360px){
+  #page-mine .mine-bar{gap:6px}
+  #page-mine .mine-bar .mine-tools .mine-tool{padding:0 7px!important;font-size:12px!important}
+}
