@@ -300,53 +300,59 @@ function avatarToDataUrl(file){
     rd.onerror=()=>reject(new Error('Fișierul nu a putut fi citit.')); rd.readAsDataURL(file);
   });
 }
-/* Poza de profil: 1 secundă apăsat = poza mărită; 4 secunde apăsat (și ridici degetul) = schimbă poza */
+/* Poza de profil: o apăsare = poza mărită (cu coș pentru ștergere); fără poză: alegi una direct */
 function setupAvatarHold(){
   const btn=$('#avatarBtn'); if(!btn||btn.dataset.hold) return; btn.dataset.hold='1';
-  const SHOW_MS=1000, CHANGE_MS=4000;
-  let ov=null, tShow=0, tChange=0, shown=false, ready=false, sx=0, sy=0, down=false;
-  const hint='Ține apăsat 4 secunde pentru a schimba poza';
-  function closePreview(){ if(ov){ ov.remove(); ov=null; } shown=false; }
+  let ov=null;
+  function closePreview(){ if(ov){ ov.remove(); ov=null; } }
   function openPreview(){
     const img=btn.querySelector('img[data-av]'); if(!img) return;
-    closePreview(); shown=true;
+    closePreview();
     ov=document.createElement('div'); ov.className='avatar-preview'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-label','Poza de profil');
     const big=document.createElement('img'); big.src=img.src; big.alt='Poza de profil';
-    const cap=document.createElement('p'); cap.textContent=hint;
-    ov.append(big,cap); ov._cap=cap; ov._t=Date.now();
-    ov.addEventListener('click',()=>{ if(Date.now()-ov._t>400) closePreview(); });
+    ov.append(big);
+    const del=document.createElement('button'); del.type='button'; del.className='avatar-del'; del.textContent='🗑️'; del.setAttribute('aria-label','Șterge poza'); del.title='Șterge poza';
+    del.addEventListener('click',ev=>{ ev.stopPropagation(); if(confirm('Ștergi poza de profil?')){ closePreview(); removeAvatar(); } });
+    ov.append(del);
+    ov.addEventListener('click',closePreview);
     document.body.appendChild(ov);
   }
-  function reset(){ clearTimeout(tShow); clearTimeout(tChange); tShow=tChange=0; ready=false; down=false; }
-  btn.addEventListener('pointerdown',e=>{
-    if(e.button>0) return;
-    reset(); down=true; sx=e.clientX; sy=e.clientY;
-    try{ btn.setPointerCapture(e.pointerId); }catch(_){}
-    tShow=setTimeout(()=>{ openPreview(); },SHOW_MS);
-    tChange=setTimeout(()=>{
-      ready=true; if(ov&&ov._cap) ov._cap.textContent='Ridică degetul pentru a schimba poza';
-      try{ if(navigator.vibrate) navigator.vibrate(40); }catch(_){}
-    },CHANGE_MS);
+  btn.addEventListener('click',()=>{
+    if(currentUser&&currentUser.has_avatar===true) openPreview(); else $('#avatarFile').click();
   });
-  btn.addEventListener('pointermove',e=>{ if(down&&!shown&&Math.hypot(e.clientX-sx,e.clientY-sy)>12) reset(); });
-  btn.addEventListener('pointercancel',()=>{ reset(); });
-  btn.addEventListener('pointerup',e=>{
-    if(!down) return;
-    const wasReady=ready; reset();
-    if(wasReady){ closePreview(); $('#avatarFile').click(); return; }
-    if(shown) return; /* poza mărită rămâne deschisă până apeși pe ea */
-    if(!(currentUser&&currentUser.has_avatar===true)){ $('#avatarFile').click(); return; } /* fără poză: alegi una direct */
-    toast('Ține apăsat 1 secundă pentru a mări poza, 4 secunde pentru a o schimba.');
-  });
-  btn.addEventListener('contextmenu',e=>e.preventDefault());
-  btn.addEventListener('click',e=>{ if(e.detail===0) $('#avatarFile').click(); }); /* tastatură: Enter / Space */
   document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePreview(); });
 }
+/* Poza altui utilizator: o apăsare pe poză din cardul vânzătorului o deschide mărită */
+document.addEventListener('click',e=>{
+  const img=e.target.closest&&e.target.closest('.seller-avatar img[data-av]'); if(!img) return;
+  e.preventDefault(); e.stopPropagation();
+  const old=document.querySelector('.avatar-preview'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.className='avatar-preview'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-label','Poza de profil');
+  const big=document.createElement('img'); big.src=img.src; big.alt='Poza de profil';
+  ov.append(big);
+  const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); };
+  const onKey=ev=>{ if(ev.key==='Escape') close(); };
+  ov.addEventListener('click',close); document.addEventListener('keydown',onKey);
+  document.body.appendChild(ov);
+},true);
+/* Panourile care se deschid (Contact, Filtrare, Sortare, Notificări) se închid când apeși în afara lor */
+document.addEventListener('click',e=>{
+  const t=e.target; if(!t||!t.closest) return;
+  $$('.contact-fold').forEach(f=>{
+    const p=f.querySelector('.contact-panel'); if(!p||p.classList.contains('hidden')||f.contains(t)) return;
+    p.classList.add('hidden'); const b=f.querySelector('[data-contact-toggle]'); if(b){ b.setAttribute('aria-expanded','false'); b.classList.remove('open'); }
+  });
+  const f=$('#filters');
+  if(f&&f.classList.contains('open')&&window.matchMedia('(max-width:800px)').matches&&!f.contains(t)&&!t.closest('#filterToggle')) f.classList.remove('open');
+  [['#mineFilterPanel','#mineFilterBtn'],['#mineSortPanel','#mineSortBtn'],['#msgFilterPanel','#msgFilterBtn'],['#notifSummary','#notifBtn']].forEach(([pi,bi])=>{
+    const p=$(pi); if(!p||p.classList.contains('hidden')||p.contains(t)||t.closest(bi)) return;
+    p.classList.add('hidden'); const b=$(bi); if(b&&b.hasAttribute('aria-expanded')) b.setAttribute('aria-expanded','false');
+  });
+});
 function renderAccountAvatar(bust){
   const b=$('#avatarBtn'); if(!b||!currentUser) return;
   const has=currentUser.has_avatar===true;
   b.innerHTML='<i>👤</i>'+(has?`<img src="/api/users/${Number(currentUser.id)}/avatar${bust?'?v='+bust:''}" alt="" data-av>`:'');
-  $('#avatarRemove').classList.toggle('hidden',!has);
 }
 async function onAvatarPick(){
   const inp=$('#avatarFile'), f=inp.files[0]; if(!f) return;
@@ -370,9 +376,8 @@ function renderAccountRatings(){
   el.innerHTML='';
   api('/api/sellers/'+currentUser.id+'/ratings').then(r=>{
     if(!currentUser||!el.isConnected) return;
-    const part=(label,p)=>p&&p.count?`<span class="acc-rate-row">${label} ${starsHtml(p.avg)} <b>${esc(String(p.avg).replace('.',','))}</b> (${p.count})</span>`:'';
-    const parts=[part('Vânzător',r.seller),part('Cumpărător',r.buyer)].filter(Boolean);
-    el.innerHTML=parts.length?parts.join(''):'<span class="acc-rate-row">Calificative: încă niciunul</span>';
+    const part=(label,role,p)=>`<button type="button" class="text-btn acc-rate-row" data-reviews="${Number(currentUser.id)}" data-role="${role}">${label} `+(p&&p.count?`${starsHtml(p.avg)} <b>${esc(String(p.avg).replace('.',','))}</b> (${p.count})`:`<span class="muted">fără calificative</span>`)+`</button>`;
+    el.innerHTML=part('Vânzător','seller',r.seller)+part('Cumpărător','buyer',r.buyer);
   }).catch(()=>{});
 }
 function renderAccount(){
@@ -2962,7 +2967,6 @@ function wire(){
   $$('input[name="billType"]').forEach(r=>r.addEventListener('change', syncBillType));
   setupAvatarHold();
   $('#avatarFile').addEventListener('change', onAvatarPick);
-  $('#avatarRemove').addEventListener('click', removeAvatar);
   $('#storeForm').addEventListener('submit', saveStore);
   $('#notifForm').addEventListener('submit', saveNotifPrefs);
   $('#vacationForm').addEventListener('submit', saveVacation);
