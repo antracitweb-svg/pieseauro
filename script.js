@@ -3610,7 +3610,7 @@ function addSwipe(el, onSwipe){
 
 /* === Ferestre ca pe desktop: _ □ X + mutare (doar laptop / ecrane mari, peste 820px) === */
 (function(){
-  const TITLES={detailModal:'Anunț',requestModal:'Cerere de piesă',adminListingModal:'Anunț (admin)',csvModal:'Import anunțuri CSV'};
+  const TITLES={detailModal:'Anunț',requestModal:'Cerere de piesă',adminListingModal:'Anunț (admin)',csvModal:'Import anunțuri CSV',garageModal:'Mașina ta'};
   const mq=window.matchMedia('(min-width:821px)');
   const I_MIN='<svg viewBox="0 0 14 14"><path d="M2 10h10"/></svg>';
   const I_MAX='<svg viewBox="0 0 14 14"><rect x="2.5" y="2.5" width="9" height="9"/></svg>';
@@ -3701,5 +3701,5 @@ function addSwipe(el, onSwipe){
     paint(); updateTitle();
   }
 
-  ['detailModal','requestModal','adminListingModal','csvModal'].forEach(id=>{ const m=document.getElementById(id); if(m) setup(m); });
+  ['detailModal','requestModal','adminListingModal','csvModal','garageModal'].forEach(id=>{ const m=document.getElementById(id); if(m) setup(m); });
 })();
