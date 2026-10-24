@@ -429,6 +429,10 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS added_at TIMESTAMPTZ',
   'UPDATE listings SET added_at=created_at WHERE added_at IS NULL',
   'ALTER TABLE listings ALTER COLUMN added_at SET DEFAULT NOW()',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS promoted_until TIMESTAMPTZ',
+  'CREATE TABLE IF NOT EXISTS credit_tx (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, balance_after INTEGER NOT NULL, kind TEXT NOT NULL, ref_id INTEGER, note TEXT, amount_lei NUMERIC(12,2), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE INDEX IF NOT EXISTS credit_tx_user_idx ON credit_tx(user_id,created_at DESC)',
   'CREATE INDEX IF NOT EXISTS listings_user_status_idx ON listings(user_id,status)',
   'ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ',
   "ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
@@ -1002,7 +1006,7 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,ah(async(req,res)=>{
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
+const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
 // Media calificativelor: ca vânzător (de la cumpărători) și ca cumpărător (de la vânzători).
 const RATE_SQL=(tbl,col,uid,al)=>`(SELECT ROUND(AVG(stars),1)::float FROM ${tbl} WHERE ${col}=${uid}) ${al}_avg,(SELECT COUNT(*)::int FROM ${tbl} WHERE ${col}=${uid}) ${al}_n`;
 const SELLER_RATE=(uid,al)=>RATE_SQL('seller_ratings','seller_id',uid,al);
@@ -1065,7 +1069,7 @@ app.get('/api/listings',requireDb,ah(async(req,res)=>{
  // Public: doar anunțuri aprobate. Statusul NU este controlat din query string.
  const {where,vals,condClause}=buildListingFilter(req.query);
  // Anunțurile fără preț (0) apar la final și la sortare crescătoare.
- const order={price_asc:'(COALESCE(l.price,0)=0) ASC, l.price ASC, l.id DESC',price_desc:'l.price DESC NULLS LAST, l.id DESC'}[req.query.sort]||'l.created_at DESC, l.id DESC';
+ const order={price_asc:'(COALESCE(l.price,0)=0) ASC, l.price ASC, l.id DESC',price_desc:'l.price DESC NULLS LAST, l.id DESC'}[req.query.sort]||'(COALESCE(l.promoted_until,\'epoch\'::timestamptz)>NOW()) DESC, l.created_at DESC, l.id DESC';
  const limit=Math.min(60,Math.max(1,Math.floor(Number(req.query.limit))||30)), offset=Math.min(100000,Math.max(0,Math.floor(Number(req.query.offset))||0));
  // Facete: câte anunțuri sunt Noi / Second-hand pentru aceeași căutare (filtrul de stare nu se aplică, dar parametrul rămâne folosit).
  const fWhere=where.map((w,ix)=>condClause&&ix===condClause.at?`($${condClause.param}::text IS NOT NULL)`:w);
@@ -1177,6 +1181,49 @@ app.post('/api/listings/:id/bump',auth,requireDb,async(req,res)=>{
  if(!r.rowCount)return res.status(400).json({error:'REACTUALIZARE_PREA_DEVREME'});
  res.json({listing:r.rows[0]});
 });
+
+/* ===== Credite și promovare anunțuri ===== */
+const PROMO_PLANS={3:5,7:10,30:30}; // zile -> credite
+async function creditMove(db,uid,amount,kind,refId,note,lei){
+  const u=await db.query('UPDATE users SET credits=credits+$2 WHERE id=$1 AND credits+$2>=0 RETURNING credits',[uid,amount]);
+  if(!u.rowCount)return null;
+  await db.query('INSERT INTO credit_tx(user_id,amount,balance_after,kind,ref_id,note,amount_lei) VALUES($1,$2,$3,$4,$5,$6,$7)',[uid,amount,u.rows[0].credits,kind,refId||null,note?String(note).slice(0,200):null,lei||null]);
+  return u.rows[0].credits;
+}
+app.get('/api/credits',auth,requireDb,ah(async(req,res)=>{
+  const b=await pool.query('SELECT credits FROM users WHERE id=$1',[req.user.id]);
+  const t=await pool.query('SELECT id,amount,balance_after,kind,ref_id,note,amount_lei,created_at FROM credit_tx WHERE user_id=$1 ORDER BY id DESC LIMIT 100',[req.user.id]);
+  res.json({balance:(b.rows[0]&&b.rows[0].credits)||0,plans:Object.entries(PROMO_PLANS).map(([days,cost])=>({days:Number(days),cost})),tx:t.rows});
+}));
+app.post('/api/listings/:id/promote',auth,requireDb,ah(async(req,res)=>{
+  const days=Math.floor(Number((req.body||{}).days)),cost=PROMO_PLANS[days];
+  if(!cost)return res.status(400).json({error:'PLAN_INVALID'});
+  const id=Math.floor(Number(req.params.id));
+  if(!Number.isInteger(id)||id<=0)return res.status(404).json({error:'NOT_FOUND'});
+  const c=await pool.connect();
+  try{
+    await c.query('BEGIN');
+    const l=await c.query("SELECT id,title FROM listings WHERE id=$1 AND user_id=$2 AND status='approved' FOR UPDATE",[id,req.user.id]);
+    if(!l.rowCount){await c.query('ROLLBACK');return res.status(404).json({error:'NOT_FOUND'});}
+    const bal=await creditMove(c,req.user.id,-cost,'promo',id,'Promovare '+days+(days===1?' zi: ':' zile: ')+l.rows[0].title);
+    if(bal===null){await c.query('ROLLBACK');return res.status(402).json({error:'CREDITE_INSUFICIENTE'});}
+    const r=await c.query("UPDATE listings SET promoted_until=GREATEST(COALESCE(promoted_until,NOW()),NOW())+($2::int*INTERVAL '1 day') WHERE id=$1 RETURNING promoted_until",[id,days]);
+    await c.query('COMMIT');
+    res.json({ok:true,balance:bal,promoted_until:r.rows[0].promoted_until});
+  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}
+  finally{c.release();}
+}));
+app.post('/api/admin/users/:id/credits',auth,admin,requireDb,ah(async(req,res)=>{
+  const uid=Math.floor(Number(req.params.id)),amount=Math.trunc(Number((req.body||{}).amount));
+  if(!Number.isInteger(uid)||uid<=0||!Number.isFinite(amount)||amount===0||Math.abs(amount)>100000)return res.status(400).json({error:'DATE_INVALIDE'});
+  const lei=Number((req.body||{}).lei)>0?Number(req.body.lei):null;
+  const note=String((req.body||{}).note||'').trim().slice(0,200)||(amount>0?'Credite adăugate de administrator':'Credite retrase de administrator');
+  const bal=await creditMove(pool,uid,amount,lei&&amount>0?'topup':'admin',null,note,lei);
+  if(bal===null)return res.status(400).json({error:'SOLD_INSUFICIENT'});
+  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'credits','user',uid,(amount>0?'+':'')+amount+' · '+note]);
+  notify(uid,amount>0?'Ai primit '+amount+' credite în cont.':'Au fost retrase '+(-amount)+' credite din cont.');
+  res.json({ok:true,balance:bal});
+}));
 app.get('/api/sellers',requireDb,async(req,res)=>{
  const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
  res.json({sellers:r.rows});
@@ -1450,7 +1497,7 @@ app.get('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
  res.json({listing:x});
 }));
 app.delete('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const d=await pool.query('DELETE FROM listings WHERE id=$1 RETURNING id',[req.params.id]);if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_listing','listing',req.params.id,'']);res.json({ok:true});});
-app.get('/api/admin/users',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,name,email,phone,role,status,created_at,(store_logo IS NOT NULL) has_logo FROM users ORDER BY created_at DESC LIMIT 500');res.json({users:r.rows});});
+app.get('/api/admin/users',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,name,email,phone,role,status,created_at,credits,(store_logo IS NOT NULL) has_logo FROM users ORDER BY created_at DESC LIMIT 500');res.json({users:r.rows});});
 app.patch('/api/admin/users/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(status==='remove_logo'){const uid=Number(req.params.id)||0;const rr=await pool.query('UPDATE users SET store_logo=NULL WHERE id=$1',[uid]);if(!rr.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'remove_store_logo','user',uid,'']);return res.json({ok:true});}if(!['active','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});if(Number(req.params.id)===Number(req.user.id)&&status==='blocked')return res.status(400).json({error:'CANNOT_BLOCK_SELF'});const r=await pool.query('UPDATE users SET status=$1 WHERE id=$2 RETURNING id,name,email,phone,role,status',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,status==='blocked'?'block_user':'unblock_user','user',req.params.id,'']);res.json({user:r.rows[0]});});
 app.get('/api/admin/requests',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT r.*,u.name user_name,u.email user_email FROM part_requests r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 500');res.json({requests:r.rows});});
 app.patch('/api/admin/requests/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','matched','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE part_requests SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_request','request',req.params.id,status]);res.json({request:r.rows[0]});});

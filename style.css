@@ -3259,3 +3259,45 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   filter:drop-shadow(0 1px 0 rgba(255,255,255,.95)) drop-shadow(0 1.5px 1px rgba(70,48,12,.38));
 }
 #page-mine .mine-act:active{transform:translateY(1px)!important;box-shadow:inset 0 1px 2px rgba(40,30,10,.15)!important}
+
+
+/* Pagina de recenzii: card în același stil ca „Contul meu” (fără Notificări, fără credite) */
+#page-account-tool.is-reviews .page-head>div{display:none}
+#page-account-tool.is-reviews .page-head{padding-bottom:0;margin-bottom:6px}
+.rv-hero{display:flex;align-items:center;gap:12px;padding:10px 14px;margin:2px 0 12px;
+  background:#fffefb;border:1px solid #e8e2d6;border-bottom:3px solid #b8935a;border-radius:14px;
+  box-shadow:0 1px 2px rgba(40,30,10,.05),0 4px 14px rgba(40,30,10,.05)}
+.rv-av{position:relative;flex:0 0 48px;width:48px;height:48px;border-radius:50%;overflow:hidden;background:#e6e0d4;display:grid;place-items:center;
+  box-shadow:0 0 0 3px #b8935a,0 0 0 5px rgba(232,211,168,.35),0 6px 14px rgba(40,30,10,.25)}
+.rv-av i{font-style:normal;font-size:22px}
+.rv-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.rv-hero-txt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.rv-hero-title{font-size:20px;line-height:1.2;color:#17181b}
+.rv-hero-name{font-size:16px;font-weight:600;color:#3b3224;overflow-wrap:anywhere}
+.rv-hero-acc{align-self:flex-start;margin-top:3px;padding:0 9px;border:1px solid #d8c9aa;border-radius:999px;background:#f6eedb;color:#7a5a28;font-weight:700;font-size:11px;line-height:1.5}
+/* cifrele din taburi nu mai sunt cursive */
+.acc-tab em,.ord-tab em{font-style:normal;font-weight:700}
+.rv-wrap .rv-top b{font-size:16px}
+.rv-wrap .ord-count{font-size:16px;font-weight:700;color:#3b3224;margin:16px 0 4px}
+
+/* secțiuni ascunse până sunt gata (BANI) */
+.account-sections details[hidden]{display:none!important}
+/* chenar Administrare */
+.adm-shield{background:#17171a;color:#e8d3a8}
+.adm-shield svg{width:26px;height:26px}
+.rv-hero-desc{font-size:13px;line-height:1.35;color:#77746c}
+#page-admin .page-head{padding-bottom:0;margin-bottom:6px}
+
+/* Credite și promovare */
+.cr-balance{display:flex;flex-direction:column;gap:2px;align-items:flex-start;background:#fffefb;border-bottom:3px solid #b8935a}
+.cr-balance small{color:var(--muted);font-size:13px}
+.cr-balance b{font-family:var(--font-serif);font-size:40px;line-height:1.1;color:#14110c}
+.cr-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.cr-row div{display:flex;flex-direction:column;min-width:0}
+.cr-row small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.cr-amt{font-weight:800;font-size:17px;white-space:nowrap}
+.cr-amt.plus{color:#2f7a3f}.cr-amt.minus{color:#a3322b}
+.promo-plans{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.promo-plan{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 6px;min-height:0}
+.promo-plan span{font-size:13px;opacity:.85}
+.promo-plan[disabled]{opacity:.5;cursor:default}
