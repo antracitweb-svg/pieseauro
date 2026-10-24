@@ -3379,3 +3379,17 @@ body .page-head.hd-compact>div:has(>h2)>:not(.eyebrow):not(h2):not(p){grid-colum
 #page-account-tool.is-reviews .page-head.hd-compact>.back{position:static;transform:none}
 .seller-view .page-head.hd-compact>div:has(>h2){padding-left:14px}
 body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .page-head.hd-compact:has(>div>.req-lock-note)>.back{top:14px;transform:none}
+
+/* ===== Lățime uniformă pe TOATE paginile = ca pagina principală (doar peste 700px; telefonul rămâne neschimbat) ===== */
+@media(min-width:700px) and (max-width:800px){
+  :is(#page-results,#page-account,#page-request-pick,#page-request,#page-sell,#page-dism,#page-services,#page-match,#page-requests,#page-stores,#page-mine,#page-messages,#page-saved,#page-privacy,#page-cookies,#page-rules,#page-contact,#page-terms,#page-reset-password,#page-admin,#page-account-tool,#page-settings,#page-verify-email-change,#page-verify-email)>.container{width:min(900px,calc(100% - 36px))!important}
+}
+@media(min-width:801px) and (max-width:1200px){
+  :is(#page-results,#page-account,#page-request-pick,#page-request,#page-sell,#page-dism,#page-services,#page-match,#page-requests,#page-stores,#page-mine,#page-messages,#page-saved,#page-privacy,#page-cookies,#page-rules,#page-contact,#page-terms,#page-reset-password,#page-admin,#page-account-tool,#page-settings,#page-verify-email-change,#page-verify-email)>.container{width:calc(100% - 48px)!important}
+}
+@media(min-width:1201px){
+  :is(#page-results,#page-account,#page-request-pick,#page-request,#page-sell,#page-dism,#page-services,#page-match,#page-requests,#page-stores,#page-mine,#page-messages,#page-saved,#page-privacy,#page-cookies,#page-rules,#page-contact,#page-terms,#page-reset-password,#page-admin,#page-account-tool,#page-settings,#page-verify-email-change,#page-verify-email)>.container{width:min(1280px,calc(100% - 64px))!important}
+}
+@media(min-width:1600px){
+  :is(#page-results,#page-account,#page-request-pick,#page-request,#page-sell,#page-dism,#page-services,#page-match,#page-requests,#page-stores,#page-mine,#page-messages,#page-saved,#page-privacy,#page-cookies,#page-rules,#page-contact,#page-terms,#page-reset-password,#page-admin,#page-account-tool,#page-settings,#page-verify-email-change,#page-verify-email)>.container{width:min(1360px,calc(100% - 96px))!important}
+}
