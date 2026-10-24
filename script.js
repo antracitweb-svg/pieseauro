@@ -1222,6 +1222,20 @@ async function loadFavoritesView(){
   if(gone.length){ favorites = favorites.filter(id=>!gone.includes(id)); writeJSON('autopiese_fav',favorites); updateFavUI(); }
   state.total = state.loaded.length; renderList();
 }
+function renderSellerBanner(){
+  const box=$('#sellerBanner'), pg=$('#page-results'); if(!box||!pg) return;
+  const id=state.extra.seller_id, name=state.extra.sname;
+  if(!id||!name||state.mode!=='search'){ box.classList.add('hidden'); pg.classList.remove('seller-view'); return; }
+  pg.classList.add('seller-view'); box.classList.remove('hidden');
+  if(box.dataset.sid===String(id)) return;
+  box.dataset.sid=String(id);
+  box.innerHTML=`<span class="sb-av">${avatarSpan(id,name,'seller-avatar')}</span><div class="sb-main"><small class="sb-label">Anunțurile vânzătorului</small><b class="sb-name">${esc(name)}</b><div class="sb-rate"></div></div>`;
+  api('/api/sellers/'+Number(id)+'/ratings').then(r=>{
+    if(box.dataset.sid!==String(id)) return;
+    const part=(label,p)=>p&&p.count?`<span class="acc-rate-row">${label} ${starsHtml(p.avg)} <b>${esc(String(p.avg).replace('.',','))}</b> (${p.count})</span>`:'';
+    const el=box.querySelector('.sb-rate'); if(el) el.innerHTML=[part('Vânzător',r.seller),part('Cumpărător',r.buyer)].filter(Boolean).join('');
+  }).catch(()=>{});
+}
 function renderList(){
   const mine = state.mode==='mine';
   let title = 'Piese auto';
@@ -1232,6 +1246,7 @@ function renderList(){
   else if(state.filters.category) title = state.filters.category;
   else if(state.filters.type==='dezmembrari') title = 'Dezmembrări auto';
   $('#resultsTitle').textContent = title;
+  renderSellerBanner();
   $('#crumbCurrent').textContent = title;
   $('#resultCount').textContent = state.total===1 ? '1 anunț' : `${state.total} anunțuri`;
   $('#listingGrid').innerHTML = state.loaded.map(x=>card(x,{mine})).join('');
@@ -1336,12 +1351,15 @@ function fmtPhone(p){
   return raw;
 }
 function contactHtml(phones, who, sellerId, own, listingId){
-  const msgBtn = '';
-  if(!phones || !phones.length) return `<p class="phone-none">📵 ${who} nu a afișat un număr de telefon.</p>${msgBtn}`;
+  if(!phones || !phones.length) return `<p class="phone-none">📵 ${who} nu a afișat un număr de telefon.</p>`;
   return phones.map(p=>{
     const tel=String(p.phone).replace(/[^\d+]/g,''), tr=listingId?` data-track-phone="${Number(listingId)}"`:'';
-    return `<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(tel)}"${tr}>Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}"${tr}>WhatsApp</a>`:''}</div></div>`;
-  }).join('')+msgBtn;
+    return `<div class="contact-line"><a class="btn tel" href="tel:${esc(tel)}"${tr}>📞 ${esc(fmtPhone(p.phone))}</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}"${tr}>WhatsApp</a>`:''}</div>`;
+  }).join('');
+}
+/* buton "Contact": telefonul, WhatsApp și mesajul stau ascunse până apeși */
+function contactFoldHtml(inner){
+  return `<div class="contact-fold"><button type="button" class="btn contact-toggle" data-contact-toggle aria-expanded="false"><span>📞 Contact</span><i aria-hidden="true">▾</i></button><div class="contact-panel hidden">${inner}</div></div>`;
 }
 let detailPhones = [];
 function detailHtml(x, phones, canContact){
@@ -1352,7 +1370,7 @@ function detailHtml(x, phones, canContact){
   detailPhones = (phones||[]).slice(0,4);
   let callbar = '';
   if(canContact){
-    const ph = phone1.length ? `<button type="button" class="btn primary ad-call" data-phones-open="${Number(x.id)}"><span class="ad-call-ico" aria-hidden="true">📞${phone1[0].is_whatsapp?'<i>WA</i>':''}</span><span>${esc(fmtPhone(phone1[0].phone))}</span></button>` : '';
+    const ph = phone1.length ? `<button type="button" class="btn primary ad-call" data-phones-open="${Number(x.id)}"><span class="ad-call-ico" aria-hidden="true">📞</span><span>Contact</span></button>` : '';
     const cart = `<button type="button" class="btn ghost ad-cartbtn" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button>`;
     callbar = `<div class="ad-callbar">${ph}${x.seller_vacation?'':cart}</div>`;
   }
@@ -1398,11 +1416,10 @@ function detailHtml(x, phones, canContact){
     <div class="ad-card">
       <div class="seller-head">${avatarSpan(x.user_id,x.seller_name||'V','seller-avatar')}<div><b>${x.user_id?`<button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">${seller}</button>`:seller}</b><small>${esc(x.seller_type||'')}${x.county?' · '+esc(x.county):''}</small><div class="rate-line">${ratingLine({avg:x.seller_rating_avg,count:x.seller_rating_n},x.user_id,'seller')}</div></div></div>
       ${x.seller_ads?`<p class="seller-stats">${adsLabel(x.seller_ads)} active${x.seller_since?` · pe AutoParts din ${new Date(x.seller_since).getFullYear()}`:''}${x.user_id?` · <button type="button" class="seller-link" data-seller-profile="${Number(x.user_id)}">Vezi toate</button>`:''}</p>`:''}
-      ${canContact?`<div class="contact-box"><b>Contactează vânzătorul</b>${contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
+      ${canContact?`<div class="contact-box">${contactFoldHtml(contactHtml(phone1,'Vânzătorul',x.user_id,currentUser&&currentUser.id===x.user_id,x.id)+((x.user_id&&!(currentUser&&currentUser.id===x.user_id))?'<button type="button" class="btn ghost contact-msg" data-msg-open="1">✉️ Trimite mesaj</button>':''))}</div>`:'<p class="muted">Anunțul este în moderare și nu este încă vizibil public.</p>'}
     </div>
     <div class="contact-row">
-      ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<button class="btn ghost small" data-msg-open="1">✉️ Mesaj</button>`:''}
-      ${canContact?`${(currentUser&&currentUser.id===x.user_id)?'':(x.seller_vacation?'<button class="btn ghost small" disabled>🛍️ Indisponibil (vacanță)</button>':'<button class="btn primary small" data-order="'+x.id+'">🛍️ Comandă</button>')}${(currentUser&&currentUser.id===x.user_id)?'':`<button class="btn ghost small ad-cart-side" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button>`}<button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
+            ${canContact?`${(currentUser&&currentUser.id===x.user_id)?'':(x.seller_vacation?'<button class="btn ghost small" disabled>🛍️ Indisponibil (vacanță)</button>':'<button class="btn primary small" data-order="'+x.id+'">🛍️ Comandă</button>')}${(currentUser&&currentUser.id===x.user_id)?'':`<button class="btn ghost small ad-cart-side" data-cart="${x.id}">${cartIds().includes(x.id)?'✓ În coș':'🛒 Adaugă în coș'}</button>`}<button class="btn ghost small" data-show-report="1">Raportează</button>`:''}
     </div>
     ${(canContact&&x.user_id&&!(currentUser&&currentUser.id===x.user_id))?`<div class="msg-box hidden" id="msgBox" data-to="${Number(x.user_id)}" data-listing="${x.id}"><b>Mesaj pentru ${seller}</b>
       <div class="msg-quick"><button type="button" data-msg-quick="Bună ziua! Mai este disponibilă piesa?">Mai este disponibilă?</button><button type="button" data-msg-quick="Bună ziua! Care este ultimul preț?">Ultimul preț?</button><button type="button" data-msg-quick="Bună ziua! Se poate livra în ">Se poate livra?</button>${x.negotiable&&Number(x.price)>0?'<button type="button" data-msg-quick="Bună ziua! Aș putea oferi ___ lei pentru piesă. Vă convine?">Propune un preț</button>':''}</div>
@@ -2644,12 +2661,12 @@ async function openSellerProfile(id){
     const s=(await api('/api/sellers/'+id)).seller, nm=esc(s.name||'Vânzător');
     const own=currentUser&&currentUser.id===s.id;
     const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
-    const phones=(s.phones||[]).map(p=>`<div class="phone-card"><div class="phone-num">📞 <span>${esc(fmtPhone(p.phone))}</span>${p.is_whatsapp?'<em class="wa-tag">WhatsApp</em>':''}</div><div class="phone-actions"><a class="btn primary" href="tel:${esc(String(p.phone).replace(/[^\d+]/g,''))}">Sună acum</a>${p.is_whatsapp?`<a class="btn wa" target="_blank" rel="noopener noreferrer" href="${esc(waLink(p.phone))}">WhatsApp</a>`:''}</div></div>`).join('');
+    const phones=contactHtml(s.phones||[],'Vânzătorul',s.id,own,null), canMsg=!own, hasPh=(s.phones||[]).length>0;
     box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small><div class="rate-line">Ca vânzător: ${ratingLine(s.rating,s.id,'seller')}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating,s.id,'buyer')}</div></div></div>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
     ${s.vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${s.vacation.until?' până la '+esc(fmtDate(s.vacation.until+'T00:00:00')):''}.</div>`:''}
-    ${phones||'<p class="muted">Vânzătorul nu a afișat un număr de telefon.</p>'}
-    <div class="contact-row"><button type="button" class="btn ghost small" data-seller="${s.id}" data-sname="${nm}">Vezi anunțurile</button>${own?'':`<button type="button" class="btn primary small" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`}${(own||!currentUser)?'':`<button type="button" class="btn ghost small" data-seller-block="${s.id}" data-blocked="${s.blocked_by_me?1:0}">${s.blocked_by_me?'Deblochează':'🚫 Blochează'}</button>`}</div><div class="rate-list hidden" id="sellerRatings"></div>`;
+    ${(hasPh||canMsg)?contactFoldHtml(phones+(canMsg?`<button type="button" class="btn ghost contact-msg" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`:'')):''}
+    <div class="contact-row"><button type="button" class="btn ghost small" data-seller="${s.id}" data-sname="${nm}">Vezi anunțurile</button>${(own||!currentUser)?'':`<button type="button" class="btn ghost small" data-seller-block="${s.id}" data-blocked="${s.blocked_by_me?1:0}">${s.blocked_by_me?'Deblochează':'🚫 Blochează'}</button>`}</div><div class="rate-list hidden" id="sellerRatings"></div>`;
     if((s.rating&&s.rating.count)||(s.buyer_rating&&s.buyer_rating.count)) loadSellerRatings(s.id);
   }catch(e){ box.innerHTML=`<p>${esc(e.message||'Profilul nu a putut fi încărcat.')}</p>`; }
 }
@@ -2668,7 +2685,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-phones-open]'))){
     e.stopPropagation();
     const lid=Number(el.dataset.phonesOpen), pm=$('#phonesModal'), pc=$('#phonesContent');
-    pc.innerHTML=`<div class="eyebrow">CONTACT</div><h2>Contactează vânzătorul</h2>${contactHtml(detailPhones,'Vânzătorul',null,false,lid)}`;
+    pc.innerHTML=`<div class="eyebrow">CONTACT</div><h2>Contactează vânzătorul</h2>${contactHtml(detailPhones,'Vânzătorul',null,false,lid)}${$('#msgBox')?'<button type="button" class="btn ghost contact-msg" data-msg-open="1">✉️ Trimite mesaj</button>':''}`;
     pm.classList.remove('hidden');
     return;
   }
@@ -2719,8 +2736,13 @@ document.addEventListener('click', e=>{
       return;
     }
   }
+  if((el=t.closest('[data-contact-toggle]'))){
+    const pnl=el.parentElement.querySelector('.contact-panel'); if(pnl){ const open=pnl.classList.toggle('hidden')===false; el.setAttribute('aria-expanded',open?'true':'false'); el.classList.toggle('open',open); }
+    return;
+  }
   if((el=t.closest('[data-req-contact]'))){ safe(requestContact)(el.dataset.reqContact, el); return; }
   if((el=t.closest('[data-msg-open]'))){
+    { const pm0=$('#phonesModal'); if(pm0) pm0.classList.add('hidden'); }
     if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
     const b=$('#msgBox'); if(b){ b.classList.toggle('hidden'); if(!b.classList.contains('hidden')){ b.scrollIntoView({block:'nearest',behavior:'smooth'}); const ta=$('#msgText'); ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); } }
     return;

@@ -3118,3 +3118,34 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 .avatar-preview{position:fixed;inset:0;z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(15,12,6,.78);padding:24px;-webkit-user-select:none;user-select:none}
 .avatar-preview img{width:min(72vw,300px);height:min(72vw,300px);object-fit:cover;border-radius:50%;box-shadow:0 0 0 4px #b8935a,0 0 0 8px rgba(232,211,168,.35),0 18px 40px rgba(0,0,0,.5);background:#e6e0d4;-webkit-touch-callout:none;pointer-events:none}
 .avatar-preview p{margin:0;max-width:300px;text-align:center;color:#f3e6c6;font-size:14px;font-weight:700;line-height:1.35}
+
+/* v17: buton "Contact" (telefon + WhatsApp pe un rând, + mesaj) și cadranul vânzătorului */
+.contact-fold{display:block}
+.contact-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:0 16px;
+  border:1px solid #e9d3a8;border-radius:12px;background:linear-gradient(180deg,#f3dfae,#b8935a);color:#2a1f0a;font:inherit;font-weight:800;font-size:16px;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 0 #6e5428,0 6px 12px rgba(40,30,10,.18)}
+.contact-toggle i{font-style:normal;transition:transform .2s}
+.contact-toggle.open i{transform:rotate(180deg)}
+.contact-panel{margin-top:10px;display:grid;gap:8px}
+.contact-panel.hidden{display:none}
+.contact-line{display:flex;gap:8px;align-items:stretch}
+.contact-line .btn{flex:1 1 0;min-width:0;text-align:center;text-decoration:none;padding:12px 8px;white-space:nowrap;font-size:15px}
+.contact-line .btn.tel{background:linear-gradient(180deg,#fffdf8,#f6eedb);color:#14110c;border:1px solid #d8c9aa;box-shadow:inset 0 1px 0 #fff,0 2px 0 #d8c9aa;font-weight:900}
+.contact-msg{width:100%;text-align:center}
+.contact-panel .phone-none{margin:0;color:inherit}
+
+.seller-banner{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;margin:4px 0 10px;background:#fffefb;border:1px solid #e8e2d6;border-bottom:3px solid #b8935a;border-radius:14px;box-shadow:0 1px 2px rgba(40,30,10,.05),0 4px 14px rgba(40,30,10,.05)}
+.seller-banner.hidden{display:none}
+.seller-banner .sb-av .seller-avatar{width:48px;height:48px;font-size:20px;flex:0 0 48px}
+.seller-banner .sb-main{min-width:0;display:flex;flex-direction:column;gap:1px}
+.seller-banner .sb-label{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8f6d38}
+.seller-banner .sb-name{font-size:17px;line-height:1.2;color:#17181b}
+.seller-banner .sb-rate{font-size:12px;font-weight:700;color:#7a5a28}
+.seller-banner .acc-rate-row{display:block;line-height:1.35}
+.seller-banner .stars{font-size:12px}
+.seller-view .page-head .eyebrow,.seller-view #resultsTitle{display:none}
+
+#sellerModal .contact-fold{margin-top:10px}
+#sellerModal .contact-row{margin-top:8px}
+#phonesContent .contact-line{margin-bottom:8px}
+#phonesContent .contact-line+.contact-line{margin-top:0}
