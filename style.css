@@ -3372,3 +3372,10 @@ body .page-head.hd-compact{margin-top:3px}
 
 /* Oferta câștigătoare (verde) cu data rezolvării */
 .req-win-date{margin:-4px 0 10px;font-size:13px;color:#1c6d42}
+
+/* ===== Toate chenarele de pagină: mici, cu „Înapoi” în dreapta, în chenar ===== */
+body .page-head.hd-compact>div:has(>h2)>p{white-space:normal;overflow:visible;text-overflow:clip}
+body .page-head.hd-compact>div:has(>h2)>:not(.eyebrow):not(h2):not(p){grid-column:1 / -1}
+#page-account-tool.is-reviews .page-head.hd-compact>.back{position:static;transform:none}
+.seller-view .page-head.hd-compact>div:has(>h2){padding-left:14px}
+body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .page-head.hd-compact:has(>div>.req-lock-note)>.back{top:14px;transform:none}
