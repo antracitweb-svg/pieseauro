@@ -382,6 +382,8 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS vacation_until DATE',
   'CREATE TABLE IF NOT EXISTS user_blocks (blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(blocker_id,blocked_id))',
   'CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks(blocked_id)',
+  "CREATE TABLE IF NOT EXISTS request_marks (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, request_id INTEGER NOT NULL REFERENCES part_requests(id) ON DELETE CASCADE, mark TEXT NOT NULL CHECK (mark IN ('later','ignored')), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(user_id,request_id))",
+  'CREATE INDEX IF NOT EXISTS request_marks_req_idx ON request_marks(request_id)',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_alert BOOLEAN NOT NULL DEFAULT TRUE',
   'CREATE TABLE IF NOT EXISTS saved_searches (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, label TEXT NOT NULL, qs TEXT NOT NULL, alerts BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_alert_at TIMESTAMPTZ, UNIQUE(user_id,qs))',
   'CREATE INDEX IF NOT EXISTS saved_searches_alerts_idx ON saved_searches(alerts) WHERE alerts',
@@ -486,6 +488,8 @@ async function auth(req,res,next){
 // Jurnal de evenimente de pe site (vizibil în Admin → Evenimente). Nu blochează și nu strică niciodată cererea.
 function logEvent(uid,kind,type,id,details){if(!pool)return;const tid=id==null?null:Number(id);pool.query('INSERT INTO site_events(user_id,kind,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[uid||null,String(kind).slice(0,40),type||null,Number.isInteger(tid)?tid:null,String(details||'').slice(0,300)]).catch(e=>console.error('site_events',e.message));}
 function admin(req,res,next){if(req.user.role!=='admin')return res.status(403).json({error:'ADMIN_ONLY'});next();}
+// Id-ul utilizatorului logat sau null (pentru rutele publice care arată și date personale, ex. „am ofertat deja”)
+async function optUserId(req){try{const t=req.cookies&&req.cookies.session;if(!t||!pool)return null;const r=await pool.query("SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW() AND u.status='active'",[hashToken(t)]);return r.rowCount?r.rows[0].id:null;}catch{return null;}}
 function needVerified(req,res,next){if(REQUIRE_VERIFIED&&!req.user.email_verified&&req.user.role!=='admin')return res.status(403).json({error:'EMAIL_NOT_VERIFIED'});next();}
 function requireDb(req,res,next){if(!pool)return res.status(503).json({error:'DATABASE_NOT_CONFIGURED',message:'Configurează DATABASE_URL în Render.'});next();}
 const ah=fn=>(req,res)=>Promise.resolve(fn(req,res)).catch(e=>{console.error(e);if(!res.headersSent)res.status(500).json({error:'EROARE_SERVER'});});
@@ -1425,10 +1429,11 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
  res.json({listing:r.rows[0],resubmitted:status==='pending'&&cur.status!=='pending'});
 });
 
-app.get('/api/requests',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100");
+app.get('/api/requests',requireDb,ah(async(req,res)=>{
+ const uid=await optUserId(req);
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+",(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT o.status FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer,(SELECT o.id FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer_id,(SELECT m.mark FROM request_marks m WHERE m.request_id=r.id AND m.user_id=$1::int) my_mark FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100",[uid]);
  res.json({requests:r.rows});
-});
+}));
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
  const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.description,r.extra_parts,r.status,r.created_at,r.images[1:1] images,GREATEST(0,CEIL(EXTRACT(EPOCH FROM (r.created_at+INTERVAL '10 minutes'-NOW()))))::int edit_secs,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id AND o.status='pending') offers_pending FROM part_requests r WHERE r.user_id=$1 ORDER BY r.created_at DESC LIMIT 200",[req.user.id]);
  res.json({requests:r.rows});
@@ -1447,7 +1452,8 @@ app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
  res.json({request:q.rows[0],offers});
 }));
 app.get('/api/requests/:id(\\d+)',requireDb,ah(async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+" FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.id=$1 AND r.status='open'",[req.params.id]);
+ const uid=await optUserId(req);
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+",u.created_at buyer_since,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT COUNT(*)::int FROM part_requests x WHERE x.user_id=r.user_id AND EXISTS(SELECT 1 FROM offers o2 WHERE o2.request_id=x.id)) buyer_with_offers,(SELECT COUNT(*)::int FROM part_requests x WHERE x.user_id=r.user_id AND x.status='closed') buyer_closed,(SELECT COUNT(*)::int FROM part_requests x WHERE x.user_id=r.user_id AND x.status='matched') buyer_matched,(SELECT COUNT(*)::int FROM buyer_ratings br WHERE br.buyer_id=r.user_id AND br.stars>=4) buyer_pos,(SELECT o.status FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer,(SELECT o.id FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer_id,(SELECT m.mark FROM request_marks m WHERE m.request_id=r.id AND m.user_id=$1::int) my_mark FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.id=$2 AND r.status='open'",[uid,req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  res.json({request:r.rows[0]});
 }));
@@ -1458,6 +1464,20 @@ app.get('/api/requests/:id/contact',auth,requireDb,async(req,res)=>{
  const phones=u&&u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[q.rows[0].user_id])).rows:[];
  res.json({phones});
 });
+// „Ofertez mai târziu” / „Ignoră cererea” — marcaj personal al vânzătorului (nu e vizibil cumpărătorului)
+app.post('/api/requests/:id(\\d+)/mark',auth,requireDb,ah(async(req,res)=>{
+ const mark=String((req.body||{}).mark||'');
+ if(!['later','ignored'].includes(mark))return res.status(400).json({error:'MARCAJ_INVALID'});
+ const q=await pool.query("SELECT user_id FROM part_requests WHERE id=$1 AND status='open'",[req.params.id]);
+ if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ if(q.rows[0].user_id===req.user.id)return res.status(400).json({error:'CERERE_PROPRIE'});
+ await pool.query("INSERT INTO request_marks(user_id,request_id,mark) VALUES($1,$2,$3) ON CONFLICT(user_id,request_id) DO UPDATE SET mark=EXCLUDED.mark,created_at=NOW()",[req.user.id,req.params.id,mark]);
+ res.json({ok:true,mark});
+}));
+app.delete('/api/requests/:id(\\d+)/mark',auth,requireDb,ah(async(req,res)=>{
+ await pool.query('DELETE FROM request_marks WHERE user_id=$1 AND request_id=$2',[req.user.id,req.params.id]);
+ res.json({ok:true});
+}));
 app.delete('/api/requests/:id',auth,requireDb,async(req,res)=>{
  const d=await pool.query('DELETE FROM part_requests WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.id]);
  if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});

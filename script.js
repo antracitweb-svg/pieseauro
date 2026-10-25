@@ -6,7 +6,7 @@ const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
 const ERR = {
-  AWB_INVALID:'AWB-ul poate conține doar litere, cifre și . _ - (3–40 caractere).',NIMIC_DE_SALVAT:'Nu ai modificat nimic.',
+  AWB_INVALID:'AWB-ul poate conține doar litere, cifre și . _ - (3–40 caractere).',NIMIC_DE_SALVAT:'Nu ai modificat nimic.',CERERE_PROPRIE:'Aceasta este cererea ta.',MARCAJ_INVALID:'Marcaj necunoscut.',
   INVALID_LOGIN:'Email/nickname sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',EMAIL_EXISTS:'Există deja un cont cu acest email.',
   NICKNAME_EXISTS:'Nickname-ul este deja folosit.',COMENZI_ACTIVE:'Ai comenzi în curs. Finalizează sau anulează comenzile înainte de a șterge contul.',ADMIN_NU_SE_STERGE:'Conturile de administrator nu se pot șterge din interfață.',SITE_INVALID:'Adresa site-ului trebuie să înceapă cu http:// sau https://.',LOGO_INVALID:'Logo invalid sau prea mare (maximum ~450 KB după comprimare).',NICKNAME_INVALID:'Nickname-ul trebuie să aibă 3–30 de caractere (litere, cifre, _ . -).',
   DATE_INVALIDE:'Verifică datele introduse.',AUTH_REQUIRED:'Trebuie să te autentifici.',
@@ -82,6 +82,12 @@ function fmtAgo(iso){
   const z=Math.floor(h/24); if(z<30) return 'acum '+(z===1?'o zi':z+' zile');
   const l=Math.floor(z/30); if(l<12) return 'acum '+(l===1?'o lună':l+' luni');
   const a=Math.floor(l/12); return 'acum '+(a===1?'un an':a+' ani');
+}
+function fmtRelDay(iso){
+  const d=new Date(iso); if(isNaN(d)) return '';
+  const t=d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}), day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((day(new Date())-day(d))/86400000);
+  return diff===0?'Azi, '+t:(diff===1?'Ieri, '+t:fmtDateTime(iso));
 }
 function fmtUpdated(iso){
   const d=new Date(iso); if(isNaN(d)) return '';
@@ -980,22 +986,38 @@ function myOfferHtml(o){
 }
 function publicRequestHtml(x){
   const where=[x.city,x.county].filter(Boolean).join(', ');
-  const callbar=`<div class="ad-callbar"><button type="button" class="btn ghost" data-req-contact="${x.id}">✉ Contactează</button><button type="button" class="btn primary" data-offer-request="${x.id}">Oferă piesa</button></div>`;
+  const uidn=Number(x.user_id)||0, mine=!!(currentUser&&Number(currentUser.id)===uidn), n=Number(x.offers_count)||0;
+  const nr=Number(x.user_rating_n)||0, pos=Number(x.buyer_pos)||0, since=x.buyer_since?new Date(x.buyer_since).getFullYear():'';
+  const num=v=>Number(v)||0, mk=(m,label)=>`<button type="button" class="btn ghost" data-req-mark="${m}" data-req-id="${x.id}">${label}</button>`;
+  const offerBtn=mine?'':(x.my_offer?`<button type="button" class="btn primary" data-offer-open="${x.my_offer_id}">Oferta mea ›</button>`:`<button type="button" class="btn primary" data-offer-request="${x.id}">Propune ofertă</button>`);
+  const askBtn=(!mine&&uidn)?`<button type="button" class="btn ghost" data-seller-msg="${uidn}">❓ Pune întrebare</button>`:'';
+  const laterBtn=mine?'':(x.my_mark==='later'?mk('none','🕒 Scoate din „mai târziu”'):mk('later','🕒 Ofertez mai târziu'));
+  const ignBtn=mine?'':(x.my_mark==='ignored'?mk('none','↩ Nu mai ignora'):mk('ignored','🚫 Ignoră cererea'));
+  const callbar=mine?'':`<div class="ad-callbar">${askBtn}${offerBtn}</div>`;
   return `<div class="ad rq">
   <div class="ad-main">
     ${reqCrumbs('Piese căutate',x.make,x.model,x.county)}
     ${imgGalleryHtml(x.images,x.title||'Cerere',true)}
+    <p class="rq-eyebrow">Cerere de ofertă:</p>
     <div class="ad-titlerow"><h2>${esc(x.title)}</h2></div>
     <p class="ad-sub">${esc(reqCarSub(x))}${where?' · 📍 '+esc(where):''}</p>
-    <div class="ad-chips"><span class="badge pending">Cerere deschisă</span>${x.kind?`<span class="lchip">${esc(REQ_KIND[x.kind]||'')}</span>`:''}</div>
+    <div class="ad-chips"><span class="badge pending">Cerere deschisă</span>${x.kind?`<span class="lchip">${esc(REQ_KIND[x.kind]||'')}</span>`:''}<span class="lchip">${n} ${n===1?'ofertă':'oferte'}</span></div>
     ${reqSpecHtml(x)}
     ${reqDetailsHtml(x)}
   </div>
   <aside class="ad-side">
-    <div class="ad-card rq-card">
-      <div class="seller-head">${avatarSpan(x.user_id,x.user_name||'C','seller-avatar')}<div><b>${esc(x.user_name||'Cumpărător')}</b><small>${esc(fmtDate(x.created_at))}${where?' · '+esc(where):''}</small><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n},x.user_id,'buyer')}</div></div></div>
-      <div class="contact-slot req-actions" id="reqContactSlot"><div class="rq-desk-row"><button type="button" class="btn ghost small" data-req-contact="${x.id}">Contactează</button> <button type="button" class="btn primary small" data-offer-request="${x.id}">Oferă piesa</button></div></div>
+    <div class="ad-card rq-card rq-actions-card">
+      ${mine?'<p class="muted">Aceasta este cererea ta. O gestionezi din „Cererile mele”.</p>':`<div class="rq-act-grid">${offerBtn}${askBtn}${laterBtn}${ignBtn}</div>`}
+      <div class="contact-slot req-actions" id="reqContactSlot"><button type="button" class="btn ghost small rq-phone" data-req-contact="${x.id}">📞 Vezi telefonul cumpărătorului</button></div>
     </div>
+    <div class="ad-card rq-card rq-buyer">
+      <h3 class="ad-h">Cumpărător</h3>
+      <div class="seller-head">${avatarSpan(x.user_id,x.user_name||'C','seller-avatar')}<div><b>${esc(x.user_name||'Cumpărător')}</b><div class="rate-line">${ratingLine({avg:x.user_rating_avg,count:x.user_rating_n},x.user_id,'buyer')}</div></div></div>
+      <p class="rq-buyer-line">${nr?Math.round(pos/nr*100)+'% calificative pozitive':'Fără calificative încă'}</p>
+      ${since?`<p class="muted rq-since">Membru din ${since}</p>`:''}
+      <div class="rq-stats"><div><span>Cereri cu oferte</span><b>${num(x.buyer_with_offers)}</b></div><div><span>Cereri anulate</span><b>${num(x.buyer_closed)}</b></div><div><span>Cereri cu câștigător</span><b>${num(x.buyer_matched)}</b></div></div>
+    </div>
+    <div class="rq-foot"><span>🔄 Publicată ${esc(fmtAgo(x.created_at))}</span><button type="button" class="rq-foot-link" data-req-similar="${esc(x.title)}">⇄ Caută piese similare</button><button type="button" class="rq-foot-link" data-legal="contact">⚑ Raportează</button></div>
   </aside>
   </div>${callbar}`;
 }
@@ -1544,23 +1566,15 @@ function reqRowHtml(x, mine){
       <div class="rq-line"><span>${n} ${n===1?'ofertă':'oferte'}${np?` (${np} noi)`:''}</span><span>${esc(fmtDateTime(x.created_at))}</span></div>
       <div class="rq-acts">${main}${edit}<button type="button" class="rq-btn rq-icon" data-del-request="${x.id}" title="Șterge" aria-label="Șterge cererea">🗑</button></div></article>`;
   }
-  const car = [x.make,x.model,x.year].filter(Boolean).join(' · ') || 'Orice mașină';
-  const im = x.images && x.images[0] ? x.images[0] : '';
-  const ex = extraPartsCount(x);
-  const where = [x.county, x.city].filter(Boolean).join(', ');
-  const acts = mine
-    ? `<button type="button" class="ar-btn ar-wide ar-primary" data-open-request="${x.id}" data-mode="mine">Vezi cererea și ofertele</button>${Number(x.edit_secs)>0?`<button type="button" class="ar-btn ar-edit" data-edit-request="${x.id}" data-edit-until="${Date.now()+Number(x.edit_secs)*1000}" title="Modifică (mai ai ${Math.ceil(Number(x.edit_secs)/60)} min)" aria-label="Modifică cererea">✎</button>`:''}<button type="button" class="ar-btn ar-del" data-del-request="${x.id}" title="Șterge" aria-label="Șterge cererea">🗑</button>`
-    : `<button type="button" class="ar-btn ar-wide ar-primary" data-offer-request="${x.id}">Oferă piesa</button><button type="button" class="ar-btn" data-req-contact="${x.id}" title="Contactează" aria-label="Contactează">✉</button><button type="button" class="ar-btn" data-open-request="${x.id}" data-mode="public" title="Detalii" aria-label="Detalii cerere">ⓘ</button>`;
-  return `<article class="ar-row ar-req" data-request="${x.id}" data-open-request="${x.id}" data-mode="${mode}" tabindex="0" role="link" aria-label="${esc(x.title)}">
-    <div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">🔎</span>'}</div>
-    <div class="ar-main">
-      <h3 class="ar-title">${esc(x.title)}</h3>
-      <div class="ar-meta">${esc(car)}${ex?` · +${ex} ${ex===1?'piesă suplimentară':'piese suplimentare'}`:''}</div>
-      ${x.description?`<p class="ar-desc">${esc(x.description.slice(0,140))}${x.description.length>140?'…':''}</p>`:''}
-      <div class="ar-sub">${mine?esc(REQ_ST[x.status]||x.status):(where?'📍 '+esc(where)+' · ':'')+avatarSpan(x.user_id,x.user_name||'C','ar-av')+' '+esc(x.user_name||'Cumpărător')+' '+rateInline(x.user_rating_avg,x.user_rating_n,x.user_id,'buyer')}</div>
-    </div>
-    <div class="ar-acts${mine?'':' contact-slot'}">${acts}</div>
-    <div class="ar-foot"><span class="ar-views">${mine?`💬 ${n} ${n===1?'ofertă':'oferte'}${np?` (${np} noi)`:''}`:esc(REQ_KIND[x.kind]||'Cerere piesă')}</span><span class="ar-qty">${esc(fmtDate(x.created_at))}</span><span class="ar-price ar-state">${mine?esc(REQ_ST[x.status]||x.status):'Deschisă'}</span></div></article>`;
+  const carBase=[x.make,x.model,x.year].filter(Boolean).join(' '), carTail=[x.variant,x.engine].filter(Boolean).join(' · ');
+  const carTitle=(carBase+(carTail?(carBase?', ':'')+carTail:''))||'Orice mașină';
+  const ex=extraPartsCount(x), cnt=Number(x.offers_count)||0, where=[x.county,x.city].filter(Boolean).join(', ');
+  const tag=x.my_offer?'<span class="rq-tag ok">Ai ofertat</span>':(x.my_mark==='later'?'<span class="rq-tag">Ofertez mai târziu</span>':(x.my_mark==='ignored'?'<span class="rq-tag mute">Ignorată</span>':''));
+  return `<article class="rq-pub-row" data-request="${x.id}" data-open-request="${x.id}" data-mode="public" tabindex="0" role="link" aria-label="${esc(x.title)}">
+    <h3 class="rq-pub-car">${cnt===0?'<i class="rq-dot" title="Nicio ofertă încă" aria-label="Nicio ofertă încă"></i>':''}${esc(carTitle)}</h3>
+    <div class="rq-pub-part"><i class="rq-chev" aria-hidden="true">›</i><span class="rq-pub-name">${esc(x.title)}</span>${ex?` <span class="rq-pub-more">+${ex}</span>`:''}${cnt?` <span class="rq-pub-cnt">(${cnt} ${cnt===1?'ofertă':'oferte'})</span>`:''}</div>
+    <div class="rq-pub-meta"><span>${esc(fmtRelDay(x.created_at))}</span>${where?`<span>📍 ${esc(where)}</span>`:''}${tag}</div>
+  </article>`;
 }
 /* Cererile mele: tab-uri Active / Inactive / Rezolvate + căutare în titlu */
 let rqAll=[], rqTab='open', rqQ='';
@@ -1577,19 +1591,100 @@ function renderMineRequests(){
 document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('[data-rq-tab]'); if(!b) return; rqTab=b.dataset.rqTab; renderMineRequests(); });
 document.addEventListener('submit',e=>{ if(e.target&&e.target.id==='rqSearchForm'){ e.preventDefault(); rqQ=$('#rqSearch').value; renderMineRequests(); } });
 document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rqSearch'){ rqQ=e.target.value; renderMineRequests(); } });
+/* Piese căutate de cumpărători (pentru vânzători): stare personală, filtre, „Ofertez mai târziu” / „Ignoră” */
+const rqPub={all:[],state:'new',f:{make:'',model:'',kind:'',county:'',offers:'',sort:'new',q:''}};
+function rqPubFiltered(){
+  const f=rqPub.f, q=f.q.trim().toLowerCase(), st=currentUser?rqPub.state:'all';
+  const list=rqPub.all.filter(x=>{
+    if(st==='offered'&&!x.my_offer) return false;
+    if(st==='later'&&x.my_mark!=='later') return false;
+    if(st==='ignored'&&x.my_mark!=='ignored') return false;
+    if(st==='new'&&(x.my_offer||x.my_mark==='ignored')) return false;
+    if(st==='all'&&x.my_mark==='ignored') return false;
+    if(f.make&&x.make!==f.make) return false;
+    if(f.model&&x.model!==f.model) return false;
+    if(f.kind&&x.kind&&x.kind!=='ambele'&&x.kind!==f.kind) return false;
+    if(f.county&&x.county!==f.county) return false;
+    if(f.offers==='none'&&Number(x.offers_count)>0) return false;
+    if(f.offers==='some'&&!(Number(x.offers_count)>0)) return false;
+    if(q&&![x.title,x.description,x.make,x.model,x.variant,x.engine].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const t=x=>new Date(x.created_at).getTime(), cn=x=>Number(x.offers_count)||0;
+  if(f.sort==='old') list.sort((a,b)=>t(a)-t(b));
+  else if(f.sort==='offers') list.sort((a,b)=>cn(b)-cn(a)||t(b)-t(a));
+  else list.sort((a,b)=>t(b)-t(a));
+  return list;
+}
+function rqChipsHtml(){
+  const f=rqPub.f, c=[];
+  if(f.make) c.push(['make',f.make]);
+  if(f.model) c.push(['model',f.model]);
+  if(f.kind) c.push(['kind',REQ_KIND[f.kind]||f.kind]);
+  if(f.county) c.push(['county',f.county]);
+  if(f.offers) c.push(['offers',f.offers==='none'?'Fără oferte':'Cu oferte']);
+  if(f.q.trim()) c.push(['q','„'+f.q.trim()+'”']);
+  if(f.sort!=='new') c.push(['sort',f.sort==='old'?'Cele mai vechi':'Cele mai multe oferte']);
+  return c.map(([k,l])=>`<button type="button" class="rq-chip" data-rq-chip="${k}" aria-label="Elimină filtrul ${esc(l)}">${esc(l)} <i aria-hidden="true">✕</i></button>`).join('');
+}
+function renderPubRequests(){
+  const grid=$('#requestGrid'), bar=$('#rqPubBar'); if(!grid||!bar) return;
+  const sel=$('#rqState'); if(sel){ sel.closest('.rq-state').classList.toggle('hidden',!currentUser); sel.value=rqPub.state; }
+  const list=rqPubFiltered();
+  grid.innerHTML=list.map(x=>reqRowHtml(x,false)).join('');
+  const chips=$('#rqChips'); chips.innerHTML=rqChipsHtml(); chips.classList.toggle('hidden',!chips.innerHTML);
+  $('#rqPubCount').textContent=`Cereri (${list.length?'1 - '+list.length:'0'} din ${list.length})`;
+  const em=$('#requestsEmpty'); em.textContent=rqPub.all.length?'Nicio cerere nu se potrivește cu starea sau filtrele alese.':'Nu există cereri deschise.'; em.classList.toggle('hidden',list.length>0);
+}
+function rqFillFilter(f){
+  const uniq=a=>[...new Set(a.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'ro'));
+  const opt=(arr,cur,all)=>`<option value="">${all}</option>`+arr.map(v=>`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`).join('');
+  $('#rqfMake').innerHTML=opt(uniq(rqPub.all.map(x=>x.make)),f.make,'Toate mărcile');
+  $('#rqfModel').innerHTML=opt(uniq(rqPub.all.filter(x=>!f.make||x.make===f.make).map(x=>x.model)),f.model,'Toate modelele');
+  $('#rqfCounty').innerHTML=opt(COUNTIES,f.county,'Toate județele');
+  $('#rqfKind').value=f.kind; $('#rqfOffers').value=f.offers; $('#rqfSort').value=f.sort; $('#rqfQ').value=f.q;
+}
+function rqReadFilter(){ return {make:$('#rqfMake').value,model:$('#rqfModel').value,kind:$('#rqfKind').value,county:$('#rqfCounty').value,offers:$('#rqfOffers').value,sort:$('#rqfSort').value||'new',q:$('#rqfQ').value}; }
+async function reqMark(id,mark){
+  if(!currentUser){ openAuth(location.hash.replace(/^#\//,'')); return; }
+  if(mark==='none') await api('/api/requests/'+id+'/mark',{method:'DELETE'});
+  else await api('/api/requests/'+id+'/mark',{method:'POST',body:JSON.stringify({mark})});
+  const val=mark==='none'?null:mark;
+  const a=rqPub.all.find(r=>Number(r.id)===id); if(a) a.my_mark=val;
+  const c=requestsCache.get(id); if(c) c.my_mark=val;
+  toast(mark==='later'?'Am salvat cererea la „Ofertez mai târziu”.':(mark==='ignored'?'Cererea e ignorată. O găsești la „Ignorate”.':'Gata, am scos marcajul.'));
+  const rm=$('#requestModal');
+  if(mark==='ignored') closeModal(rm);
+  else if(rm&&!rm.classList.contains('hidden')&&currentRequestModal&&Number(currentRequestModal.id)===id) openRequestModal(id,'public');
+  const pg=$('#page-requests'); if(pg&&pg.classList.contains('active')) renderPubRequests();
+}
+document.addEventListener('click',e=>{
+  const t=e.target; if(!t||!t.closest) return; let el;
+  if(t.closest('#rqFilterOpen')){ rqFillFilter(rqPub.f); $('#rqFilterModal').classList.remove('hidden'); return; }
+  if(t.closest('#rqfApply')){ rqPub.f=rqReadFilter(); closeModal($('#rqFilterModal')); renderPubRequests(); return; }
+  if(t.closest('#rqfReset')){ rqPub.f={make:'',model:'',kind:'',county:'',offers:'',sort:'new',q:''}; closeModal($('#rqFilterModal')); renderPubRequests(); return; }
+  if((el=t.closest('[data-rq-chip]'))){ const k=el.dataset.rqChip; rqPub.f[k]=(k==='sort'?'new':''); if(k==='make') rqPub.f.model=''; renderPubRequests(); return; }
+  if((el=t.closest('[data-req-mark]'))){ safe(reqMark)(Number(el.dataset.reqId),el.dataset.reqMark); return; }
+  if((el=t.closest('[data-req-similar]'))){ openSearch({q:el.dataset.reqSimilar}); return; }
+});
+document.addEventListener('change',e=>{
+  const t=e.target; if(!t) return;
+  if(t.id==='rqState'){ rqPub.state=t.value; renderPubRequests(); }
+  else if(t.id==='rqfMake'){ const f=rqReadFilter(); f.model=''; rqFillFilter(f); }
+});
 async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
   $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
   $('#requestsCrumb').textContent = $('#requestsTitle').textContent;
   { const pg=$('#page-requests'), pc=pg&&pg.querySelector('.container'); if(pg) pg.classList.toggle('req-mine',!!mine); if(pc) pc.classList.toggle('narrow',!!mine); }
-  { const ph=$('#page-requests .page-head'); if(ph) ph.classList.toggle('hd-compact',!!mine); const mb=$('#rqMineBar'); if(mb) mb.classList.toggle('hidden',!mine); grid.classList.toggle('rq-list',!!mine); }
+  { const ph=$('#page-requests .page-head'); if(ph) ph.classList.toggle('hd-compact',!!mine); const mb=$('#rqMineBar'); if(mb) mb.classList.toggle('hidden',!mine); grid.classList.toggle('rq-list',!!mine); const pb=$('#rqPubBar'); if(pb) pb.classList.toggle('hidden',!!mine); const ab=$('#rqAddBtn'); if(ab) ab.classList.toggle('hidden',!!mine); grid.classList.toggle('rq-pub-list',!mine); }
   $('#requestsSub').textContent = mine ? 'Cererile publicate de tine.' : 'Cereri publicate de cumpărători. Ai piesa? Contactează-l.';
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
     const r = await api(mine ? '/api/requests/mine' : '/api/requests');
     requestsCache=new Map(r.requests.map(x=>[x.id,x]));
     if(mine){ rqAll=r.requests; renderMineRequests(); }
-    else { grid.innerHTML = r.requests.map(x=>reqRowHtml(x,mine)).join(''); $('#requestsEmpty').classList.toggle('hidden', r.requests.length>0); }
+    else { rqPub.all=r.requests; renderPubRequests(); }
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 async function requestContact(id, btn){
@@ -2882,7 +2977,7 @@ document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){ const m=$$('.modal').filter(x=>!x.classList.contains('hidden')).pop(); if(m) closeModal(m); }
   if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.listing[data-open],.ar-row[data-open]')){ e.preventDefault(); openDetail(Number(e.target.dataset.open)); }
   if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.ar-row[data-offer-open]')){ e.preventDefault(); openRequestModal(Number(e.target.dataset.offerOpen),'offer'); }
-  if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.ar-row[data-open-request]')){ e.preventDefault(); openRequestModal(Number(e.target.dataset.openRequest), e.target.dataset.mode||'public'); }
+  if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.ar-row[data-open-request],.rq-pub-row[data-open-request]')){ e.preventDefault(); openRequestModal(Number(e.target.dataset.openRequest), e.target.dataset.mode||'public'); }
 });
 
 function getRecentSearches(){ return readJSON('autopiese_recent_searches',[]).filter(x=>typeof x==='string'&&x.trim()).slice(0,10); }
