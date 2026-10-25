@@ -724,7 +724,7 @@ async function drawReviewsPage(box,uid,role){
   const tab=(r,t,p)=>`<button type="button" class="acc-tab${role===r?' on':''}" data-go="account-tool?view=reviews&with=${id}&ref=${r}" role="tab" aria-selected="${role===r}">${t} <em>${(p&&p.count)||0}</em></button>`;
   const bars=[5,4,3,2,1].map(n=>`<div class="rv-bar"><span>${n} ★</span><i><u style="width:${total?Math.round(dist[n]/total*100):0}%"></u></i><small>${dist[n]}</small></div>`).join('');
   const list=(part.ratings||[]).map(x=>`<article class="rv-item"><div class="rv-top">${starsHtml(x.stars)}<b>${esc(x.who||'Utilizator')}</b><small>${esc(fmtDate(x.created_at))}</small></div><p>${x.comment?esc(x.comment):'<span class="muted">Fără comentariu</span>'}</p></article>`).join('');
-  const hero=`<div class="rv-hero"><span class="rv-av"><i>👤</i><img src="/api/users/${id}/avatar" alt="" onerror="this.remove()"></span><div class="rv-hero-txt"><b class="rv-hero-title">Recenzii</b><span class="rv-hero-name">${esc(name)}</span><small class="rv-hero-acc">Cont standard</small></div></div>`;
+  const hero=`<div class="rv-hero"><span class="rv-av"><i>👤</i><img src="/api/users/${id}/avatar" alt="" onerror="this.remove()"></span><div class="rv-hero-txt"><b class="rv-hero-title">Recenzii</b><span class="rv-hero-name">${esc(name)}</span><small class="rv-hero-acc">Cont standard</small></div><button type="button" class="back" data-back>← Înapoi</button></div>`;
   box.innerHTML=`<div class="rv-wrap">${hero}
     <div class="acc-tabs ord-tabs" role="tablist">${tab('seller','Ca vânzător',rt.seller)}${tab('buyer','Ca cumpărător',rt.buyer)}</div>
     ${total?`<div class="rv-summary"><div class="rv-score"><b>${esc(String(part.avg).replace('.',','))}</b><span>din 5</span>${starsHtml(part.avg)}<small>${total} ${total===1?'recenzie':'recenzii'}</small></div><div class="rv-bars">${bars}</div></div>
@@ -1677,7 +1677,7 @@ async function loadRequests(mine){
   $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
   $('#requestsCrumb').textContent = $('#requestsTitle').textContent;
   { const pg=$('#page-requests'), pc=pg&&pg.querySelector('.container'); if(pg) pg.classList.toggle('req-mine',!!mine); if(pc) pc.classList.toggle('narrow',!!mine); }
-  { const ph=$('#page-requests .page-head'); if(ph) ph.classList.toggle('hd-compact',!!mine); const mb=$('#rqMineBar'); if(mb) mb.classList.toggle('hidden',!mine); grid.classList.toggle('rq-list',!!mine); const pb=$('#rqPubBar'); if(pb) pb.classList.toggle('hidden',!!mine); const ab=$('#rqAddBtn'); if(ab) ab.classList.toggle('hidden',!!mine); grid.classList.toggle('rq-pub-list',!mine); }
+  { const ph=$('#page-requests .page-head'); if(ph) ph.classList.add('hd-compact'); const mb=$('#rqMineBar'); if(mb) mb.classList.toggle('hidden',!mine); grid.classList.toggle('rq-list',!!mine); const pb=$('#rqPubBar'); if(pb) pb.classList.toggle('hidden',!!mine); const ab=$('#rqAddBtn'); if(ab) ab.classList.toggle('hidden',!!mine); grid.classList.toggle('rq-pub-list',!mine); }
   $('#requestsSub').textContent = mine ? 'Cererile publicate de tine.' : 'Cereri publicate de cumpărători. Ai piesa? Contactează-l.';
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
@@ -3817,4 +3817,23 @@ function addSwipe(el, onSwipe){
   }
   new MutationObserver(sync).observe(btn,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
   sync();
+})();
+
+
+/* Fir de navigare „AutoParts › Pagina” pe toate paginile cu casetă (titlul se actualizează singur) */
+(function(){
+  const fixed={'page-account':'Contul meu','page-admin':'Administrare'};
+  document.querySelectorAll('section.page').forEach(pg=>{
+    const c=pg.querySelector(':scope>.container'); if(!c||c.querySelector('.crumbs')) return;
+    const h2=c.querySelector('.page-head h2'), fx=fixed[pg.id];
+    if(!h2&&!fx) return;
+    const p=document.createElement('p'); p.className='crumbs';
+    p.innerHTML='<a href="#/">AutoParts</a> › <span></span>';
+    const sp=p.lastElementChild;
+    c.insertBefore(p,c.firstChild);
+    const upd=()=>{ sp.textContent = fx || (pg.classList.contains('is-reviews') ? 'Recenzii' : h2.textContent.trim()); };
+    upd();
+    if(h2) new MutationObserver(upd).observe(h2,{childList:true,characterData:true,subtree:true});
+    new MutationObserver(upd).observe(pg,{attributes:true,attributeFilter:['class']});
+  });
 })();

@@ -2543,7 +2543,7 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
 
 /* ===== Design unitar: „Cererile mele”, mesaje de succes, elemente mărunte (doar aspect) ===== */
 /* Cererile mele — aceeași lățime și același antet ca restul contului (breadcrumb-ul public rămâne pe pagina publică) */
-#page-requests.req-mine .crumbs{display:none}
+
 /* mesaje de succes (cele de eroare erau deja roșii) */
 .ok-message{color:#1b6b3a!important;font-weight:700}
 /* notificări: iconița aliniată */
@@ -3538,3 +3538,14 @@ body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .p
   #page-requests .page-head .rq-add{margin-left:0;flex:1 0 100%;justify-content:center}
   .rq-pub-car{font-size:17px}
 }
+
+/* === „Înapoi” în caseta paginii (dreapta-sus): Contul meu, Administrare, Recenzii; Piese căutate de cumpărători folosește hd-compact === */
+.rv-hero{position:relative}
+.rv-hero>.back,#page-account .acc-user>.back{position:absolute;right:12px;top:8px;z-index:2;min-height:0;margin:0;padding:6px 2px;width:auto}
+.rv-hero:has(>.back){padding-right:84px}
+#page-account .acc-user>.acc-notif{top:40px!important}
+#page-account-tool.is-reviews .page-head{display:none}
+
+/* Fir de navigare vizibil pe toate paginile */
+.page>.container>.crumbs{margin:0 0 6px;line-height:1.4}
+.page>.container.narrow>.crumbs:first-child{padding-top:10px}
