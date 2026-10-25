@@ -2,15 +2,27 @@
 
 Marketplace de piese auto (Node.js + Express + PostgreSQL), găzduit pe Render.
 
+## Pornire rapidă (local, pentru exersare)
+1. Instalează Node.js 20 sau mai nou.
+2. În folderul proiectului: `npm install`.
+3. `npm start`, apoi deschide `http://localhost:3000`.
+   - Fără `DATABASE_URL`, aplicația pornește în mod „fără bază de date”: pagina se vede, dar conturile și anunțurile nu funcționează.
+   - Cu bază PostgreSQL: setează `DATABASE_URL`, `ADMIN_EMAIL` și `ADMIN_PASSWORD` (minimum 12 caractere), apoi `npm start`. Contul de administrator se creează la prima pornire.
+4. Testele: `npm test`.
+5. Verificare: `http://localhost:3000/api/health` trebuie să răspundă `ok: true`.
+
+Pentru lansare, vezi `LANSARE.md`. Pagina de ajutor pentru utilizatori este `ajutor.html` (se deschide la `/ajutor.html`). Lista modificărilor este în `SCHIMBARI.md`.
+
 ## Structura proiectului
 Totul într-un singur folder, fără subfoldere obligatorii:
 - `server.js` – backend (API, autentificare, admin, SEO)
-- `index.html`, `style.css`, `script.js` – frontend-ul
+- `index.html`, `style.css`, `script.js` – frontend-ul; `ajutor.html` – pagina de ajutor și FAQ
+- `test/` – teste automate (`npm test`)
 - `package.json`, `render.yaml` – configurare Node și Render
 - `assets/` (opțional) – imagini, dacă le adaugi mai târziu
 - `vehicles-catalog.js` – catalog local de mărci/modele (fallback); administratorul poate extinde catalogul din baza de date prin panoul admin
 
-Serverul trimite browserului doar `index.html`, `style.css`, `script.js` și conținutul din `assets/`. `server.js` și `package.json` nu pot fi descărcate.
+Serverul trimite browserului doar `index.html`, `style.css`, `script.js`, `ajutor.html` și conținutul din `assets/`. `server.js` și `package.json` nu pot fi descărcate.
 
 ## Variabile de mediu (Render → Environment)
 | Variabilă | Obligatorie | Rol |

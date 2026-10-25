@@ -13,7 +13,7 @@ const app = express();
 for(const m of ['get','post','put','patch','delete']){const orig=app[m].bind(app);app[m]=(p,...hs)=>orig(p,...hs.map(h=>typeof h==='function'&&h.length<4&&h.constructor&&h.constructor.name==='AsyncFunction'?(req,res,next)=>h(req,res,next).catch(next):h));}
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV==='production' || !!process.env.RENDER;
-const PUBLIC_FILES = ['index.html','style.css','script.js'];
+const PUBLIC_FILES = ['index.html','style.css','script.js','ajutor.html'];
 const ASSETS_DIR = path.join(__dirname,'assets');
 const DB_URL = process.env.DATABASE_URL || '';
 const DB_LOCAL = /localhost|127\.0\.0\.1/.test(DB_URL);
