@@ -3549,3 +3549,22 @@ body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .p
 /* Fir de navigare vizibil pe toate paginile */
 .page>.container>.crumbs{margin:0 0 6px;line-height:1.4}
 .page>.container.narrow>.crumbs:first-child{padding-top:10px}
+
+/* === Rezultate / Anunțurile vânzătorului ===
+   1) Vânzător: un singur chenar (bannerul), cu „Înapoi” și numărul de anunțuri sus în dreapta */
+.seller-view .page-head{display:none}
+.seller-banner{position:relative;padding-right:104px}
+.seller-banner .sb-side{position:absolute;right:12px;top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.seller-banner .sb-side .back{min-height:0;margin:0;padding:6px 2px}
+.seller-banner .sb-count{font-size:12.5px;color:var(--muted);white-space:nowrap}
+/* 2) Desktop: Filtrare | Cele mai noi | căutare pe un rând; panoul de filtre se deschide doar la apăsare */
+@media(min-width:801px){
+  body .results-actions{display:flex;flex-wrap:nowrap;gap:10px;align-items:center}
+  body .results-actions .filter-toggle{display:block;order:1;flex:0 0 auto;width:auto;height:46px;min-height:46px;padding:0 18px;font-size:15px;white-space:nowrap}
+  body .results-actions select{order:2;flex:0 0 auto;width:190px;height:46px;min-height:46px}
+  body .results-actions .result-search{order:3;flex:1 1 0;min-width:0}
+  #page-results .results-layout{grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
+  #page-results .filters{display:none;margin:0}
+  #page-results .filters.open{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0 16px;align-items:end}
+  #page-results .filters.open>.filter-head,#page-results .filters.open>.check{grid-column:1/-1}
+}

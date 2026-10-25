@@ -351,7 +351,7 @@ document.addEventListener('click',e=>{
     p.classList.add('hidden'); const b=f.querySelector('[data-contact-toggle]'); if(b){ b.setAttribute('aria-expanded','false'); b.classList.remove('open'); }
   });
   const f=$('#filters');
-  if(f&&f.classList.contains('open')&&window.matchMedia('(max-width:800px)').matches&&!f.contains(t)&&!t.closest('#filterToggle')) f.classList.remove('open');
+  if(f&&f.classList.contains('open')&&!f.contains(t)&&!t.closest('#filterToggle')) f.classList.remove('open');
   [['#mineFilterPanel','#mineFilterBtn'],['#mineSortPanel','#mineSortBtn'],['#msgFilterPanel','#msgFilterBtn'],['#notifSummary','#notifBtn']].forEach(([pi,bi])=>{
     const p=$(pi); if(!p||p.classList.contains('hidden')||p.contains(t)||t.closest(bi)) return;
     p.classList.add('hidden'); const b=$(bi); if(b&&b.hasAttribute('aria-expanded')) b.setAttribute('aria-expanded','false');
@@ -1258,7 +1258,7 @@ async function goToResultsPage(page){
   state.page=Math.min(pages,Math.max(1,Number(page)||1));
   state.offset=(state.page-1)*30;
   await loadResults(false);
-  const top=document.querySelector('#page-results .page-head');
+  const top=document.querySelector('#page-results.seller-view #sellerBanner')||document.querySelector('#page-results .page-head');
   if(top) top.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -1288,7 +1288,7 @@ function renderSellerBanner(){
   pg.classList.add('seller-view'); box.classList.remove('hidden');
   if(box.dataset.sid===String(id)) return;
   box.dataset.sid=String(id);
-  box.innerHTML=`<span class="sb-av">${avatarSpan(id,name,'seller-avatar')}</span><div class="sb-main"><small class="sb-label">Anunțurile vânzătorului</small><b class="sb-name">${esc(name)}</b><div class="sb-rate"></div></div>`;
+  box.innerHTML=`<span class="sb-av">${avatarSpan(id,name,'seller-avatar')}</span><div class="sb-main"><small class="sb-label">Anunțurile vânzătorului</small><b class="sb-name">${esc(name)}</b><div class="sb-rate"></div></div><div class="sb-side"><button type="button" class="back" data-back>← Înapoi</button><small class="sb-count"></small></div>`;
   api('/api/sellers/'+Number(id)+'/ratings').then(r=>{
     if(box.dataset.sid!==String(id)) return;
     const part=(label,p)=>p&&p.count?`<span class="acc-rate-row">${label} ${starsHtml(p.avg)} <b>${esc(String(p.avg).replace('.',','))}</b> (${p.count})</span>`:'';
@@ -1307,7 +1307,7 @@ function renderList(){
   $('#resultsTitle').textContent = title;
   renderSellerBanner();
   $('#crumbCurrent').textContent = title;
-  $('#resultCount').textContent = state.total===1 ? '1 anunț' : `${state.total} anunțuri`;
+  $('#resultCount').textContent = state.total===1 ? '1 anunț' : `${state.total} anunțuri`; { const sc=document.querySelector('#sellerBanner .sb-count'); if(sc) sc.textContent=$('#resultCount').textContent; }
   $('#listingGrid').innerHTML = state.loaded.map(x=>card(x,{mine})).join('');
   $('#noResults').classList.toggle('hidden', state.loaded.length>0);
   renderFacets(); renderRelated(); renderRequestCta();
