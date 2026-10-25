@@ -12,8 +12,10 @@
 - `package.json` – `npm test` rulează verificarea de sintaxă și testele; nou: `npm run test:unit`.
 - `README.md` – secțiune nouă „Pornire rapidă” și mențiuni despre `ajutor.html` și `test/`.
 
+- `index.html` – o singură linie adăugată: linkul „Ajutor și întrebări frecvente” în subsol, coloana „Ajutor rapid”. Folosește stilul existent al linkurilor din subsol (`style.css` nu s-a schimbat).
+
 ## Nemodificate
-`index.html`, `style.css`, `script.js`, `vehicles-catalog.js`, `render.yaml`, `package-lock.json`, `migrate-images-to-supabase.js`, `DEPLOY-AUDIT.md`.
+`style.css`, `script.js`, `vehicles-catalog.js`, `render.yaml`, `package-lock.json`, `migrate-images-to-supabase.js`, `DEPLOY-AUDIT.md`.
 
 ## Ce nu s-a putut verifica
 Testele din `test/server.test.js` nu au fost rulate aici (nu se pot instala pachetele). Rulează `npm install` și `npm test` la tine.

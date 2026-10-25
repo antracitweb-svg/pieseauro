@@ -14,8 +14,7 @@
 - [ ] Resend configurat și `REQUIRE_VERIFIED_EMAIL=true`
 - [ ] Plan Render care nu adoarme serverul (sau ping de monitorizare)
 - [ ] Testat pe telefon: înregistrare, postare cu poze, mesaj, cerere și ofertă
-- [ ] Completat tariful în `ajutor.html` (întrebarea „Cât costă să postez un anunț?”)
+- [ ] Dacă publicarea devine cu plată, adaugă în `ajutor.html` o întrebare despre tarife
 
 ## Pagina de ajutor
-`ajutor.html` este deja adăugată în lista serverului și se deschide la `/ajutor.html`.
-Ca să apară și în site, adaugă în subsolul din `index.html`: `<a href="/ajutor.html">Ajutor</a>` (opțional; nu am modificat designul).
+`ajutor.html` este adăugată în lista serverului (`/ajutor.html`) și are link în subsolul site-ului, în coloana „Ajutor rapid”.
