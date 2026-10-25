@@ -3578,3 +3578,8 @@ body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .p
 #homeFeed .ar-ph small,#listingGrid .ar-ph small,.similar-grid .ar-ph small{display:block}
 .listing-placeholder:has(svg){filter:none;opacity:1;color:#b8935a;display:grid;place-items:center}
 .listing-placeholder svg{width:64px;height:auto}
+
+/* Plasă de siguranță: dacă pe pagină a rămas un loc de poză vechi (rotiță), îl arăt tot ca mașină + „Fără poză" */
+#homeFeed .ar-ph:not(:has(svg)),#listingGrid .ar-ph:not(:has(svg)),.similar-grid .ar-ph:not(:has(svg)),#dismGrid .ar-ph:not(:has(svg)){font-size:0;color:transparent}
+#homeFeed .ar-ph:not(:has(svg))::before,#listingGrid .ar-ph:not(:has(svg))::before,.similar-grid .ar-ph:not(:has(svg))::before,#dismGrid .ar-ph:not(:has(svg))::before{content:"";display:block;width:46%;max-width:72px;aspect-ratio:64/40;background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 40%22 fill=%22none%22 stroke=%22%23b8935a%22 stroke-width=%221.7%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 aria-hidden=%22true%22 focusable=%22false%22%3E%3Cpath d=%22M4 29v-7c0-2 1.2-3 3-3.5l9-2.5 6-7.5h20l8 7.5 8 2.5c2 .5 3 1.5 3 3.5v7%22/%3E%3Cpath d=%22M4 29h8M22 29h20M52 29h8M25 11.5l-4.5 7h12v-7zM36 11.5v7h10.5l-6-7z%22/%3E%3Ccircle cx=%2217%22 cy=%2229.5%22 r=%225%22/%3E%3Ccircle cx=%2247%22 cy=%2229.5%22 r=%225%22/%3E%3C/svg%3E") center/contain no-repeat}
+#homeFeed .ar-ph:not(:has(svg))::after,#listingGrid .ar-ph:not(:has(svg))::after,.similar-grid .ar-ph:not(:has(svg))::after,#dismGrid .ar-ph:not(:has(svg))::after{content:"Fără poză";font-size:11px;font-weight:600;color:#a39270;letter-spacing:.02em}

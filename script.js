@@ -540,7 +540,7 @@ async function loadToolData(view, box, withId, refId){
     const ok=[],gone=[]; res.forEach((r,i)=>{ if(r.status==='fulfilled') ok.push(r.value.listing); else if(r.reason&&r.reason.status===404) gone.push(ids[i]); });
     if(gone.length) writeJSON('autopiese_cart',ids.filter(i=>!gone.includes(i)));
     const total=ok.reduce((n,x)=>n+(Number(x.price)||0),0);
-    items=ok.map(x=>{ const im=Array.isArray(x.images)&&x.images[0]?x.images[0]:''; return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}"><div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>'}</div><div class="ar-main"><h3 class="ar-title">${esc(x.title)}</h3><div class="ar-sub">📍 ${esc(x.county||'România')}${x.seller_name?' · '+esc(x.seller_name):''}</div></div><div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-order="${x.id}">🛍️ Comandă</button><button type="button" class="ar-btn ar-del" data-cart-del="${x.id}" title="Elimină din coș" aria-label="Elimină din coș">🗑</button></div><div class="ar-foot"><span class="ar-views">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${esc(money(x.price))}</span></div></article>`; });
+    items=ok.map(x=>{ const im=Array.isArray(x.images)&&x.images[0]?x.images[0]:''; return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}"><div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:phHtml(x)}</div><div class="ar-main"><h3 class="ar-title">${esc(x.title)}</h3><div class="ar-sub">📍 ${esc(x.county||'România')}${x.seller_name?' · '+esc(x.seller_name):''}</div></div><div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-order="${x.id}">🛍️ Comandă</button><button type="button" class="ar-btn ar-del" data-cart-del="${x.id}" title="Elimină din coș" aria-label="Elimină din coș">🗑</button></div><div class="ar-foot"><span class="ar-views">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${esc(money(x.price))}</span></div></article>`; });
     if(ok.length) items.push(`<div class="info-card tool-item"><b>Total estimat: ${esc(money(total))}</b><p class="muted">Apasă „Comandă” la fiecare piesă ca vânzătorul să primească comanda ta cu adresa de livrare. Plata se face direct cu vânzătorul.</p></div>`);
   }else if(view==='transactions'){
     const r=await api('/api/orders');
@@ -605,7 +605,7 @@ let lastOrderId='';
 function ordCls(st){ return st==='completed'?'ok':(st==='cancelled'?'bad':((st==='new'||st==='suspended')?'wait':'go')); }
 function orderRowHtml(o){
   const money=Number(o.price||0).toLocaleString('ro-RO')+' lei', seller=o.role==='seller';
-  const thumb=o.has_thumb?`<img src="/api/orders/${o.id}/thumb" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
+  const thumb=o.has_thumb?`<img src="/api/orders/${o.id}/thumb" alt="" loading="lazy" decoding="async">`:phHtml(null);
   return `<article class="ar-row ord-row" data-go="account-tool?view=order&with=${o.id}" tabindex="0" role="link" aria-label="Comanda nr. ${o.id}">
     <div class="ar-thumb">${thumb}</div>
     <div class="ar-main"><div class="ar-sub">Comanda nr. ${o.id}</div><h3 class="ar-title">${esc(o.title||'Comandă')}${Number(o.quantity)>1?' × '+Number(o.quantity):''}</h3>${o.other_name?`<div class="ar-meta">${seller?'Cumpărător':'Vânzător'}: ${esc(o.other_name)}</div>`:''}</div>
@@ -641,7 +641,7 @@ function orderDetailHtml(o){
     if(o.status==='suspended') btns.push(['confirmed','Reia comanda','ghost']); else btns.push(['suspended','Suspendată','ghost']);
     btns.push(['cancelled','Anulată','danger']);
   }else if(!seller&&o.status==='new') btns.push(['cancelled','Anulează comanda','danger']);
-  const thumb=o.has_thumb?`<img src="/api/orders/${o.id}/thumb" alt="" loading="lazy" decoding="async">`:'<span class="ar-ph">⚙️</span>';
+  const thumb=o.has_thumb?`<img src="/api/orders/${o.id}/thumb" alt="" loading="lazy" decoding="async">`:phHtml(null);
   const prod=o.listing_id?`<button type="button" class="seller-link ord-link" data-order-listing="${o.id}">${esc(o.title||'Comandă')}</button>`:`<span>${esc(o.title||'Comandă')}</span>`;
   const unit=Number(o.price||0)/qty;
   const party=o.other_name?`<div class="ord-party"><div class="ord-party-name">${(!seller&&o.other_id)?`<button type="button" class="seller-link" data-seller-profile="${o.other_id}">${esc(o.other_name)}</button>`:esc(o.other_name)}</div><div class="rate-line">${ratingLine({avg:o.other_rating_avg,count:o.other_rating_n},o.other_id,seller?'buyer':'seller')}</div>${(o.other_company&&o.other_person&&o.other_person!==o.other_company)?`<div class="ord-line">👤 ${esc(o.other_person)}</div>`:''}${o.other_id?`<button type="button" class="btn ghost small" data-go="account-tool?view=messages&with=${o.other_id}">✉ Scrie mesaj</button>`:''}</div>`:'';
@@ -1085,7 +1085,7 @@ async function loadYears(make, model){
 function cardMine(x){
   const st=STATUS_LABEL[x.status]||['',''];
   const im=Array.isArray(x.images)&&x.images[0]?x.images[0]:'';
-  const img=im?`<img src="${esc(im)}" alt="${esc(x.title)}" loading="lazy" decoding="async">`:`<div class="listing-placeholder">${x.type==='dezmembrari'?'🚗':'⚙️'}</div>`;
+  const img=im?`<img src="${esc(im)}" alt="${esc(x.title)}" loading="lazy" decoding="async">`:`<div class="listing-placeholder">${phIcon(x)}</div>`;
   const canSold=(x.status==='approved'||x.status==='sold');
   const btns=[
     canSold?`<button type="button" class="mr-btn" data-sold-listing="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune la vânzare':'Marchează vândut'}" aria-label="${x.status==='sold'?'Repune la vânzare':'Marchează vândut'}">${x.status==='sold'?'↺':'✓'}</button>`:'',
@@ -1098,12 +1098,30 @@ function cardMine(x){
     <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${money(x.price)}</b></div></article>`;
 }
 /* Format compact (ca în „Anunțurile mele”): poză stânga, titlu, butoane, apoi vizualizări · bucăți · preț. Folosit peste tot unde apar anunțuri. */
+/* Iconițe pentru anunțuri fără poză (desenate în cod, culorile site-ului) */
+const PH_ICONS={"car": "<svg viewBox=\"0 0 64 40\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M4 29v-7c0-2 1.2-3 3-3.5l9-2.5 6-7.5h20l8 7.5 8 2.5c2 .5 3 1.5 3 3.5v7\"/><path d=\"M4 29h8M22 29h20M52 29h8M25 11.5l-4.5 7h12v-7zM36 11.5v7h10.5l-6-7z\"/><circle cx=\"17\" cy=\"29.5\" r=\"5\"/><circle cx=\"47\" cy=\"29.5\" r=\"5\"/></svg>", "engine": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 20h22l4 4v11H12z\"/><path d=\"M18 20v-6h12v6M7 27h5M38 28h4M18 27h14M18 31h14\"/></svg>", "brake": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"24\" cy=\"24\" r=\"16\"/><circle cx=\"24\" cy=\"24\" r=\"5\"/><circle cx=\"34.0\" cy=\"24.0\" r=\"1.4\"/><circle cx=\"29.0\" cy=\"32.7\" r=\"1.4\"/><circle cx=\"19.0\" cy=\"32.7\" r=\"1.4\"/><circle cx=\"14.0\" cy=\"24.0\" r=\"1.4\"/><circle cx=\"19.0\" cy=\"15.3\" r=\"1.4\"/><circle cx=\"29.0\" cy=\"15.3\" r=\"1.4\"/><path d=\"M36 10a18 18 0 0 1 6 9\"/></svg>", "light": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M8 15c8-5 20-5 28 0v18c-8 5-20 5-28 0z\"/><circle cx=\"22\" cy=\"24\" r=\"5.5\"/><path d=\"M40 19h5M40 24h5M40 29h5\"/></svg>", "body": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M8 37V19c0-3 2-5 5-5h15c3 0 5 1 7 4l5 7v12z\"/><path d=\"M14 19h12l6 7H14zM30 32h6\"/></svg>", "susp": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M24 5v8M20 13h8v6h-8z\"/><path d=\"M16 22h16l-16 4.5h16l-16 4.5h16l-16 4.5h16\"/><path d=\"M24 36v3\"/><circle cx=\"24\" cy=\"42\" r=\"3\"/></svg>", "wheel": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"24\" cy=\"24\" r=\"17\"/><circle cx=\"24\" cy=\"24\" r=\"12\"/><circle cx=\"24\" cy=\"24\" r=\"3.5\"/><path d=\"M24.0 20.5L24.0 12.0M27.3 22.9L35.4 20.3M26.1 26.8L31.1 33.7M21.9 26.8L16.9 33.7M20.7 22.9L12.6 20.3\"/></svg>", "elec": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M7 19h34v20H7z\"/><path d=\"M13 19v-4h7v4M28 19v-4h7v4M12 29h8M16 25v8M29 29h8\"/></svg>", "interior": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"24\" cy=\"24\" r=\"17\"/><circle cx=\"24\" cy=\"24\" r=\"4\"/><path d=\"M7.5 22c5 1 11 1.5 12.5 2M40.5 22c-5 1-11 1.5-12.5 2M24 28v13\"/></svg>", "gear": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"19\" cy=\"28\" r=\"10\"/><circle cx=\"19\" cy=\"28\" r=\"3.5\"/><path d=\"M29.0 28.0L32.0 28.0M26.1 35.1L28.2 37.2M19.0 38.0L19.0 41.0M11.9 35.1L9.8 37.2M9.0 28.0L6.0 28.0M11.9 20.9L9.8 18.8M19.0 18.0L19.0 15.0M26.1 20.9L28.2 18.8\"/><circle cx=\"36\" cy=\"14\" r=\"5.5\"/><circle cx=\"36\" cy=\"14\" r=\"1.8\"/><path d=\"M41.5 14.0L44.0 14.0M38.8 18.8L40.0 20.9M33.2 18.8L32.0 20.9M30.5 14.0L28.0 14.0M33.2 9.2L32.0 7.1M38.8 9.2L40.0 7.1\"/></svg>"};
+function phKind(x){
+  if(x && x.type==='dezmembrari') return 'car';
+  const t=(((x&&x.category)||'')+' '+((x&&x.subcategory)||'')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(/moto|chiulas|piston|turbo|distribu|evacuar|racire|pompe|injector|aprindere|filtre|ulei/.test(t)) return 'engine';
+  if(/fran|disc|placut/.test(t)) return 'brake';
+  if(/ilumin|farur|stopur|lumini|xenon|lampa|proiector/.test(t)) return 'light';
+  if(/caroser|aripa|usa|bara|capota|oglind|grila|haion/.test(t)) return 'body';
+  if(/suspens|amortiz|directie|bascul|punte|rulment/.test(t)) return 'susp';
+  if(/roti|jant|anvelop|cauciuc/.test(t)) return 'wheel';
+  if(/electr|cabluri|acumulator|baterie|alternator|senzor|calculator|audio|navigatie|gps|climatiz/.test(t)) return 'elec';
+  if(/interio|volan|scaun|bord|consola/.test(t)) return 'interior';
+  if(/transmis|cutie|ambreiaj|diferential|cardan/.test(t)) return 'gear';
+  return 'car';
+}
+function phIcon(x){ return PH_ICONS[phKind(x)]||PH_ICONS.car; }
+function phHtml(x){ return `<span class="ar-ph">${phIcon(x)}<small>Fără poză</small></span>`; }
 function adRowHtml(x, eager){
   const fav = favorites.includes(x.id);
   const isDism = x.type==='dezmembrari';
   const im = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
   const nImg = Number(x.image_count)||0;
-  const thumb = im ? `<img src="${esc(im)}" alt="" ${eager?'fetchpriority="high"':'loading="lazy"'} decoding="async">` : `<span class="ar-ph">${isDism?'🚗':'⚙️'}</span>`;
+  const thumb = im ? `<img src="${esc(im)}" alt="" ${eager?'fetchpriority="high"':'loading="lazy"'} decoding="async">` : phHtml(x);
   const compat = [x.make,x.model,x.year].filter(Boolean).join(' ') + (x.engine?' · '+x.engine:'');
   const meta = [compat || x.category || 'Piesă auto'];
   if(compat && x.category && !isDism) meta.push(x.category);
