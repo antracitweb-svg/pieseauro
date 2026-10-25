@@ -3428,3 +3428,65 @@ body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .p
   #page-mine .mine-card,#page-messages .mine-card{max-width:none!important;margin-left:0!important;margin-right:0!important}
   #page-dism .dism-grid.ar-list,#page-requests .request-grid.ar-list{max-width:none!important}
 }
+
+/* === v17: bare de căutare / filtrare pe un singur rând (Anunțurile mele, Mesagerie, Rezultate, Cereri, Admin) ===
+   Bloc separat, la sfârșit: dacă ceva nu arată bine, ștergi tot de aici în jos și revii la versiunea veche. */
+
+/* Butoanele Filtrare / Afișare: textul încape mereu în buton (desktop și telefon) */
+#page-mine .mine-bar .mine-tools .mine-tool,
+#page-messages .msg-bar .mine-tools .mine-tool{
+  display:inline-flex!important;align-items:center;justify-content:center;box-sizing:border-box;
+  flex:0 0 auto!important;width:auto!important;min-width:max-content!important;
+  height:40px!important;min-height:40px!important;padding:0 14px!important;
+  font-size:14px!important;line-height:1!important;white-space:nowrap!important;overflow:visible!important;
+}
+@media(max-width:360px){
+  #page-mine .mine-bar .mine-tools .mine-tool,
+  #page-messages .msg-bar .mine-tools .mine-tool{padding:0 8px!important;font-size:13px!important}
+}
+
+/* Mesagerie: Filtrare + căutare pe același rând, ca în Anunțurile mele */
+#page-messages .msg-bar{display:flex;align-items:stretch;gap:8px;margin:0 0 10px;padding-bottom:4px}
+#page-messages .msg-bar .mine-tools{display:flex!important;flex:0 0 auto;flex-wrap:nowrap!important;gap:8px!important;margin:0!important}
+#page-messages .msg-bar .mine-search{display:flex;align-items:center;flex:1 1 0;min-width:0;height:40px;margin:0!important;border:1px solid #ddd3bf;border-radius:8px;background:#fff}
+#page-messages .msg-bar .mine-search input{flex:1;min-width:0;height:100%;min-height:0!important;border:0!important;outline:0;background:transparent;padding:0 4px 0 10px;font:inherit;font-size:14px;text-overflow:ellipsis}
+#page-messages .msg-bar .mine-search .ms-ico{padding:0 10px;font-size:18px;color:#8f6d38}
+
+/* Rezultate (telefon): Filtrare + sortare + căutare pe un rând. Sub 560px dispar butonul „Caută” și lupa (Enter / tasta Caută din tastatură trimite căutarea) */
+@media(max-width:800px){
+  body .results-actions{flex-wrap:nowrap!important;gap:8px!important;align-items:center}
+  body .results-actions .filter-toggle{order:1;flex:0 0 auto!important;width:auto!important;min-width:max-content!important;margin:0!important;height:40px!important;min-height:40px!important;padding:0 12px!important;font-size:14px!important;white-space:nowrap}
+  body .results-actions select{order:2;flex:0 0 auto!important;width:112px!important;min-width:0;margin:0!important;height:40px!important;min-height:40px!important;padding:0 8px!important;font-size:13px!important;text-overflow:ellipsis}
+  body .results-actions .result-search{order:3;flex:1 1 0!important;min-width:0;width:auto;min-height:40px}
+  body .results-actions .result-search input{min-width:0;padding:0 4px;font-size:14px;text-overflow:ellipsis}
+}
+@media(max-width:560px){
+  body .results-actions .result-search span,
+  body .results-actions #resultsSearchBtn{display:none!important}
+  body .results-actions .result-search input{padding-left:10px}
+}
+
+/* Cereri de piese: pe telefon taburile sus, apoi căutare + număr pe același rând; pe laptop taburi + căutare pe același rând */
+#page-requests #rqMineBar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px}
+#page-requests #rqMineBar .mine-tabs{grid-column:1/-1;grid-row:1}
+#page-requests #rqMineBar .mine-search{grid-column:1;grid-row:2;height:40px;margin:0 0 6px!important}
+#page-requests #rqMineBar .mine-search input{height:100%;min-height:0;padding:0 4px 0 10px;font-size:14px}
+#page-requests #rqMineBar .mine-head{grid-column:2;grid-row:2;border-bottom:0;padding:0 0 6px;white-space:nowrap}
+@media(min-width:700px){
+  #page-requests #rqMineBar{grid-template-columns:auto minmax(0,1fr)}
+  #page-requests #rqMineBar .mine-tabs{grid-column:1;grid-row:1;margin:0 0 6px}
+  #page-requests #rqMineBar .mine-search{grid-column:2;grid-row:1}
+  #page-requests #rqMineBar .mine-head{grid-column:1/-1;grid-row:2;border-bottom:1px solid var(--line);padding:4px 0}
+}
+
+/* Admin: căutare + filtre (chips) pe același rând; chips-urile derulează pe orizontală dacă nu încap. Pe telefon: căutarea sus, chips-urile pe un singur rând derulabil */
+.adm-toolbar{display:flex;flex-wrap:nowrap;align-items:center;gap:10px}
+.adm-toolbar input{flex:1 1 240px;width:auto;min-width:0}
+.adm-toolbar .adm-chips{flex:0 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.adm-toolbar .adm-chips::-webkit-scrollbar{display:none}
+.adm-toolbar .adm-chip{flex:0 0 auto;white-space:nowrap}
+@media(max-width:800px){
+  .adm-toolbar{flex-wrap:wrap}
+  .adm-toolbar input{flex:1 0 100%}
+  .adm-toolbar .adm-chips{flex:1 0 100%}
+}
