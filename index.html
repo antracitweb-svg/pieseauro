@@ -268,25 +268,5 @@
   <button type="button" class="image-lightbox-nav next" id="imageLightboxNext" data-image-next aria-label="Poza următoare">›</button>
   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
 </div>
-<script src="script.js?v=prestige2027l" defer></script>
-<script>
-(function(){
-  var btn=document.getElementById('avatarBtn'),box=document.getElementById('menuAvatar');
-  if(!btn||!box)return;
-  function sync(){
-    var src=btn.querySelector('img'); src=src&&src.getAttribute('src');
-    var cur=box.querySelector('img');
-    if(src){
-      if(!cur){cur=document.createElement('img');cur.alt='';box.appendChild(cur);}
-      if(cur.getAttribute('src')!==src)cur.setAttribute('src',src);
-      box.classList.add('has-photo');
-    }else{
-      if(cur)cur.remove();
-      box.classList.remove('has-photo');
-    }
-  }
-  new MutationObserver(sync).observe(btn,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
-  sync();
-})();
-</script>
+<script src="script.js?v=prestige2027m" defer></script>
 </body></html>

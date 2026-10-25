@@ -3703,3 +3703,23 @@ function addSwipe(el, onSwipe){
 
   ['detailModal','requestModal','adminListingModal','csvModal','garageModal'].forEach(id=>{ const m=document.getElementById(id); if(m) setup(m); });
 })();
+
+/* Sincronizare poză profil în meniu (mutat din index.html: CSP nu permite scripturi inline) */
+(function(){
+  var btn=document.getElementById('avatarBtn'),box=document.getElementById('menuAvatar');
+  if(!btn||!box)return;
+  function sync(){
+    var src=btn.querySelector('img'); src=src&&src.getAttribute('src');
+    var cur=box.querySelector('img');
+    if(src){
+      if(!cur){cur=document.createElement('img');cur.alt='';box.appendChild(cur);}
+      if(cur.getAttribute('src')!==src)cur.setAttribute('src',src);
+      box.classList.add('has-photo');
+    }else{
+      if(cur)cur.remove();
+      box.classList.remove('has-photo');
+    }
+  }
+  new MutationObserver(sync).observe(btn,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+  sync();
+})();
