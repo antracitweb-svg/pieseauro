@@ -3855,3 +3855,212 @@ function addSwipe(el, onSwipe){
     new MutationObserver(upd).observe(pg,{attributes:true,attributeFilter:['class']});
   });
 })();
+
+
+/* ===== Buton „Ajutor” în chenarul fiecărei pagini: fereastră care coboară cu explicații =====
+   Textele sunt într-un singur loc (HELP / TOOL). Pagina fără text propriu primește explicația generală. */
+(function helpSheet(){
+  const L=(t,d)=>({t,d});
+  const HELP={
+    'page-results':{title:'Piese auto',intro:'Aici vezi anunțurile care se potrivesc căutării tale.',items:[
+      L('Căutare','Scrie codul OEM, numele piesei sau marca și modelul, apoi apasă butonul de căutare.'),
+      L('Filtre','Restrâng lista după categorie, marcă, model, stare, județ, preț sau tipul vânzătorului. Pe telefon se deschid cu butonul Filtrare.'),
+      L('Ordonare','Alegi dacă vezi întâi cele mai noi, cele mai ieftine sau cele mai scumpe anunțuri.'),
+      L('Salvează căutarea','Salvează căutarea curentă. Primești o notificare când apare un anunț nou care i se potrivește (e nevoie de cont).'),
+      L('Inimioara de pe anunț','Adaugă anunțul la Favorite, ca să îl găsești ușor mai târziu.'),
+      L('Deschide un anunț','Apasă pe el ca să vezi pozele, detaliile și datele vânzătorului. De acolo îl poți contacta sau comanda.'),
+      L('Nu găsești piesa?','Folosește „Anunță ce piesă cauți”. Vânzătorii îți trimit oferte.')]},
+    'seller':{title:'Anunțurile vânzătorului',intro:'Lista cu toate anunțurile active ale acestui vânzător.',items:[
+      L('Înapoi','Te întoarce la pagina de unde ai venit.'),
+      L('Calificativ și stele','Părerea cumpărătorilor care au comandat de la el. Apasă pe ele ca să vezi recenziile.'),
+      L('Anunțurile','Apasă pe un anunț ca să vezi detaliile și să scrii vânzătorului.')]},
+    'page-request-pick':{title:'Cerere de piese: alege mașina',intro:'Primul pas ca să primești oferte de la vânzători.',items:[
+      L('Alege mașina ta','Apasă pe o mașină salvată în Garajul meu. Datele ei se completează singure în cerere.'),
+      L('+ Adaugă o cerere pentru altă mașină','Pentru o mașină care nu e în garaj. Completezi datele de la zero.')]},
+    'page-request':{title:'Cerere de piese',intro:'Spui ce piesă cauți, iar vânzătorii îți trimit oferte cu preț.',items:[
+      L('Denumire piesă','Scrie clar ce cauți. Ex: „Bară față Dacia Logan 2005 roșie”.'),
+      L('Codul piesei sau detalii','Cod OEM, stare dorită, orice detaliu care ajută vânzătorul.'),
+      L('+ Adaugă încă o piesă','Ceri mai multe piese pentru aceeași mașină, în aceeași cerere.'),
+      L('Mașina','Marca, modelul, anul, motorizarea și seria de șasiu (VIN). Cu VIN-ul, vânzătorii găsesc piesa exactă.'),
+      L('Doresc oferte de piese','Alegi piese noi, second-hand sau ambele.'),
+      L('Livrare','Județul este obligatoriu. Adresa completă e opțională și o vede doar vânzătorul a cărui ofertă o accepți.'),
+      L('Poze','Până la 6 poze, de exemplu cu piesa veche.'),
+      L('Trimite cererea','Publică cererea. O poți modifica doar în primele 10 minute după publicare.')]},
+    'page-sell':{title:'Postează un anunț',intro:'Completezi datele piesei, iar anunțul este verificat de echipă înainte să apară în căutări.',items:[
+      L('Titlu','Piesa, marca, modelul și anii compatibili. Marca și modelul se completează singure din titlu.'),
+      L('Descriere','Starea piesei, codul OEM și orice defect.'),
+      L('Categoria','Alege categoria piesei, ca să fie găsită mai ușor.'),
+      L('Poze','Până la 8 poze clare, făcute la lumină, din mai multe unghiuri.'),
+      L('Pentru ce mașină','Marcă, model, an, motorizare, kilometri și VIN. Cu cât sunt mai complete, cu atât anunțul e mai ușor de găsit.'),
+      L('Preț','Cumpărătorii compară rapid după preț.'),
+      L('Tip anunț, Vând ca, Stare','Piesă sau mașină la dezmembrat; persoană fizică sau firmă; nouă sau second-hand.'),
+      L('Județ și Cod OEM','Județul te ajută să fii găsit local. Mulți cumpărători caută după codul OEM.'),
+      L('Publică anunțul','Trimite anunțul la verificare. Până la aprobare îl vezi în Contul meu → Anunțurile mele, cu starea „În așteptare”.'),
+      L('Renunță la modificări','Apare când editezi un anunț. Închide editarea fără să salveze.')]},
+    'page-dism':{title:'Mașini pentru piese',intro:'Vehicule aflate la dezmembrare, cu piesele lor disponibile.',items:[
+      L('Cardul mașinii','Arată mașina, anul, motorul și ce piese sunt disponibile. Apasă pe el ca să întrebi vânzătorul.'),
+      L('＋ Adaugă o mașină la dezmembrat','Pentru parcuri și dezmembrări: publici mașina, iar cumpărătorii te contactează pentru piese.')]},
+    'page-services':{title:'Ateliere și montaj',intro:'Zona pentru service-uri și reparații.',items:[
+      L('În curând','Vom putea căuta service-uri după județ, localitate și tip de lucrare. Deocamdată pagina nu are funcții.')]},
+    'page-match':{title:'Se potrivește mașinii mele?',intro:'Verifici ce piese sunt compatibile cu mașina ta.',items:[
+      L('Marcă, model, an, motor','Alege mașina. Datele se completează și automat, pe măsură ce scrii.'),
+      L('Piesa căutată','Ex: far dreapta sau turbocompresor.'),
+      L('Caută piese compatibile','Îți arată doar anunțurile care se potrivesc mașinii alese.')]},
+    'page-requests':{title:'Piese căutate de cumpărători',intro:'Cereri publicate de cumpărători. Dacă ai piesa, trimiți o ofertă.',items:[
+      L('Starea cererilor','Lista de sus (de exemplu „Nu am ofertat încă”) alege ce cereri vezi: toate, cele la care ai ofertat, cele amânate sau cele ignorate.'),
+      L('Filtrează','Restrânge cererile după marcă, model, tip de piese, județ, număr de oferte sau cuvinte cheie.'),
+      L('Deschide o cerere','Apasă pe ea ca să vezi detaliile și pozele cumpărătorului.'),
+      L('Trimite o ofertă','Scrii prețul, un mesaj și, dacă vrei, poze. Cumpărătorul vede și telefoanele din contul tău.'),
+      L('Ofertez mai târziu','Muți cererea în lista ta de amânate.'),
+      L('Ignoră','Ascunzi cererea. O găsești în „Ignorate”.'),
+      L('Raportează','Anunți echipa dacă o cerere pare suspectă sau încalcă regulile.'),
+      L('Adaugă cerere de piese','Pentru când cauți tu o piesă.')]},
+    'requests-mine':{title:'Cererile mele de piese',intro:'Cererile publicate de tine și ofertele primite.',items:[
+      L('Active, Inactive, Rezolvate','Filele împart cererile după stare. Cele active primesc oferte.'),
+      L('Caută în titlu','Găsești repede o cerere după cuvinte din titlu.'),
+      L('Ofertele primite','Deschide o cerere ca să vezi ofertele. Poți accepta, respinge sau pune întrebări.'),
+      L('Acceptă oferta','Se creează o comandă, iar vânzătorul primește adresa de livrare.'),
+      L('Editare','Cererea se poate modifica doar în primele 10 minute după publicare.')]},
+    'page-stores':{title:'Magazine și parcuri',intro:'Vânzători verificați și parcuri de dezmembrări.',items:[
+      L('Cardul vânzătorului','Apasă pe el ca să vezi toate anunțurile lui, calificativele și datele de contact.')]},
+    'page-mine':{title:'Anunțurile mele',intro:'Aici gestionezi anunțurile pe care le-ai publicat.',items:[
+      L('Cum postezi un anunț','Din meniu apasă „Postează un anunț”. Completezi titlul, pozele, mașina și prețul, apoi „Publică anunțul”. Anunțul apare întâi „În așteptare”, până îl verifică echipa.'),
+      L('Filele: Active, Stoc epuizat, Expiră, Promovate, Șterse','Împart anunțurile după stare. La „Expiră” vezi anunțurile care expiră curând.'),
+      L('Reactualizează (săgeata în sus)','Aduce anunțul din nou sus în listă. Nu se poate face prea des.'),
+      L('Editează (creionul)','Modifici anunțul. Dacă schimbi pozele, categoria, marca, modelul, anul, codul OEM sau tipul, anunțul este verificat din nou.'),
+      L('Stoc epuizat / Repune în stoc','Marchezi piesa vândută, ca să nu mai fii sunat degeaba. Același buton o repune la vânzare.'),
+      L('Promovează','Apare doar când promovarea este activă. Pune anunțul în față.'),
+      L('Șterge (coșul)','Mută anunțul în „Șterse”. De acolo îl poți restaura sau șterge definitiv.'),
+      L('Bife și acțiuni în masă','Bifează mai multe anunțuri ca să le modifici o dată.')]},
+    'page-messages':{title:'Mesagerie',intro:'Conversațiile tale cu cumpărători și vânzători.',items:[
+      L('Primite, Trimise, Arhivate','Filele împart mesajele după locul în care se află.'),
+      L('Trimite un mesaj','Scrii unui utilizator, de exemplu pentru un anunț care te interesează.'),
+      L('Arhivează','Scoate conversația din „Primite”, fără să o șteargă.'),
+      L('Blochează','Oprește mesajele de la o persoană care te deranjează. Lista blocaților e în Setări, unde îi poți debloca.')]},
+    'page-saved':{title:'Căutări salvate',intro:'Căutările pe care le-ai salvat cu inimioara ♡.',items:[
+      L('Deschide o căutare','Apasă pe ea ca să rulezi din nou căutarea.'),
+      L('Ștergere','Elimină căutarea din listă.'),
+      L('Alerte','Ca să primești email când apare un anunț nou, bifează „Alerte pentru căutările salvate” în Setări.')]},
+    'page-account':{title:'Contul meu',intro:'Punctul de pornire pentru tot ce ține de contul tău.',items:[
+      L('🔔 Notificări','Rezumatul activității noi: mesaje, oferte, comenzi.'),
+      L('Poza de profil','Apasă pe avatar ca să o schimbi.'),
+      L('VÂND','Anunțurile mele, răspunsurile tale la cereri, vânzările din cereri și întrebările de la cumpărători.'),
+      L('CUMPĂR','Cererile tale de piese, ofertele primite, favorite, comenzile și căutările salvate.'),
+      L('CONVERSAȚII','Mesajele și notificările contului.'),
+      L('INSTRUMENTE','Import CSV, actualizare de prețuri, generator de anunțuri, statistici și B2B. Sunt utile mai ales pentru parcuri și magazine.'),
+      L('BANI','Credite, tranzacții și facturi. Momentan sunt doar informative.'),
+      L('CALIFICATIVE','Stelele primite ca vânzător și ca cumpărător.'),
+      L('SETĂRI','Datele contului, livrarea, notificările, modul vacanță, blocații și ștergerea contului.'),
+      L('Ieșire din cont','Te deconectează.'),
+      L('Retrimite emailul de confirmare','Apare cât timp adresa de email nu este confirmată.')]},
+    'page-settings':{title:'Setări cont',intro:'Aici îți schimbi datele și preferințele.',items:[
+      L('1. Date personale','Nickname, nume, email și parolă. Emailul nou trebuie confirmat.'),
+      L('2. Date de livrare','Adresa și telefoanele pe care le vede vânzătorul când comanzi.'),
+      L('4. Profil firmă / parc','Logo sau poză, pentru vânzătorii care au firmă sau parc.'),
+      L('5. Notificări pe email','Alegi ce emailuri primești, inclusiv alertele pentru căutările salvate.'),
+      L('6. Mod vacanță','Ascunde anunțurile până la data aleasă (maximum 365 de zile). Mesajele merg în continuare.'),
+      L('7. Utilizatori blocați','Lista celor blocați, cu buton de deblocare.'),
+      L('8. Sesiuni active','Dispozitivele conectate la contul tău. Le poți deconecta.'),
+      L('9. Datele mele și ștergerea contului','Descarci datele tale sau ștergi contul. Contul nu se poate șterge cât ai comenzi în curs.')]},
+    'page-admin':{title:'Administrare',intro:'Panoul pentru administratori.',items:[
+      L('Moderare anunțuri','Aprobi sau respingi anunțurile în așteptare. Respingerea trimite motivul vânzătorului.'),
+      L('Utilizatori','Vezi conturile și poți bloca sau debloca un cont.'),
+      L('Cereri și raportări','Verifici cererile de piese și conținutul raportat de utilizatori.'),
+      L('Activitatea administratorilor','Istoricul acțiunilor făcute de administratori.')]},
+    'page-privacy':{title:'Politica de confidențialitate',intro:'Cum sunt folosite datele tale.',items:[L('Ce găsești aici','Ce date colectăm, de ce, cât le păstrăm și cum îți exerciți drepturile. Datele contului le poți descărca sau șterge din Setări.')]},
+    'page-cookies':{title:'Politica de cookie-uri',intro:'Ce cookie-uri folosește site-ul.',items:[L('Ce găsești aici','Folosim doar cookie-ul de sesiune, necesar pentru autentificare. Nu folosim cookie-uri de urmărire.')]},
+    'page-rules':{title:'Regulament de publicare',intro:'Regulile pe care trebuie să le respecte anunțurile.',items:[L('Ce găsești aici','Ce se poate publica și ce nu. Un anunț respins nu respectă acest regulament: corectează-l și trimite-l din nou.')]},
+    'page-contact':{title:'Contact și raportare',intro:'Cum ne scrii sau raportezi un conținut.',items:[L('Ce găsești aici','Datele de contact și pașii pentru a raporta un anunț, un mesaj sau un utilizator suspect.')]},
+    'page-terms':{title:'Termeni și condiții',intro:'Regulile de folosire a AutoParts.',items:[L('Ce găsești aici','AutoParts pune în legătură cumpărătorii cu vânzătorii. Vânzarea se face între ei. Aici sunt drepturile și obligațiile fiecăruia.')]},
+    'page-reset-password':{title:'Schimbă parola',intro:'Alegi o parolă nouă.',items:[
+      L('Parolă nouă și confirmare','Cel puțin 8 caractere. Scrie-o de două ori, la fel.'),
+      L('◉ (ochiul)','Arată sau ascunde parola.'),
+      L('Link valabil','Linkul din email e valabil 30 de minute și se poate folosi o singură dată.')]},
+    'page-verify-email':{title:'Confirmă emailul',intro:'Verificăm linkul primit pe email.',items:[L('Ce se întâmplă','Dacă linkul e valid, adresa se confirmă singură. Dacă a expirat, cere un email nou din Contul meu.')]},
+    'page-verify-email-change':{title:'Confirmă emailul nou',intro:'Verificăm linkul pentru schimbarea adresei.',items:[L('Ce se întâmplă','Dacă linkul e valid, adresa nouă devine adresa contului. Dacă a expirat, cere schimbarea din nou din Setări.')]}
+  };
+  /* secțiunile din Contul meu (pagina „account-tool”), după cheia din meniu: [titlu, introducere, elemente] */
+  const TOOL={
+    cart:['Coșul meu','Anunțurile pe care vrei să le ții la îndemână.',[L('Vezi piesele','Te duce la lista de anunțuri.')]],
+    offers:['Răspunsuri la cereri','Ofertele pe care le-ai trimis la cererile cumpărătorilor.',[L('File după stare','În așteptare, Acceptate, Respinse sau Toate.'),L('Editează','Modifici oferta cât timp nu a fost acceptată.'),L('Retrage','Ștergi oferta trimisă.'),L('Vezi cererile disponibile','Te duce la lista cererilor la care poți trimite oferta.')]],
+    'orders-seller':['Comenzi primite','Comenzile venite din anunțurile tale și din ofertele acceptate.',[L('File după stare','Active, Suspendate, Finalizate, Anulate sau Toate.'),L('Butoanele comenzii','Confirmi, marchezi expediată sau finalizată ori anulezi comanda. La anulare scrii cumpărătorului un mesaj.'),L('Calificativ','După finalizare poți da o notă cumpărătorului.')]],
+    'offers-received':['Ofertele primite','Ofertele vânzătorilor la cererile tale.',[L('Acceptă oferta','Se creează o comandă, iar vânzătorul primește adresa de livrare.'),L('Respinge','Refuzi oferta. Vânzătorul este anunțat.'),L('Întrebări','Poți scrie vânzătorului înainte să decizi.'),L('Vezi cererile mele','Te duce la cererile tale de piese.')]],
+    orders:['Comenzile mele','Piesele pe care le-ai comandat.',[L('File după stare','Active, Suspendate, Finalizate, Anulate sau Toate.'),L('Anulează','Poți anula cât timp comanda nu a fost expediată.'),L('Calificativ','După finalizare dai o notă vânzătorului. Nota se vede public, lângă numele lui.')]],
+    order:['Comandă','Detaliile unei comenzi.',[L('Stare','Arată în ce etapă este comanda.'),L('Date de livrare','Adresa și telefoanele stabilite pentru livrare.'),L('Mesaj','Poți scrie celeilalte părți despre comandă.')]],
+    messages:['Mesaje','Conversațiile tale cu cumpărători și vânzători.',[L('Deschide o conversație','Apasă pe ea ca să citești și să răspunzi.'),L('Blochează','Oprește mesajele de la acea persoană.')]],
+    notifications:['Notificări','Activitatea nouă din cont.',[L('Notificare','Apasă pe ea ca să ajungi direct la mesajul, oferta sau comanda respectivă.')]],
+    credits:['Credite','Soldul contului.',[L('Sold','Momentan funcția de credite este doar informativă.')]],
+    transactions:['Tranzacții','Comenzile tale, ca cumpărător și ca vânzător.',[L('Listă','Vezi istoricul comenzilor. Momentan este doar informativ.')]],
+    invoices:['Facturi','Facturile emise pentru contul tău.',[L('Listă','Momentan este doar informativ.')]],
+    stats:['Statistici','Cum se comportă anunțurile tale.',[L('Perioada','Alegi ce interval vezi: pe zile sau pe luni.'),L('Pe anunț','Vezi cum merge fiecare anunț în parte.')]],
+    'offer-questions':['Întrebări de la cumpărători','Întrebările cumpărătorilor despre ofertele tale.',[L('Răspunde','Scrii răspunsul. Cumpărătorul îl primește imediat.')]],
+    'bulk-price':['Actualizare prețuri','Schimbi dintr-o dată prețurile anunțurilor active.',[L('Mod de modificare','Alegi cum se schimbă prețurile.'),L('Aplică','Modifică toate anunțurile alese. Verifică rezultatul după aceea.')]],
+    generator:['Generator de anunțuri','Primești titlul și descrierea gata scrise.',[L('Datele piesei','Completezi câteva date despre piesă.'),L('Generează','Obții un text pe care îl poți copia în anunț.')]],
+    b2b:['B2B','Instrumente pentru parcuri, service-uri și magazine cu stoc mare.',[L('Import CSV','Încarci dintr-o dată toate piesele, din Contul meu → INSTRUMENTE.'),L('Actualizare prețuri','Schimbi prețurile în masă.')]],
+    ratings:['Calificativele mele','Stelele primite ca vânzător și ca cumpărător.',[L('Medie și număr','Cât de mulțumiți sunt cei cu care ai lucrat.'),L('Comentarii','Părerile scrise. Se văd public, lângă numele tău.')]],
+    reviews:['Recenzii','Părerile cumpărătorilor despre un vânzător.',[L('Stele și comentarii','Notele date după comenzile finalizate.')]],
+    favorites:['Favorite','Anunțurile pe care le-ai salvat cu inimioara ♡.',[L('Deschide','Apasă pe anunț ca să îl vezi.'),L('Inimioara','O apeși din nou ca să scoți anunțul din Favorite.')]],
+    saved:['Căutări salvate','Căutările pe care le urmărești.',[L('Deschide','Rulezi din nou căutarea.'),L('Alerte','Se activează din Setări, la „Alerte pentru căutările salvate”.')]],
+    requests:['Cererile mele de piese','Cererile publicate de tine.',[L('Active, Inactive, Rezolvate','Împart cererile după stare.'),L('Ofertele','Deschide o cerere ca să vezi ofertele primite.')]],
+    settings:['Setări','Datele contului și preferințele.',[L('Secțiunile','Date personale, livrare, notificări, modul vacanță, blocați, sesiuni și ștergerea contului.')]]
+  };
+  const GENERIC={title:'Ajutor',intro:'Explicații pentru această pagină.',items:[
+    L('Înapoi','Te întoarce la pagina anterioară.'),
+    L('Mai mult ajutor','Pagina completă de ajutor are pașii, regulile de siguranță și răspunsurile la întrebările dese.')]};
+
+  const $h=(s,r=document)=>r.querySelector(s);
+  function resolve(btn){
+    const pg=btn.closest('section.page'); const id=pg?pg.id:'';
+    if(btn.closest('.seller-banner')||(pg&&pg.classList.contains('seller-view'))) return HELP.seller;
+    if(id==='page-requests') return /[?&]t=mine/.test(location.hash)?HELP['requests-mine']:HELP['page-requests'];
+    if(id==='page-account-tool'){
+      let v=''; try{ v=currentToolView; }catch{}
+      const t=TOOL[v]; if(t) return {title:t[0],intro:t[1],items:t[2]};
+      return {title:($h('#accountToolTitle')||{}).textContent||'Contul meu',intro:($h('#accountToolSub')||{}).textContent||'',items:[L('Înapoi','Te întoarce în Contul meu.')]};
+    }
+    return HELP[id]||GENERIC;
+  }
+
+  /* ---- fereastra care coboară ---- */
+  let sheet,lastFocus;
+  function build(){
+    sheet=document.createElement('div'); sheet.id='helpSheet'; sheet.className='hs hidden';
+    sheet.innerHTML='<div class="hs-back" data-hs-close></div><div class="hs-card" role="dialog" aria-modal="true" aria-labelledby="hsTitle" tabindex="-1"><button type="button" class="hs-x" data-hs-close aria-label="Închide ajutorul">×</button><div class="hs-eyebrow">AJUTOR</div><h2 id="hsTitle"></h2><p class="hs-intro"></p><div class="hs-list"></div><a class="hs-more" href="/ajutor.html">Pagina completă de ajutor și întrebări frecvente →</a></div>';
+    document.body.appendChild(sheet);
+    sheet.addEventListener('click',e=>{ if(e.target.closest('[data-hs-close]')) close(); });
+  }
+  const escH=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function open(btn){
+    if(!sheet) build();
+    const h=resolve(btn);
+    $h('#hsTitle',sheet).textContent='Ajutor: '+h.title;
+    const intro=$h('.hs-intro',sheet); intro.textContent=h.intro||''; intro.hidden=!h.intro;
+    $h('.hs-list',sheet).innerHTML=h.items.map(i=>'<div class="hs-item"><b>'+escH(i.t)+'</b><span>'+escH(i.d)+'</span></div>').join('');
+    lastFocus=document.activeElement;
+    sheet.classList.remove('hidden');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ sheet.classList.add('open'); $h('.hs-card',sheet).scrollTop=0; $h('.hs-x',sheet).focus({preventScroll:true}); }));
+    document.documentElement.classList.add('hs-lock');
+  }
+  function close(){
+    if(!sheet||sheet.classList.contains('hidden')) return;
+    sheet.classList.remove('open'); document.documentElement.classList.remove('hs-lock');
+    setTimeout(()=>{ if(!sheet.classList.contains('open')) sheet.classList.add('hidden'); },260);
+    if(lastFocus&&lastFocus.focus) try{ lastFocus.focus({preventScroll:true}); }catch{}
+  }
+  document.addEventListener('click',e=>{ const b=e.target.closest('[data-help-open]'); if(b){ e.preventDefault(); open(b); } });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
+  window.addEventListener('hashchange',close);
+
+  /* ---- butonul în chenarele paginilor (se reface singur dacă chenarul e redesenat) ---- */
+  const BTN='<button type="button" class="help-btn" data-help-open aria-label="Ajutor"><span class="help-q" aria-hidden="true">?</span><span class="help-t">Ajutor</span></button>';
+  function ensure(){
+    document.querySelectorAll('section.page .page-head, section.page .rv-hero, #page-account .acc-user, .seller-banner').forEach(box=>{
+      if(box.querySelector(':scope>.help-btn')) return;
+      if(box.classList.contains('page-head') && !box.querySelector(':scope>.back')) return;
+      box.insertAdjacentHTML('beforeend',BTN);
+    });
+  }
+  let raf=0; const sched=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; ensure(); }); };
+  ensure();
+  new MutationObserver(sched).observe(document.body,{childList:true,subtree:true});
+})();

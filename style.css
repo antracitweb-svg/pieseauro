@@ -3583,3 +3583,54 @@ body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.back,body .p
 #homeFeed .ar-ph:not(:has(svg)),#listingGrid .ar-ph:not(:has(svg)),.similar-grid .ar-ph:not(:has(svg)),#dismGrid .ar-ph:not(:has(svg)){font-size:0;color:transparent}
 #homeFeed .ar-ph:not(:has(svg))::before,#listingGrid .ar-ph:not(:has(svg))::before,.similar-grid .ar-ph:not(:has(svg))::before,#dismGrid .ar-ph:not(:has(svg))::before{content:"";display:block;width:46%;max-width:72px;aspect-ratio:64/40;background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 40%22 fill=%22none%22 stroke=%22%23b8935a%22 stroke-width=%221.7%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 aria-hidden=%22true%22 focusable=%22false%22%3E%3Cpath d=%22M4 29v-7c0-2 1.2-3 3-3.5l9-2.5 6-7.5h20l8 7.5 8 2.5c2 .5 3 1.5 3 3.5v7%22/%3E%3Cpath d=%22M4 29h8M22 29h20M52 29h8M25 11.5l-4.5 7h12v-7zM36 11.5v7h10.5l-6-7z%22/%3E%3Ccircle cx=%2217%22 cy=%2229.5%22 r=%225%22/%3E%3Ccircle cx=%2247%22 cy=%2229.5%22 r=%225%22/%3E%3C/svg%3E") center/contain no-repeat}
 #homeFeed .ar-ph:not(:has(svg))::after,#listingGrid .ar-ph:not(:has(svg))::after,.similar-grid .ar-ph:not(:has(svg))::after,#dismGrid .ar-ph:not(:has(svg))::after{content:"Fără poză";font-size:11px;font-weight:600;color:#a39270;letter-spacing:.02em}
+
+
+/* ===== Buton „Ajutor” + fereastra de ajutor care coboară ===== */
+.help-btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px 0 5px;border:1px solid #d8c9aa;border-radius:999px;background:#f6eedb;color:#7a5a28;font-family:inherit;font-weight:800;font-size:12.5px;line-height:1;cursor:pointer;white-space:nowrap;z-index:2}
+.help-btn:hover{background:#efe3c6;color:#4a3714}
+.help-btn:focus-visible{outline:2px solid #b8935a;outline-offset:2px}
+.help-q{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#b8935a;color:#fff;font-size:13px;font-weight:900;line-height:1}
+/* în chenarul paginii: lângă „Înapoi”, pe același rând */
+body .page-head.hd-compact>.help-btn{position:absolute;right:86px;top:50%;transform:translateY(-50%)}
+body .page-head.hd-compact:has(>div>:not(.eyebrow):not(h2):not(p))>.help-btn,body .page-head.hd-compact:has(>div>.req-lock-note)>.help-btn{top:13px;transform:none}
+body .page-head.hd-compact:has(>.help-btn)>div:has(>h2){padding-right:178px}
+/* Contul meu, Administrare, Recenzii, banner vânzător */
+.rv-hero>.help-btn,#page-account .acc-user>.help-btn,.seller-banner>.help-btn{position:absolute!important;right:86px;top:8px}
+.rv-hero:has(>.help-btn){padding-right:178px}
+#page-account .acc-user:has(>.help-btn){padding-right:178px!important}
+.seller-banner:has(>.help-btn){padding-right:178px}
+/* „Înapoi” nu mai cade pe marginea chenarului: butonul „Adaugă cerere de piese” stă sub chenar, fără să-i mărească înălțimea */
+@media(min-width:801px){
+  body #page-requests .page-head.hd-compact:has(>.rq-add:not(.hidden)){margin-bottom:60px}
+  body #page-requests .page-head.hd-compact>.rq-add{position:absolute;right:0;top:calc(100% + 8px);margin:0}
+}
+/* telefon: doar cercul „?”, ca să rămână loc pentru titlu */
+@media(max-width:520px){
+  .help-btn{width:32px;height:32px;padding:0;justify-content:center;gap:0}
+  .help-t{display:none}
+  .help-q{width:24px;height:24px;font-size:15px}
+  body .page-head.hd-compact>.help-btn,.rv-hero>.help-btn,#page-account .acc-user>.help-btn,.seller-banner>.help-btn{right:80px}
+  body .page-head.hd-compact:has(>.help-btn)>div:has(>h2){padding-right:124px}
+  .rv-hero:has(>.help-btn),.seller-banner:has(>.help-btn){padding-right:124px}
+  #page-account .acc-user:has(>.help-btn){padding-right:124px!important}
+}
+/* fereastra */
+html.hs-lock{overflow:hidden}
+.hs{position:fixed;inset:0;z-index:110}
+.hs-back{position:absolute;inset:0;background:rgba(10,9,6,.5);opacity:0;transition:opacity .25s}
+.hs.open .hs-back{opacity:1}
+.hs-card{position:absolute;top:0;left:50%;width:min(640px,100%);max-height:88vh;max-height:88dvh;overflow:auto;overscroll-behavior:contain;background:#fffefb;border-bottom:4px solid #b8935a;border-radius:0 0 18px 18px;box-shadow:0 18px 50px rgba(10,9,6,.35);padding:calc(18px + env(safe-area-inset-top,0px)) 22px 16px;transform:translate(-50%,-106%);transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+.hs.open .hs-card{transform:translate(-50%,0)}
+.hs-card:focus{outline:0}
+.hs-eyebrow{color:#b8935a;font-size:11px;font-weight:900;letter-spacing:2px}
+.hs-card h2{margin:4px 44px 6px 0;font-size:22px;line-height:1.2;letter-spacing:-.3px;color:#17181b}
+.hs-intro{margin:0 0 10px;color:#77746c;line-height:1.5;font-size:14.5px}
+.hs-x{position:absolute;right:10px;top:calc(8px + env(safe-area-inset-top,0px));width:38px;height:38px;border:0;border-radius:50%;background:#f6eedb;color:#4a3714;font-size:24px;line-height:1;cursor:pointer}
+.hs-x:hover{background:#efe3c6}
+.hs-list{display:flex;flex-direction:column}
+.hs-item{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid #eee7d6}
+.hs-item b{font-size:14px;color:#17181b}
+.hs-item span{font-size:13.5px;line-height:1.5;color:#5f5b52}
+.hs-more{display:block;margin-top:8px;padding:12px 0 2px;border-top:1px solid #eee7d6;color:#7a5a28;font-weight:800;font-size:13.5px;text-decoration:none}
+.hs-more:hover{color:#4a3714;text-decoration:underline}
+@media(prefers-reduced-motion:reduce){.hs-back,.hs-card{transition:none}}
