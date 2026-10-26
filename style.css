@@ -3787,3 +3787,41 @@ html.dark #page-admin .rv-hero,html.dark #page-admin .rv-hero-desc{background:va
 html.dark #page-admin .rv-hero-title{color:var(--ink)!important}
 
 html.dark .ad-nav{color:#14110c!important}
+
+/* ===== DARK MODE FIXES (v3): lupă, inimioare, butoane de anunț ===== */
+/* Căutare: câmpul și fâșia din jurul lupei au aceeași culoare închisă */
+html.dark .home-search-form{background:#0f151d!important}
+html.dark .home-search-form input,html.dark .home-search-form input:focus{background:transparent!important}
+html.dark .home-search-go{background-color:#14110c}
+
+/* Inimioare (favorite) de pe pozele anunțurilor */
+html.dark .ar-fav,html.dark #homeFeed .ar-fav,html.dark #listingGrid .ar-fav,html.dark .similar-grid .ar-fav{background:rgba(22,28,38,.88)!important;background-image:none!important;border:1px solid rgba(255,255,255,.18)!important;color:#e9e7e2!important;box-shadow:0 2px 8px rgba(0,0,0,.5)!important}
+html.dark .ar-fav.on,html.dark #homeFeed .ar-fav.on,html.dark #listingGrid .ar-fav.on,html.dark .similar-grid .ar-fav.on{background:rgba(42,21,24,.92)!important;border-color:#5a2c28!important;color:#ff7a74!important}
+
+/* Butoanele de la „Anunțurile mele” */
+html.dark .mine-act,html.dark #page-mine .mine-list>.mine-row .mine-acts .mine-act,html.dark #page-mine .mine-act{background:var(--card)!important;background-image:none!important;border-color:var(--line)!important;color:#d8bd8d!important;box-shadow:none!important}
+html.dark .mine-act:hover,html.dark #page-mine .mine-act:hover{background:#1e2632!important}
+html.dark .mine-act[data-m-del]{color:#e08a84!important}
+
+/* ===== DARK MODE FIXES (v4): fâșii albe — umbre interioare, „praguri” și straturi de luciu ===== */
+/* Căutare acasă: fără linia albă de sus */
+html.dark .home-search-form{box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 18px 50px rgba(0,0,0,.5)!important;border-color:var(--line)!important}
+/* Butoane: highlight alb + prag crem de jos → variante închise */
+html.dark .btn:not(.primary),html.dark .btn.ghost,html.dark .btn.danger,html.dark .btn.secondary,
+html.dark .pick-btn,html.dark label.pick-btn,html.dark .filter-toggle,html.dark .mine-tool,html.dark #page-mine .mine-tool,
+html.dark .set-btn,html.dark .help-btn,html.dark .save-search{box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 2px 0 rgba(0,0,0,.45)!important}
+html.dark .btn.ghost,html.dark .btn.secondary,html.dark .help-btn{background:var(--card)!important;background-image:none!important;border-color:#5a4a24!important;color:#d8bd8d!important}
+html.dark .btn.danger{background:#2a1518!important;background-image:none!important;border-color:#5a2c28!important;color:#e08a84!important}
+/* Stratul alb de „luciu” de peste butoane */
+html.dark .btn::after{background:rgba(255,255,255,.06)!important}
+/* Margini crem rămase */
+html.dark .mine-search,html.dark #page-mine .mine-search,html.dark #page-messages .msg-bar .mine-search{border-color:var(--line)!important}
+html.dark .rv-hero,html.dark .adm-hero{border-color:var(--line)!important}
+/* Placeholdere de încărcare */
+html.dark .skel,html.dark .skel-line,html.dark .ar-skel .ar-thumb{background:linear-gradient(100deg,#1a212c 30%,#232c3a 50%,#1a212c 70%)!important;background-size:200% 100%}
+html.dark body .page-head>div:has(>h2)::before{background:#20262f!important;box-shadow:0 0 0 3px #8f6d38,0 0 0 5px rgba(184,147,90,.25),0 6px 14px rgba(0,0,0,.5)!important}
+html.dark #page-mine .mine-bar .mine-tools .mine-tool,html.dark #page-messages .mine-tools .mine-tool,html.dark .mine-tools .mine-tool{box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 3px 0 rgba(0,0,0,.45)!important}
+
+/* Ferestre mari (pagina anunțului, cereri) și butonul de închidere */
+html.dark .modal-card,html.dark .modal-card.wide{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}
+html.dark .modal .close,html.dark .modal-card .close,html.dark button.close{background:rgba(22,28,38,.92)!important;color:var(--ink)!important;border:1px solid var(--line)!important}
