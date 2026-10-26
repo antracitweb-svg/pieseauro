@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="AutoParts">
+  <!-- maskable: conținutul stă în zona sigură (cerc de 80% din latură) -->
+  <rect width="512" height="512" fill="#0e0f12"/>
+  <path d="M256 150 L372 380 H320 L256 246 L192 380 H140 Z" fill="#ffb020"/>
+</svg>

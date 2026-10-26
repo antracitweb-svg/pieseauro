@@ -7,13 +7,20 @@ const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 let compression=null;try{compression=require('compression');}catch{}
+// Plăți online cu cardul (Stripe Checkout). Fără cheie, plățile rămân dezactivate și site-ul funcționează normal.
+let stripe=null;
+try{
+  const STRIPE_KEY=(process.env.STRIPE_SECRET_KEY||'').trim();
+  if(STRIPE_KEY){ stripe=require('stripe')(STRIPE_KEY); }
+  else console.warn('STRIPE_SECRET_KEY lipsește: plățile online cu card sunt dezactivate.');
+}catch(e){ console.warn('Stripe nu a putut fi inițializat:',e.message); }
 
 const app = express();
 // Erorile din handlere async ajung la handlerul global (răspuns 500) în loc să lase cererea agățată.
 for(const m of ['get','post','put','patch','delete']){const orig=app[m].bind(app);app[m]=(p,...hs)=>orig(p,...hs.map(h=>typeof h==='function'&&h.length<4&&h.constructor&&h.constructor.name==='AsyncFunction'?(req,res,next)=>h(req,res,next).catch(next):h));}
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV==='production' || !!process.env.RENDER;
-const PUBLIC_FILES = ['index.html','style.css','script.js','ajutor.html'];
+const PUBLIC_FILES = ['index.html','style.css','script.js','ajutor.html','theme-init.js','analytics.js','pwa.js','sw.js','manifest.webmanifest'];
 const ASSETS_DIR = path.join(__dirname,'assets');
 const DB_URL = process.env.DATABASE_URL || '';
 const DB_LOCAL = /localhost|127\.0\.0\.1/.test(DB_URL);
@@ -435,6 +442,11 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS promoted_until TIMESTAMPTZ',
   'CREATE TABLE IF NOT EXISTS credit_tx (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, balance_after INTEGER NOT NULL, kind TEXT NOT NULL, ref_id INTEGER, note TEXT, amount_lei NUMERIC(12,2), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
   'CREATE INDEX IF NOT EXISTS credit_tx_user_idx ON credit_tx(user_id,created_at DESC)',
+  'CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, session_id TEXT UNIQUE NOT NULL, pack TEXT NOT NULL, credits INTEGER NOT NULL, amount_lei NUMERIC(12,2), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE INDEX IF NOT EXISTS payments_user_idx ON payments(user_id,created_at DESC)',
+  'CREATE TABLE IF NOT EXISTS offer_questions (id SERIAL PRIMARY KEY, offer_id INTEGER NOT NULL REFERENCES offers(id) ON DELETE CASCADE, buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, seller_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, body TEXT NOT NULL, answer TEXT, answered_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE INDEX IF NOT EXISTS offer_questions_seller_idx ON offer_questions(seller_id,created_at DESC)',
+  'CREATE INDEX IF NOT EXISTS offer_questions_offer_idx ON offer_questions(offer_id,created_at)',
   'CREATE INDEX IF NOT EXISTS listings_user_status_idx ON listings(user_id,status)',
   'ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ',
   "ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
@@ -618,6 +630,28 @@ async function ensureVehicleDb(){
 }
 
 app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'local',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':'local'}));
+
+/* ===== Analytics fără scripturi externe (respectă CSP-ul: doar 'self') =====
+   Pagina trimite evenimente către /api/track; serverul le înaintează către Plausible
+   dacă PLAUSIBLE_DOMAIN e configurat. Fără el, evenimentele sunt ignorate silențios. */
+const ANALYTICS_DOMAIN=(process.env.PLAUSIBLE_DOMAIN||'').trim();
+const ANALYTICS_HOST=(process.env.PLAUSIBLE_HOST||'https://plausible.io').replace(/\/+$/,'');
+const trackAttempts=new Map();
+app.post('/api/track',ah(async(req,res)=>{
+  // răspundem mereu 204: analytics nu trebuie să blocheze sau să semnaleze erori în UI
+  res.status(204).end();
+  try{
+    if(!ANALYTICS_DOMAIN)return;
+    const ip=clientIp(req);
+    if(!throttle(trackAttempts,'t:'+ip,120,60*1000))return;
+    const b=req.body||{}, name=String(b.n||'').slice(0,60);
+    if(!/^[a-z0-9_-]{1,60}$/i.test(name))return;
+    const ua=String(req.headers['user-agent']||'').slice(0,300);
+    if(!ua||/bot|crawler|spider|headless/i.test(ua))return;
+    const payload={n:name,d:ANALYTICS_DOMAIN,u:String(b.u||'').slice(0,300)||undefined,r:b.r?String(b.r).slice(0,300):undefined};
+    await fetch(ANALYTICS_HOST+'/api/event',{method:'POST',headers:{'Content-Type':'application/json','User-Agent':ua,'X-Forwarded-For':ip},body:JSON.stringify(payload)});
+  }catch(e){/* analytics nu are voie să strice nimic */}
+}));
 app.get('/api/catalog/makes',async(req,res)=>{
  const c=await getVehicleRows(); const seen=new Map();
  for(const x of c){const k=vkey(x.make);if(k&&!seen.has(k))seen.set(k,x.make);}
@@ -1062,8 +1096,15 @@ function buildListingFilter(query){
   if(v){where.push(`${flat(col)}=$${i}`);vals.push(v);i++;}
  }
  if(/^\d{1,10}$/.test(String(query.seller_id||''))){where.push(`l.user_id=$${i}`);vals.push(Number(query.seller_id));i++;}
- const mp=Number(query.maxPrice);
- if(query.maxPrice!==undefined&&query.maxPrice!==''&&Number.isFinite(mp)){where.push(`l.price <= $${i}`);vals.push(mp);i++;}
+  const mp=Number(query.maxPrice);
+  if(query.maxPrice!==undefined&&query.maxPrice!==''&&Number.isFinite(mp)){where.push(`l.price <= $${i}`);vals.push(mp);i++;}
+  const mnp=Number(query.minPrice);
+  if(query.minPrice!==undefined&&query.minPrice!==''&&Number.isFinite(mnp)){where.push(`l.price >= $${i}`);vals.push(mnp);i++;}
+  const yf=Number(query.yearFrom);
+  if(query.yearFrom!==undefined&&query.yearFrom!==''&&Number.isFinite(yf)){where.push(`l.year >= $${i}`);vals.push(yf);i++;}
+  const yt=Number(query.yearTo);
+  if(query.yearTo!==undefined&&query.yearTo!==''&&Number.isFinite(yt)){where.push(`l.year <= $${i}`);vals.push(yt);i++;}
+  if(query.fuel){where.push(`${flat('l.fuel')}=$${i}`);vals.push(norm(String(query.fuel).slice(0,40)).replace(/\s+/g,''));i++;}
  if(delivery==='true')where.push('l.delivery=true');
  return {where,vals,condClause};
 }
@@ -1197,7 +1238,133 @@ async function creditMove(db,uid,amount,kind,refId,note,lei){
 app.get('/api/credits',auth,requireDb,ah(async(req,res)=>{
   const b=await pool.query('SELECT credits FROM users WHERE id=$1',[req.user.id]);
   const t=await pool.query('SELECT id,amount,balance_after,kind,ref_id,note,amount_lei,created_at FROM credit_tx WHERE user_id=$1 ORDER BY id DESC LIMIT 100',[req.user.id]);
-  res.json({balance:(b.rows[0]&&b.rows[0].credits)||0,plans:Object.entries(PROMO_PLANS).map(([days,cost])=>({days:Number(days),cost})),tx:t.rows});
+  res.json({balance:(b.rows[0]&&b.rows[0].credits)||0,plans:Object.entries(PROMO_PLANS).map(([days,cost])=>({days:Number(days),cost})),tx:t.rows,payments_enabled:!!stripe});
+}));
+
+/* --- Endpoint pentru page-services (catolog service-uri) ---
+   Se poate conecta la o tabelă reală ulterior. Pentru acum returnează un array gol.
+*/
+app.get('/api/services',requireDb,ah(async(req,res)=>{
+  try{
+    const r=await pool.query(`SELECT id,title,address,county,type,rating,offers_count,created_at FROM services ORDER BY created_at DESC LIMIT 20`);
+    res.json({services:r.rows});
+  }catch(e){
+    // tabela services nu există încă – returnează array gol (nu o eroare 503)
+    res.json({services:[]});
+  }
+}));
+
+/* ===== Întrebări pe oferte (Q&A cumpărător ↔ vânzător) ===== */
+// Vânzătorul vede întrebările primite pe ofertele lui
+app.get('/api/offer-questions',auth,requireDb,ah(async(req,res)=>{
+  const r=await pool.query(
+    `SELECT q.id,q.offer_id,q.body,q.answer,q.answered_at,q.created_at,
+            u.nickname AS buyer_nick, r.title AS request_title,
+            o.price, o.status AS offer_status
+       FROM offer_questions q
+       JOIN users u ON u.id=q.buyer_id
+       JOIN offers o ON o.id=q.offer_id
+       JOIN part_requests r ON r.id=o.request_id
+      WHERE q.seller_id=$1
+      ORDER BY q.created_at DESC LIMIT 100`,[req.user.id]);
+  res.json({questions:r.rows});
+}));
+// Cumpărătorul pune o întrebare pe o ofertă
+app.post('/api/offers/:id/questions',auth,requireDb,ah(async(req,res)=>{
+  const offerId=Number(req.params.id);
+  const body=String((req.body||{}).body||'').trim();
+  if(!body)return res.status(400).json({error:'INTREBARE_GOALA'});
+  if(body.length>1000)return res.status(400).json({error:'INTREBARE_LUNGA'});
+  const o=await pool.query('SELECT id,seller_id FROM offers WHERE id=$1',[offerId]);
+  if(!o.rows.length)return res.status(404).json({error:'OFERTA_NEGASITA'});
+  const sellerId=o.rows[0].seller_id;
+  if(sellerId===req.user.id)return res.status(400).json({error:'NU_INTREBI_PROPRIUL_ANUNT'});
+  const q=await pool.query(
+    `INSERT INTO offer_questions (offer_id,buyer_id,seller_id,body) VALUES ($1,$2,$3,$4) RETURNING id,created_at`,
+    [offerId,req.user.id,sellerId,body]);
+  await notify(sellerId,'Întrebare nouă la oferta ta: „'+body.slice(0,60)+(body.length>60?'…':'')+'”','offer');
+  res.json({ok:true,question:q.rows[0]});
+}));
+// Vânzătorul răspunde la o întrebare
+app.post('/api/offer-questions/:id/answer',auth,requireDb,ah(async(req,res)=>{
+  const qid=Number(req.params.id);
+  const answer=String((req.body||{}).answer||'').trim();
+  if(!answer)return res.status(400).json({error:'RASPUNS_GOL'});
+  if(answer.length>2000)return res.status(400).json({error:'RASPUNS_LUNG'});
+  const q=await pool.query('SELECT id,buyer_id,seller_id FROM offer_questions WHERE id=$1',[qid]);
+  if(!q.rows.length)return res.status(404).json({error:'INTREBARE_NEGASITA'});
+  if(q.rows[0].seller_id!==req.user.id)return res.status(403).json({error:'NU_ESTI_PROPRIETAR'});
+  await pool.query('UPDATE offer_questions SET answer=$1,answered_at=NOW() WHERE id=$2',[answer,qid]);
+  await notify(q.rows[0].buyer_id,'Ai primit răspuns la întrebarea ta: „'+answer.slice(0,60)+(answer.length>60?'…':'')+'”','offer');
+  res.json({ok:true});
+}));
+// Întrebările pe o anumită ofertă (vizibile pentru ambele părți)
+app.get('/api/offers/:id/questions',auth,requireDb,ah(async(req,res)=>{
+  const offerId=Number(req.params.id);
+  const o=await pool.query('SELECT id,seller_id FROM offers WHERE id=$1',[offerId]);
+  if(!o.rows.length)return res.status(404).json({error:'OFERTA_NEGASITA'});
+  const r=await pool.query(
+    `SELECT q.id,q.body,q.answer,q.answered_at,q.created_at,u.nickname AS buyer_nick
+       FROM offer_questions q JOIN users u ON u.id=q.buyer_id
+      WHERE q.offer_id=$1 ORDER BY q.created_at`,[offerId]);
+  res.json({questions:r.rows});
+}));
+
+/* ===== Plăți online cu cardul (Stripe Checkout) ===== */
+// Pachete de credite. Prețurile sunt în RON; unit_amount = bani (RON × 100).
+const CREDIT_PACKS={
+  s:{credits:50,lei:25,label:'50 credite'},
+  m:{credits:120,lei:50,label:'120 credite'},
+  l:{credits:300,lei:100,label:'300 credite'},
+  xl:{credits:700,lei:200,label:'700 credite'}
+};
+app.post('/api/payments/checkout',auth,ah(async(req,res)=>{
+  if(!stripe)return res.status(503).json({error:'PLATA_ONLINE_INDISPONIBILA'});
+  const pack=CREDIT_PACKS[String((req.body||{}).pack||'')];
+  if(!pack)return res.status(400).json({error:'PLAN_INVALID'});
+  try{
+    const base=appBaseUrl(req);
+    const session=await stripe.checkout.sessions.create({
+      mode:'payment',
+      client_reference_id:String(req.user.id),
+      customer_email:req.user.email||undefined,
+      line_items:[{price_data:{currency:'ron',product_data:{name:'AutoParts — '+pack.label},unit_amount:Math.round(pack.lei*100)},quantity:1}],
+      metadata:{pack:String(Object.keys(CREDIT_PACKS).find(k=>CREDIT_PACKS[k]===pack)||'s')},
+      success_url:base+'/api/payments/success?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url:base+'#/account-tool?view=credits&pay=cancel'
+    });
+    res.json({url:session.url});
+  }catch(e){
+    console.error('CHECKOUT EȘUAT:',e.message);
+    res.status(502).json({error:'PLATA_ONLINE_INDISPONIBILA'});
+  }
+}));
+app.get('/api/payments/success',auth,requireDb,ah(async(req,res)=>{
+  const base=appBaseUrl(req);
+  const back=base+'#/account-tool?view=credits';
+  const sid=String((req.query.session_id||'')).slice(0,120);
+  if(!stripe||!sid)return res.redirect(302,back);
+  let session;
+  try{ session=await stripe.checkout.sessions.retrieve(sid); }
+  catch(e){ console.error('PLATA: sesiunea nu a putut fi citită:',e.message); return res.status(502).json({error:'PLATA_ONLINE_INDISPONIBILA'}); }
+  if(!session||session.payment_status!=='paid')return res.redirect(302,back+'&pay=cancel');
+  if(String(session.client_reference_id||'')!==String(req.user.id))return res.status(403).json({error:'SESIUNE_INVALIDA'});
+  const packId=String((session.metadata&&session.metadata.pack)||'');
+  const pack=CREDIT_PACKS[packId];
+  if(!pack)return res.redirect(302,back);
+  const c=await pool.connect();
+  try{
+    await c.query('BEGIN');
+    const ex=await c.query('SELECT id FROM payments WHERE session_id=$1 FOR UPDATE',[sid]);
+    if(!ex.rowCount){
+      await c.query('INSERT INTO payments(user_id,session_id,pack,credits,amount_lei) VALUES($1,$2,$3,$4,$5) ON CONFLICT (session_id) DO NOTHING',[req.user.id,sid,packId,pack.credits,pack.lei]);
+      await creditMove(c,req.user.id,pack.credits,'topup',null,'Plată online: '+pack.label,pack.lei);
+      notify(req.user.id,'Plata online a fost procesată: '+pack.credits+' credite au fost adăugate în cont.');
+    }
+    await c.query('COMMIT');
+  }catch(e){ try{await c.query('ROLLBACK');}catch{} throw e; }
+  finally{ c.release(); }
+  res.redirect(302,back+'&pay=ok');
 }));
 app.post('/api/listings/:id/promote',auth,requireDb,ah(async(req,res)=>{
   const days=Math.floor(Number((req.body||{}).days)),cost=PROMO_PLANS[days];

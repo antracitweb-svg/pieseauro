@@ -1,0 +1,24 @@
+{
+  "name": "AutoParts — Piese auto și dezmembrări",
+  "short_name": "AutoParts",
+  "description": "Caută piese auto noi și second-hand, cere oferte și găsește dezmembrări auto din România.",
+  "lang": "ro",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f7f5f0",
+  "theme_color": "#232429",
+  "categories": ["shopping", "business"],
+  "icons": [
+    { "src": "/assets/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/assets/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/assets/icon-maskable.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Caută piese", "url": "/#/rezultate" },
+    { "name": "Vinde o piesă", "url": "/#/vinde" },
+    { "name": "Mesaje", "url": "/#/mesagerie" }
+  ]
+}
