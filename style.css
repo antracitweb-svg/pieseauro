@@ -3825,3 +3825,47 @@ html.dark #page-mine .mine-bar .mine-tools .mine-tool,html.dark #page-messages .
 /* Ferestre mari (pagina anunțului, cereri) și butonul de închidere */
 html.dark .modal-card,html.dark .modal-card.wide{background:var(--card)!important;color:var(--ink)!important;border-color:var(--line)!important}
 html.dark .modal .close,html.dark .modal-card .close,html.dark button.close{background:rgba(22,28,38,.92)!important;color:var(--ink)!important;border:1px solid var(--line)!important}
+
+/* ===== DARK MODE FIXES (v5): albul rămas în jurul butoanelor, pozelor, chip-urilor și casetelor ===== */
+/* Butoane din liste (editează, șterge, favorite…): fără gradient crem, fără linie albă sus, fără „talpă” crem */
+html.dark .ar-btn:not(.ar-primary):not(.on),
+html.dark .mr-btn{background:var(--card)!important;background-image:none!important;border-color:#3a4250!important;color:#e9e7e2!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 2px 0 rgba(0,0,0,.45)!important}
+html.dark .ar-btn:not(.ar-primary):not(.on):hover,
+html.dark .mr-btn:hover{background:#1e2632!important;background-image:none!important}
+html.dark .ar-btn:not(.ar-primary):not(.on):active,
+html.dark .mr-btn:active{box-shadow:inset 0 2px 3px rgba(0,0,0,.5)!important}
+html.dark .ar-btn.ar-del{color:#e08a84!important}
+html.dark .ar-btn.ar-edit{color:#d8bd8d!important}
+html.dark .ar-btn.ar-primary{box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(90,64,24,.35),0 3px 0 #4a3818,0 6px 12px rgba(0,0,0,.4)!important}
+
+/* Poze: cadrul rămas gol când poza e mai mică / lipsește */
+html.dark .ar-thumb{background:#1c232e}
+html.dark .ar-thumb:has(.ar-ph){background:linear-gradient(145deg,#1c232e,#161c26)}
+html.dark .ar-ph,html.dark .ar-ph small{color:#7d8696}
+html.dark .listing-image-button,
+html.dark .listing-image-button img{background:#1c232e}
+html.dark .detail-gallery,
+html.dark .detail-gallery.ad-slider,
+html.dark .ad-gal .detail-gallery,
+html.dark .ad-main .detail-gallery.ad-slider,
+html.dark .req-gal .detail-gallery.ad-slider{background:#1c232e!important}
+html.dark .ad-nav{background:rgba(22,28,38,.88)!important;border:1px solid var(--line)!important;color:#e9e7e2!important}
+html.dark .ad-nav:hover{background:#1e2632!important}
+
+/* „Vezi și:”, „Cere oferte”, „Piesa se potrivește la” */
+html.dark .rel-chip{background:var(--card);border-color:var(--line);color:var(--ink)}
+html.dark .rel-chip:hover{background:#1e2632;border-color:#8f6d38}
+html.dark .cta-request{background:linear-gradient(135deg,#161c26,#1a2230)!important;border-color:#5a4a24!important}
+html.dark .cta-request b{color:var(--ink)}
+html.dark .cta-request span{color:var(--muted)}
+html.dark .ad-car{background:var(--card)!important;border-color:var(--line)!important}
+html.dark .ad-car small{color:var(--muted)}
+html.dark .ad-car b{color:#d8bd8d}
+
+/* Butoane din pagina anunțului: bara de jos și caseta proprietarului */
+html.dark .ad-owner .btn:not(.primary):not(.danger):not(.wa),
+html.dark .ad-callbar .btn:not(.primary):not(.wa){background:var(--card)!important;background-image:none!important;border-color:#5a4a24!important;color:#d8bd8d!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 3px 0 rgba(0,0,0,.45)!important}
+html.dark .ad-callbar .btn.primary{background:linear-gradient(180deg,#2a2f3a 0%,#1a1f28 100%)!important;background-image:linear-gradient(180deg,#2a2f3a 0%,#1a1f28 100%)!important;border:1px solid #8f6d38!important;color:#e9d3a8!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 3px 0 rgba(0,0,0,.5)!important}
+html.dark .ad-owner .btn.danger,html.dark .ad-owner [data-del-listing]{background:#2a1518!important;background-image:none!important;border-color:#5a2c28!important;color:#e08a84!important}
+html.dark .rel-label,html.dark .save-search{color:#d8bd8d}
+html.dark .btn:not(.primary):not(.ghost):not(.danger):not(.secondary):not(.wa):not(.dark):not(.contact-toggle):not(.danger-btn){background-color:var(--card);border:1px solid var(--line);color:#d8bd8d}
