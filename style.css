@@ -3731,3 +3731,59 @@ html.dark .toast{background:#1c232e}
 html.dark .hs-more{border-top-color:#2b323d;color:#d8bd8d}
 html.dark .hs-more:hover{color:#e9e7e2}
 html.dark .detail-gallery-item,html.dark .detail-gallery-item img{border-color:var(--line)}
+
+/* ===== DARK MODE FIXES (v2) =====
+   Corectează elementele cu culori fixe (hardcodate) care rămâneau închise
+   pe fundal închis, plus fundalul paginii de start (#page-home avea gradient crem). */
+html.dark #page-home{background:radial-gradient(1100px 520px at 50% -8%,rgba(184,147,90,.14),transparent 62%),linear-gradient(180deg,#0d1117 0%,#0a0e14 100%)}
+html.dark{color-scheme:dark}
+
+/* Titluri, prețuri și texte principale: din culoare fixă în culoarea temei */
+html.dark h1,html.dark h2,html.dark h3,
+html.dark .home-feed-head h2,
+html.dark .home-center h1,
+html.dark .ar-title,html.dark .ar-price,html.dark .similar-grid .ar-price,
+html.dark .listing h3,html.dark .listing-price,
+html.dark .mine-name,html.dark .mr-title,html.dark .mr-price,
+html.dark .detail-price,html.dark .ad-main h2,html.dark .ad-price-m,
+html.dark .catpick-row,html.dark .notif-row,html.dark .ord-link,html.dark .ord-party-name,
+html.dark .ord-totals b,html.dark .phone-num,html.dark .rv-score b,html.dark .seller-link,
+html.dark .cta-request b,html.dark .cr-balance b,html.dark .ad-owner .ad-owner-dates,
+html.dark #page-mine .mine-list>.mine-row .mine-name,
+html.dark label,html.dark .pick-btn,html.dark .pick-btn span{color:var(--ink)}
+
+/* Elemente aurii (butoane „înapoi”, filtre, chip-uri): auriu deschis, lizibil pe fundal închis */
+html.dark .back,html.dark .filter-toggle,html.dark .text-btn,html.dark .home-links button,
+html.dark .home-feed-head button,html.dark .results-actions select,
+html.dark .pick-btn .pick-ico,html.dark #sellCategoryText{color:#d8bd8d}
+
+/* Bare/notițe cu fundal crem rămas */
+html.dark .req-lock-note{background:#2a2416;border-color:#5a4a24;color:#d8bd8d}
+html.dark .mine-tool{background:var(--card);border-color:var(--line);color:#d8bd8d}
+
+/* Reguli mai specifice / cu !important în CSS-ul vechi: le depășim explicit în dark */
+html.dark body .page-head>div:has(>h2)>h2,
+html.dark .hs-card h2,
+html.dark .ar-price,html.dark #homeFeed .ar-price,html.dark #listingGrid .ar-price,html.dark .similar-grid .ar-price{color:var(--ink)!important}
+html.dark #homeRequestBtn,html.dark .home-request-btn{background:var(--card)!important;border-color:var(--line)!important;color:#d8bd8d!important}
+html.dark #page-mine .mine-tool,html.dark #page-mine .mine-bar .mine-tools .mine-tool,html.dark .mine-tools .mine-tool,html.dark .mine-tool{background:var(--card)!important;border-color:#8f6d38!important;color:#d8bd8d!important}
+html.dark .set-btn{color:#d8bd8d!important}
+
+/* Pagina „Contul meu”: reguli vechi cu !important lăsau cardurile crem */
+html.dark #page-account .acc-user,
+html.dark #page-account .account-sections summary,
+html.dark #page-account .account-sections details>button,
+html.dark #page-account .acc-notif{background:var(--card)!important;border-color:var(--line)!important;color:var(--ink)!important;box-shadow:none!important}
+html.dark #page-account .acc-user small,
+html.dark #page-account .account-sections summary b,
+html.dark #page-account .account-sections details>button *{color:var(--ink)!important}
+html.dark #page-account .account-sections summary,
+html.dark #page-account .acc-notif{color:#d8bd8d!important}
+html.dark #page-account .acc-user #accountHello{background:none!important;-webkit-text-fill-color:var(--ink)!important;color:var(--ink)!important}
+html.dark #page-account .acc-user .back{color:#d8bd8d!important}
+html.dark #page-account .acc-user #accountHello+small{background:#2a2416!important;color:#d8bd8d!important}
+html.dark #page-account .acc-user b,html.dark #page-account .acc-user #accCredits{color:var(--ink)!important}
+html.dark #page-admin .rv-hero,html.dark #page-admin .rv-hero-desc{background:var(--card)!important;color:var(--muted)!important}
+html.dark #page-admin .rv-hero-title{color:var(--ink)!important}
+
+html.dark .ad-nav{color:#14110c!important}
