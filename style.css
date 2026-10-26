@@ -3869,3 +3869,82 @@ html.dark .ad-callbar .btn.primary{background:linear-gradient(180deg,#2a2f3a 0%,
 html.dark .ad-owner .btn.danger,html.dark .ad-owner [data-del-listing]{background:#2a1518!important;background-image:none!important;border-color:#5a2c28!important;color:#e08a84!important}
 html.dark .rel-label,html.dark .save-search{color:#d8bd8d}
 html.dark .btn:not(.primary):not(.ghost):not(.danger):not(.secondary):not(.wa):not(.dark):not(.contact-toggle):not(.danger-btn){background-color:var(--card);border:1px solid var(--line);color:#d8bd8d}
+
+/* ===== DARK MODE FIXES (v6): butoanele Toate / Nou / Second hand ===== */
+html.dark .facet{background:var(--card);border-color:var(--line);color:var(--ink)}
+html.dark .facet b{color:#d8bd8d}
+html.dark .facet:hover{background:#1e2632;border-color:#8f6d38}
+html.dark .facet.on,html.dark .facet.on:hover{background:#2a2416;border-color:#8f6d38;color:#e9d3a8}
+html.dark .facet.on b{color:#e9d3a8}
+
+/* ===== DARK MODE v7: contrast pentru pastile, banner vânzător, butoane rămase deschise ===== */
+html.dark .facet,html.dark button.facet{background:#1c232e!important;background-image:none!important;border:1px solid #3a4250!important;color:#e9e7e2!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)!important}
+html.dark .facet b{color:#d8bd8d!important}
+html.dark .facet:hover{background:#243040!important;border-color:#8f6d38!important}
+html.dark .facet.on,html.dark .facet.on:hover{background:#d8bd8d!important;border-color:#e9d3a8!important;color:#14110c!important}
+html.dark .facet.on b{color:#14110c!important}
+
+html.dark .seller-banner{background:var(--card)!important;border-color:var(--line)!important}
+html.dark .seller-banner .sb-label{color:#e9d3a8!important}
+html.dark .seller-banner .sb-name{color:#f4efe4!important}
+html.dark .seller-banner .sb-rate,html.dark .seller-banner .sb-count{color:#cfc7b5!important}
+html.dark .seller-banner .back{color:#e9d3a8!important}
+
+html.dark .help-btn{background:#20262f!important;border-color:#5a4a24!important;color:#e9d3a8!important}
+html.dark .results-actions select,html.dark .filter-toggle,html.dark .result-search,html.dark .result-search input{background:#161c26!important;color:#e9e7e2!important;border-color:#3a4250!important}
+html.dark .result-search .heart-btn{color:#e9d3a8!important;background:transparent!important}
+html.dark .rel-chip,html.dark .page-btn:not(.active),html.dark .recent-search-item,html.dark .home-links button,html.dark .garage-see,html.dark .garage-pick,html.dark .cp-item,html.dark .rq-btn,html.dark .rq-chip{background:#161c26!important;color:#e9e7e2!important;border-color:#3a4250!important}
+html.dark .page-btn.active{background:#d8bd8d!important;color:#14110c!important}
+html.dark .muted,html.dark .ar-sub,html.dark .ar-meta,html.dark .form-note,html.dark .sf-hint{color:#b7b2a6!important}
+html.dark .ar-row,html.dark .rq-pub-row,html.dark .rq-row{border-color:#2b323d!important}
+html.dark .ar-btn:not(.ar-primary),html.dark .mr-btn{color:#e9e7e2!important}
+
+/* ===== DARK MODE v8: breadcrumb pagina anunțului ===== */
+html.dark .ad-crumbs,html.dark .ad-crumbs span{background:#161c26!important;color:#d9d4c7!important}
+html.dark .ad-crumbs{border-bottom:1px solid #2b323d}
+html.dark .ad-crumbs i{color:#8f8a7c!important;background:transparent!important}
+html.dark .ad-crumbs span:last-child{color:#e9d3a8!important}
+html.dark .ad-crumbs span{background:transparent!important}
+
+/* ===== DARK MODE v9: audit automat – contrast minim pe toate paginile ===== */
+html.dark .help-btn .help-q,html.dark .help-q{color:#14110c!important}
+html.dark .footer-col a,html.dark .footer-col button{color:#d4b483!important}
+html.dark .page-head p,html.dark .page-head p span,html.dark #resultCount,html.dark #requestsSub{color:#b7b2a6!important}
+html.dark .acc-tab,html.dark .ord-tab,html.dark .mine-tab,html.dark .acc-tabs button{color:#c9b58a!important}
+html.dark .acc-tab.on,html.dark .ord-tab.on,html.dark .mine-tab.on,html.dark .acc-tabs button.on{color:#f0dcb0!important;border-color:#d4b483!important}
+html.dark .acc-tab small,html.dark .mine-tab small{color:#b7b2a6!important}
+html.dark .ms-ico,html.dark .acc-caret,html.dark .password-toggle{color:#d4b483!important}
+html.dark .mrow-name,html.dark .mrow-date{color:#d4b483!important}
+html.dark .mrow-body,html.dark .mrow-body *{color:#d9d4c7!important}
+html.dark .rate-link .stars,html.dark .stars{color:#e3b341!important}
+html.dark .rq-pub-name,html.dark .rq-filter-link{color:#e9d3a8!important}
+html.dark .lchip,html.dark .lchip-oem,html.dark .lchip-ship{color:#e9d3a8!important;background:#20262f!important;border-color:#4a3f26!important}
+html.dark .set-ok{color:#7fd6a0!important}
+html.dark .acc-avatar{background:#20262f!important;border-color:#8f6d38!important}
+html.dark .acc-avatar i{color:#e9d3a8!important}
+html.dark .acc-rate-row,html.dark .text-btn.acc-rate-row,html.dark .acc-rating button{color:#d4b483!important}
+html.dark .mine-thumb{background:#1c232e!important;border-color:#2b323d!important}
+html.dark .account-admin-compat button,html.dark .account-admin-compat .btn,html.dark [data-action="admin"]{background:#1c232e!important;color:#e9d3a8!important;border:1px solid #5a4a24!important}
+html.dark .stars{background:linear-gradient(90deg,#f0b429 var(--p,0%),#454d5a var(--p,0%))!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;color:transparent!important}
+html.dark #page-account .acc-user .acc-rating .acc-rate-row,html.dark #page-account .acc-user .acc-rating .acc-rate-row *,html.dark .seller-banner .acc-rate-row{color:#d4b483!important}
+html.dark #page-account .acc-user .acc-rating .acc-rate-row b{color:#f0dcb0!important}
+html.dark #page-account .acc-caret,html.dark .acc-caret{color:#d4b483!important}
+html.dark .crumbs a,html.dark p.crumbs a{color:#d4b483!important}
+html.dark .mine-search button,html.dark .mine-search button *{color:#d4b483!important}
+
+/* ===== DARK MODE v10: detaliu anunț, categorii, modale ===== */
+html.dark .detail-desc,html.dark .ad-main .detail-desc{color:#d9d4c7!important}
+html.dark .ad-main .ad-sub,html.dark .ad-sub{color:#b7b2a6!important}
+html.dark .ad-ship{color:#cfc7b5!important}
+html.dark .detail-facts span,html.dark .ad-fit span,html.dark .ad-main span{border-color:transparent}
+html.dark .catpick-card{background:#161c26!important}
+html.dark .catpick-body{background:#0e0f12!important}
+html.dark .catpick-head,html.dark .catpick-head b{color:#e9e7e2!important;border-color:#2b323d!important}
+html.dark .catpick-sub{color:#e9d3a8!important}
+html.dark .catpick-search input,html.dark #catSearch{background:#1c232e!important;color:#e9e7e2!important;border:1px solid #3a4250!important}
+html.dark .catpick-search input::placeholder{color:#8a8578!important}
+html.dark .modal-card .eyebrow,html.dark .eyebrow{color:#d4b483!important}
+html.dark .csv-help summary,html.dark details summary{color:#d4b483!important}
+html.dark #clearFilters,html.dark .filter-head button{color:#e9d3a8!important}
+html.dark .ad-main .ad-fit span,html.dark .ad-main span{--dm:1}
+html.dark .ad-main small,html.dark .ad-main .ad-label{color:#c9c3b4!important}
