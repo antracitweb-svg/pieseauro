@@ -1928,38 +1928,13 @@ function openAuth(next){
   setMsg($('#loginMessage'),''); $('#authModal').classList.remove('hidden');
   setTimeout(()=>$('#loginIdentifier').focus(),0);
 }
-function restoreFocus(modal){
-  // Focus-ul revine pe butonul care a deschis modalul, sau pe primul input focusabil.
-  const trigger=modal.dataset&&modal.dataset.trigger?document.querySelector(modal.dataset.trigger):null;
-  if(trigger && trigger.offsetParent){ trigger.focus(); return; }
-  const first=document.querySelector('.modal:not(.hidden) input[type=text],.modal:not(.hidden) input[type=tel],.modal:not(.hidden) button.close');
-  if(first){ first.focus(); }
-}
-function initModals(){
-  // Focus trap: cand o modal e deschisa, butonul Close și primul input sunt focusabili
-  // iar butoanele din spatele ei sunt neschimbabile. La închidere, focus-ul revine la trigger.
-  const modals=document.querySelectorAll('.modal:not(.hidden)');
-  modals.forEach(m=>{
-    const focusable=m.querySelectorAll('button,input,select,textarea,a');
-    if(focusable.length){
-      // butonul Close devine firstChild in tab order
-      const closeBtn=m.querySelector('.close');
-      if(closeBtn){ closeBtn.setAttribute('tabindex','0'); }
-    }
-  });
-  // Observer: cand o modal trece de la hidden -> deschisa, salveaza care buton a fost apasat
-  if(!window.__modalObs){
-    window.__modalObs=new MutationObserver(mutations=>{
-for(const m of m){
-        if(m.addedNodes&&m.addedNodes.length){
-          const newNode=m.addedNodes[0];
-          if(newNode&&newNode.classList&&newNode.classList.contains('modal')){
-            window.__lastModalBtn=document.activeElement?.tagName||'';
-          }
-        }
-      }
-    });
-    window.__modalObs.observe(document.body,{childList:true,subtree:true});
+function closeModal(modal){
+  if(!modal) return;
+  modal.classList.add('hidden');
+  if(modal.id==='authModal' && window.__afterAuth){
+    window.__afterAuth = null;
+    const { name, params } = parseHash();
+    if(needsAuth(name, params) && !currentUser){ history.replaceState(null,'','#/'); route(); }
   }
 }
 async function afterLogin(user, msg){
