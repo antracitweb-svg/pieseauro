@@ -3660,6 +3660,12 @@ html.hs-lock{overflow:hidden}
 .service-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
 .service-meta .badge{padding:3px 9px;border-radius:999px;background:var(--pale);color:var(--ink);font-weight:700}
 .svc-rating{font-weight:700;color:#b8860b}
+.svc-hours{margin:6px 0 0;font-size:13px;color:var(--ink);opacity:.85}
+.svc-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.svc-actions a{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--pale);color:var(--ink);font-size:13px;font-weight:600;text-decoration:none;transition:transform .12s ease,opacity .12s ease}
+.svc-actions a:hover{opacity:.85}
+.svc-actions a:active{transform:scale(.97)}
+.svc-actions:empty{display:none}
 @media(max-width:680px){.filter-bar .two{grid-template-columns:1fr}.service-grid{grid-template-columns:1fr}}
 
 /* ===== Întrebări pe oferte (Q&A) ===== */

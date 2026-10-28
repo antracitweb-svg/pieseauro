@@ -28,17 +28,17 @@ const CATEGORY_TREE = [
  ['Aprindere','⚡',['Bujii','Bobine de inducție','Distribuitor','Cabluri bujii','Module de aprindere','Bujii incandescente','Alte piese aprindere']],
  ['Cabluri auto','🔌',['Cabluri accelerație','Cabluri ambreiaj','Cabluri frână de mână','Cabluri schimbător','Cabluri pornire','Cabluri remorcare','Instalații electrice','Alte cabluri']],
  ['Car audio','🔊',['Radio / Casetofon','Navigații / Multimedia','Boxe','Amplificatoare','Subwoofere','Antene','Alte piese car audio']],
- ['Caroserie','🚗',['Bară față','Bară spate','Aripi','Capote','Portbagaj / Hayon','Uși','Praguri','Oglinzi','Geamuri','Parbriz / Lunetă','Grile / Măști','Elemente de tablă','Alte piese caroserie']],
+ ['Caroserie','🚗',['Usă față','Usă spate','Usă hayon / Portbagaj','Capotă','Bară față','Bară spate','Aripă față','Aripă spate','Portieră','Prag','Podea / Planșeu','Panou față','Panou spate','Stâlp A','Stâlp B','Stâlp C','Cadru față','Cadru spate','Grille / Mască','Oglinzi','Geamuri','Parbriz','Lunetă','Plafon','Elemente de tablă','Alte piese caroserie']],
  ['Climatizare','❄️',['Compresor AC','Condensator','Radiator AC','Radiator încălzire','Ventilator habitaclu','Filtru polen','Panou climatizare','Uscător','Alte piese climatizare']],
  ['Direcție','🎯',['Casetă direcție','Pompă servodirecție','Bieletă direcție','Capete de bară','Cardan volan','Volan','Rezervor servodirecție','Alte piese direcție']],
  ['Diverse','📦',[]],
- ['Electrică & Electronică Auto','🔋',['Alternator','Electromotor','Baterii','Senzori','Calculatoare / ECU','Relee și siguranțe','Butoane și comenzi','Motorașe ștergătoare','Alte piese electrice']],
+ ['Electrică & Electronică Auto','🔋',['Alternator','Electromotor','Baterii','Senzori','Calculatoare / ECU','Relee și siguranțe','Butoane și comenzi','Motorașe ștergătoare','Întrerupătoare','Modul confort','Chei și telecomenzi','Instalație electrică','Alte piese electrice']],
  ['Evacuare','💨',['Catalizator','Filtru particule (DPF)','Tobă finală','Tobă intermediară','Colector evacuare','Țeavă evacuare','Sondă lambda','Supapă EGR','Alte piese evacuare']],
  ['Faruri stopuri lumini','💡',['Faruri','Stopuri','Proiectoare ceață','Lumini de zi','Semnalizări','Becuri','Lămpi interior','Alte lumini']],
  ['Filtre auto','🧴',['Filtru ulei','Filtru aer','Filtru combustibil','Filtru habitaclu','Filtru cutie automată','Alte filtre']],
- ['Frâne','🛑',['Discuri frână','Plăcuțe frână','Etrieri','Saboți și tamburi','Pompă frână','Servofrână','Furtunuri frână','ABS / ESP','Frână de mână','Alte piese frâne']],
+ ['Frâne','🛑',['Discuri frână față','Discuri frână spate','Plăcuțe frână față','Plăcuțe frână spate','Etrieri față','Etrieri spate','Saboți și tamburi','Pompă frână','Servofrână','Furtunuri frână','ABS / ESP','Frână de mână','Cilindru frână','Lichid de frână','Alte piese frâne']],
  ['Instalații GPL','🔥',['Rezervoare GPL','Truse GPL','Injectoare GPL','Reductoare','Electrovalve','Alte piese GPL']],
- ['Interioare auto','💺',['Scaune','Bord','Console centrale','Volan și airbag','Centuri de siguranță','Panouri uși','Plafoane','Mânere','Alte piese interior']],
+ ['Interioare auto','💺',['Scaune față','Scaune spate','Banchetă spate','Bord','Consolă centrală','Volan','Airbag','Centuri de siguranță','Panouri uși','Tapiserie / Mochete','Plafon / Ciel','Cotiere','Mânere','Torpedou','Cotieră centrală','Alte piese interior']],
  ['Întreținere auto','🧽',['Soluții de curățare','Ceruire și lustruire','Aditivi','Lichid parbriz','Lichid de frână','Antigel','Alte produse întreținere']],
  ['Jante & Anvelope','🛞',['Jante aliaj','Jante tablă','Anvelope vară','Anvelope iarnă','Anvelope all-season','Alte jante și anvelope']],
  ['Navigație GPS','🧭',['Sisteme de navigație','Hărți și actualizări','Suporturi GPS','Camere marșarier','Alte produse GPS']],
@@ -46,7 +46,7 @@ const CATEGORY_TREE = [
  ['Piese moto','🏍️',['Frâne moto','Filtre moto','Transmisie moto','Anvelope moto','Electrice moto','Ulei moto','Alte piese moto']],
  ['Piese motoare','⚙️',['Bloc motor','Chiulasă','Pistoane și biele','Arbore cotit','Distribuție','Garnituri','Supape','Pompă ulei','Pompă apă / ulei','Radiatoare și răcire','Carter','Suporți motor','Cuzineți','Turbină','Motor complet','Alte piese motor']],
  ['Pompe și injectoare','⛽',['Pompă combustibil','Pompă înaltă presiune','Injectoare','Rampă injecție','Regulator presiune','Rezervor','Carburator','Corp accelerație','Conducte combustibil','Alte piese alimentare']],
- ['Punte și rulmenți','🔘',['Rulmenți roți','Butuci','Planetare','Cuzineți punte','Elemente de punte','Alte piese punte']],
+ ['Punte și rulmenți','🔘',['Rulmenți roți față','Rulmenți roți spate','Butuci față','Butuci spate','Planetare','Cuzineți punte','Elemente de punte','Fuzete','Punte față','Punte spate','Alte piese punte']],
  ['Răcire','🌡️',['Radiator apă','Pompă apă','Termostat','Ventilator răcire','Vas expansiune','Furtunuri răcire','Intercooler','Alte piese răcire']],
  ['Scule auto','🛠️',['Chei și truse','Cricuri și elevatoare','Scule diagnoză','Aparate de testare','Scule specializate','Alte scule']],
  ['Suspensie','🔩',['Amortizatoare','Arcuri','Brațe suspensie','Bielete','Rulmenți roți','Fuzete','Bucșe','Bară stabilizatoare','Punte spate','Perne de aer','Alte piese suspensie']],
@@ -67,7 +67,20 @@ const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'m
 /* ---------- utilitare ---------- */
 function readJSON(key, def){ try{ const v=JSON.parse(localStorage.getItem(key)); return v==null?def:v; }catch{ return def; } }
 function writeJSON(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch{} }
-function esc(s=''){ return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function esc(s=''){ return String(s).replace(/[&<>"']/g, function(c){ if(c==='&')return'&'; if(c==='<')return'<'; if(c==='>')return'>'; if(c==='"')return'\"'; if(c==="'")return"'"}); }
+function cleanOemAlt(raw){
+ const list=Array.isArray(raw)?raw:String(raw||'').split(/[,;\n|]+/);
+ const out=[],seen=new Set();
+ for(const item of list){
+  const code=String(item||'').toUpperCase().replace(/[^A-Z0-9 .\/-]/g,'').replace(/\s+/g,' ').trim().slice(0,40);
+  if(!code)continue;
+  const key=code.replace(/[^A-Z0-9]/g,'');
+  if(!key||seen.has(key))continue;
+  seen.add(key);out.push(code);
+  if(out.length>=12)break;
+ }
+ return out.join(', ')||null;
+}
 function money(n){ return Number(n)>0 ? new Intl.NumberFormat('ro-RO').format(Number(n))+' lei' : 'La cerere'; }
 function fmtDate(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('ro-RO'); }
 function fmtDateTime(iso){
@@ -1167,6 +1180,7 @@ function adRowHtml(x, eager){
   const chips = [
     x.condition ? `<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>` : '',
     x.oem ? `<span class="lchip lchip-oem" title="Cod OEM">OEM ${esc(x.oem)}</span>` : '',
+    x.oem_alt ? `<span class="lchip lchip-oem" title="Coduri OEM alternative">+${String(x.oem_alt).split(',').filter(t=>t.trim()).length} coduri</span>` : '',
     x.delivery ? `<span class="lchip lchip-ship">🚚 Livrare</span>` : '',
     ...(isDism && x.parts_avail ? String(x.parts_avail).split(',').map(t=>t.trim()).filter(Boolean).slice(0,3).map(t=>`<span class="lchip">${esc(t)}</span>`) : [])
   ].join('');
@@ -1480,7 +1494,7 @@ function contactFoldHtml(inner){
 let detailPhones = [];
 function detailHtml(x, phones, canContact){
   const fav = favorites.includes(x.id);
-  const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
+  const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Coduri alternative',x.oem_alt],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
   const spec = [['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
   const phone1 = (phones||[]).slice(0,1);
   detailPhones = (phones||[]).slice(0,4);
@@ -1615,9 +1629,17 @@ function svcCardHtml(s){
   const rating=Number(s.rating)||0;
   const stars=rating>0?`<span class="svc-rating" title="${rating}/5">★ ${rating.toFixed(1)}</span>`:'<span class="svc-rating muted">Fără recenzii</span>';
   const typeLabel=SVC_TYPES[s.type]||s.type||'Service auto';
+  // Program de lucru: text liber ("L-V 08:00-18:00, S 09:00-13:00").
+  const hours=s.hours?`<p class="svc-hours">🕒 ${esc(s.hours)}</p>`:'';
+  // Link hartă fără librării externe (CSP rămâne strict): coordonate dacă există, altfel adresa căutată.
+  const mapQ=(s.lat!=null&&s.lng!=null)?`${s.lat},${s.lng}`:where;
+  const mapUrl=mapQ?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQ)}`:'';
+  const mapLink=mapUrl?`<a class="svc-map" href="${esc(mapUrl)}" target="_blank" rel="noopener noreferrer">🗺 Hartă</a>`:'';
+  const phone=s.phone?`<a class="svc-phone" href="tel:${esc(String(s.phone).replace(/[^\d+]/g,''))}">📞 ${esc(s.phone)}</a>`:'';
   return `<article class="service-card" data-id="${esc(String(s.id||''))}">
-    <div class="service-info"><h3>${esc(s.title||'Service auto')}</h3>${where?`<p class="muted">📍 ${esc(where)}</p>`:''}</div>
+    <div class="service-info"><h3>${esc(s.title||'Service auto')}</h3>${where?`<p class="muted">📍 ${esc(where)}</p>`:''}${hours}</div>
     <div class="service-meta"><span class="badge">${esc(typeLabel)}</span>${stars}</div>
+    <div class="svc-actions">${phone}${mapLink}</div>
   </article>`;
 }
 function renderServices(services){
@@ -1906,12 +1928,38 @@ function openAuth(next){
   setMsg($('#loginMessage'),''); $('#authModal').classList.remove('hidden');
   setTimeout(()=>$('#loginIdentifier').focus(),0);
 }
-function closeModal(modal){
-  modal.classList.add('hidden');
-  if(modal.id==='authModal' && window.__afterAuth){
-    window.__afterAuth = null;
-    const { name, params } = parseHash();
-    if(needsAuth(name, params) && !currentUser){ history.replaceState(null,'','#/'); route(); }
+function restoreFocus(modal){
+  // Focus-ul revine pe butonul care a deschis modalul, sau pe primul input focusabil.
+  const trigger=modal.dataset&&modal.dataset.trigger?document.querySelector(modal.dataset.trigger):null;
+  if(trigger && trigger.offsetParent){ trigger.focus(); return; }
+  const first=document.querySelector('.modal:not(.hidden) input[type=text],.modal:not(.hidden) input[type=tel],.modal:not(.hidden) button.close');
+  if(first){ first.focus(); }
+}
+function initModals(){
+  // Focus trap: cand o modal e deschisa, butonul Close și primul input sunt focusabili
+  // iar butoanele din spatele ei sunt neschimbabile. La închidere, focus-ul revine la trigger.
+  const modals=document.querySelectorAll('.modal:not(.hidden)');
+  modals.forEach(m=>{
+    const focusable=m.querySelectorAll('button,input,select,textarea,a');
+    if(focusable.length){
+      // butonul Close devine firstChild in tab order
+      const closeBtn=m.querySelector('.close');
+      if(closeBtn){ closeBtn.setAttribute('tabindex','0'); }
+    }
+  });
+  // Observer: cand o modal trece de la hidden -> deschisa, salveaza care buton a fost apasat
+  if(!window.__modalObs){
+    window.__modalObs=new MutationObserver(mutations=>{
+for(const m of m){
+        if(m.addedNodes&&m.addedNodes.length){
+          const newNode=m.addedNodes[0];
+          if(newNode&&newNode.classList&&newNode.classList.contains('modal')){
+            window.__lastModalBtn=document.activeElement?.tagName||'';
+          }
+        }
+      }
+    });
+    window.__modalObs.observe(document.body,{childList:true,subtree:true});
   }
 }
 async function afterLogin(user, msg){
@@ -1978,7 +2026,14 @@ async function resetPasswordSubmit(e){
 /* ---------- alegere categorie (fereastră ca pe pieseauto.ro) ---------- */
 const carNorm = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const catUI = { main:null };
+// Denumiri vechi de subcategorii -> denumirea nouă echivalentă (anunțurile existente rămân valide la editare).
+const SUB_ALIAS = {'uși':'Usă față','usi':'Usă față','capote':'Capotă','aripe':'Aripă față','praguri':'Prag','grile / măști':'Grille / Mască','grille / masca':'Grille / Mască','portbagaj / hayon':'Usă hayon / Portbagaj','panouri uși':'Panouri uși','scaune':'Scaune față','console centrale':'Consolă centrală','plafoane':'Plafon / Ciel','volan și airbag':'Volan','discuri frână':'Discuri frână față','plăcuțe frână':'Plăcuțe frână față','etrieri':'Etrieri față','rulmenți roți':'Rulmenți roți față','butuci':'Butuci față'};
+function normSub(sub){
+  const key=String(sub||'').trim();
+  return SUB_ALIAS[key.toLowerCase()]||key;
+}
 function setCategory(cat, sub){
+  sub = normSub(sub);
   $('#sellCategory').value = cat || ''; $('#sellSubcategory').value = sub || '';
   const t = $('#sellCategoryText'), b = $('#sellCategoryBtn');
   t.textContent = cat ? (sub ? cat+' › '+sub : cat) : 'Alege categoria';
@@ -2421,7 +2476,7 @@ async function enterSell(editParam,mode){
   await loadModels(x.make||'','sellModel'); $('#sellModel').value = x.model||''; loadYears(x.make||'',x.model||'');
   if(x.model && $('#sellModel').value!==x.model){ const o=document.createElement('option'); o.value=o.textContent=x.model; $('#sellModel').appendChild(o); $('#sellModel').value=x.model; }
   if(x.make && $('#sellMake').value!==x.make){ const o=document.createElement('option'); o.value=o.textContent=x.make; $('#sellMake').appendChild(o); $('#sellMake').value=x.make; }
-  $('#sellYear').value = x.year||''; $('#sellOem').value = x.oem||'';
+  $('#sellYear').value = x.year||''; $('#sellOem').value = x.oem||''; $('#sellOemAlt').value = x.oem_alt||'';
   $('#sellEngine').value = x.engine||''; $('#sellKm').value = x.km!=null ? String(x.km) : ''; $('#sellVin').value = x.vin||''; $('#sellParts').value = x.parts_avail||'';
   $('#sellPrice').value = Number(x.price)>0 ? String(Number(x.price)) : '';
   $('#sellCondition').value = x.condition || 'Second-hand'; $('#sellCounty').value = x.county||'';
@@ -2446,7 +2501,7 @@ async function submitSell(e){
   if(btn){ btn.disabled=true; btn.textContent='Se trimite…'; }
   try{
     await applySellPhone();
-    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim()});
+    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim()});
     const editing = state.editId;
     const r = editing ? await api('/api/listings/'+editing,{method:'PATCH',body:payload}) : await api('/api/listings',{method:'POST',body:payload});
     resetSellForm(); setSellMode(null); state.sellFilled=null;
@@ -2711,7 +2766,7 @@ function adminListRows(){
       <div class="adm-main"><b>#${x.id} · ${esc(x.title)}</b> <span class="badge ${st[1]}">${esc(st[0])}</span>
         <p>${money(x.price)} · ${esc(x.type)} · ${esc(x.county||'—')} · ${fmtDate(x.created_at)} · 👁 ${Number(x.views)||0}</p>
         <p class="muted">${esc(x.seller_name||'Fără vânzător')} · ${esc(x.seller_email||'')}</p>
-        <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button></div></div>
+        <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn ghost small" data-admin="listing-edit" data-id="${x.id}">Editează</button><button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button></div></div>
     </article>`;
   }).join('');
 }
@@ -2736,17 +2791,17 @@ async function openAdminListing(id){
     <div class="adm-grid">${row('Tip',x.type)}${row('Stare',x.condition)}${row('Marcă',x.make)}${row('Model',x.model)}${row('An',x.year)}${row('Motor',x.engine)}${row('Combustibil',x.fuel)}${row('Categorie',x.category)}${row('OEM',x.oem)}${row('Cantitate',x.quantity)}${row('Județ',x.county)}${row('Livrare',x.delivery?'Da':'Nu')}${row('Vizualizări',x.views)}${row('Publicat',x.created_at?new Date(x.created_at).toLocaleString('ro-RO'):'')}</div>
     ${x.description?`<div class="adm-desc"><small>Descriere</small><p>${esc(x.description).replace(/\n/g,'<br>')}</p></div>`:''}
     <div class="adm-seller"><small>Vânzător</small><p><b>${esc(x.seller_name||'Fără vânzător')}</b> · ${esc(x.seller_email||'')}${x.seller_phone?' · '+esc(x.seller_phone):''}</p></div>
-    <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button></div>`;
+    <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn ghost small" data-admin="listing-edit" data-id="${x.id}">Editează</button><button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button></div>`;
 }
 async function loadAdmin(){
   if(!currentUser || currentUser.role!=='admin'){ navigate('home'); toast('Zona de administrare este disponibilă doar administratorului.'); return; }
   try{
     const get = async (u,k) => { try{ return (await api(u))[k] || []; }catch(e){ console.error('admin',u,e.message); return []; } };
     const ovr = await api('/api/admin/overview');
-    const [users,listings,requests,reports,activity,offers,orders] = await Promise.all([get('/api/admin/users','users'),get('/api/admin/listings','listings'),get('/api/admin/requests','requests'),get('/api/admin/reports','reports'),get('/api/admin/activity','activity'),get('/api/admin/offers','offers'),get('/api/admin/orders','orders')]);
+    const [users,listings,requests,reports,activity,offers,orders,messages] = await Promise.all([get('/api/admin/users','users'),get('/api/admin/listings','listings'),get('/api/admin/requests','requests'),get('/api/admin/reports','reports'),get('/api/admin/activity','activity'),get('/api/admin/offers','offers'),get('/api/admin/orders','orders'),get('/api/admin/messages','messages')]);
     const events = await get('/api/admin/events','events');
     let feat = null; try{ feat = await api('/api/admin/features'); }catch(e){ console.error('admin features',e.message); }
-    adminData = {s:ovr.stats,users,listings,requests,reports,activity,offers,orders,events,feat};
+    adminData = {s:ovr.stats,users,listings,requests,reports,activity,offers,orders,messages,events,feat};
     renderAdmin();
   }catch(e){ $('#adminContent').innerHTML = `<p>${esc(e.message)}</p>`; }
 }
@@ -2774,20 +2829,21 @@ function adminFeaturesHtml(){
     <div class="stat-grid" style="margin-top:12px">${stat('Calificative vânzători',rt.seller.n||0,rt.seller.n?'medie '+String(rt.seller.avg).replace('.',','):'')}${stat('Calificative cumpărători',rt.buyer.n||0,rt.buyer.n?'medie '+String(rt.buyer.avg).replace('.',','):'')}${stat('Importuri CSV',f.imports30,'ultimele 30 de zile')}</div>`;
   const vac = f.vacation.length ? f.vacation.map(u=>`<article class="info-card"><b>🌴 ${esc(u.name||'—')}</b> <small>#${u.id} · ${esc(u.email||'')}</small><p>${u.until?'Până la '+esc(fmtDate(u.until+'T00:00:00')):'Fără dată de întoarcere'} · ${u.ads} anunțuri ascunse din căutări</p></article>`).join('') : '<p class="muted">Niciun vânzător în vacanță.</p>';
   const blk = f.blocks.latest.length ? f.blocks.latest.map(b=>`<article class="info-card"><b>🚫 ${esc(b.blocker)} a blocat ${esc(b.blocked)}</b><p class="muted">#${b.blocker_id} → #${b.blocked_id} · ${evWhen(b.created_at)}</p></article>`).join('') : '<p class="muted">Nicio blocare.</p>';
-  const rat = rt.latest.length ? rt.latest.map(r=>`<article class="info-card"><b>${starsHtml(r.stars)} ${r.stars}/5 · ${esc(r.rated)} <small>(${r.kind==='seller'?'vânzător':'cumpărător'})</small></b><p class="muted">de la ${esc(r.rater)} · comanda #${r.order_id} · ${evWhen(r.created_at)}</p>${r.comment?`<p>${esc(r.comment)}</p>`:''}<div class="admin-actions"><button class="btn danger small" data-admin="rating-del" data-rkind="${r.kind}" data-id="${r.id}">Șterge calificativul</button></div></article>`).join('') : '<p class="muted">Niciun calificativ încă.</p>';
+  const rat = rt.latest.length ? rt.latest.map(r=>`<article class="info-card"><b>${starsHtml(r.stars)} ${r.stars}/5 · ${esc(r.rated)} <small>(${r.kind==='seller'?'vânzător':'cumpărător'})</small></b><p class="muted">de la ${esc(r.rater)} · comanda #${r.order_id} · ${evWhen(r.created_at)}</p>${r.comment?`<p>${esc(r.comment)}</p>`:''}<div class="admin-actions"><button class="btn ghost small" data-admin="rating-edit" data-rkind="${r.kind}" data-id="${r.id}" data-stars="${r.stars}" data-comment="${esc(r.comment||'')}">Editează</button><button class="btn danger small" data-admin="rating-del" data-rkind="${r.kind}" data-id="${r.id}">Șterge calificativul</button></div></article>`).join('') : '<p class="muted">Niciun calificativ încă.</p>';
   return `${cards}<h3 class="ad-h">Vânzători în vacanță</h3><div class="admin-list">${vac}</div><h3 class="ad-h">Blocări recente</h3><div class="admin-list">${blk}</div><h3 class="ad-h">Calificative recente</h3><div class="admin-list">${rat}</div>`;
 }
 function renderAdmin(){
   const d = adminData, s = d.s;
-  const tabs = [['dashboard','Dashboard'],['listings',`Anunțuri${s.pending?` (${s.pending})`:''}`],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['credits','Credite'],['reports',`Raportări${s.reports?` (${s.reports})`:''}`],['events','Evenimente'],['features','Funcții noi'],['activity','Activitate'],['vehicles','Mașini']];
+  const tabs = [['dashboard','Dashboard'],['listings',`Anunțuri${s.pending?` (${s.pending})`:''}`],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['messages','Mesaje'],['credits','Credite'],['reports',`Raportări${s.reports?` (${s.reports})`:''}`],['events','Evenimente'],['features','Funcții noi'],['activity','Activitate'],['vehicles','Mașini']];
   let body = '';
   if(adminTab==='dashboard') body = `<div class="stat-grid"><div class="stat"><b>Utilizatori</b><h3>${s.users}</h3><small>${s.activeUsers} activi</small></div><div class="stat"><b>Anunțuri</b><h3>${s.listings}</h3><small>${s.approved} aprobate · ${s.pending} în așteptare · ${s.rejected} respinse</small></div><div class="stat"><b>Raportări deschise</b><h3>${s.reports}</h3></div><div class="stat"><b>Cereri deschise</b><h3>${s.requests}</h3></div></div>`;
   if(adminTab==='dashboard') body += `<div class="stat-grid" style="margin-top:12px"><div class="stat"><b>Oferte</b><h3>${s.offers||0}</h3></div><div class="stat"><b>Comenzi</b><h3>${s.orders||0}</h3></div><div class="stat"><b>Mesaje trimise</b><h3>${s.messages||0}</h3><small>doar numărul, conținutul e privat</small></div></div>`;
-  if(adminTab==='offers') body = `<div class="admin-list">${d.offers.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.request_title)}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small></article>`).join('')||'<p>Nu există oferte.</p>'}</div>`;
-  if(adminTab==='orders') body = `<div class="admin-list">${d.orders.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title||'Comandă')}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small></article>`).join('')||'<p>Nu există comenzi.</p>'}</div>`;
+  if(adminTab==='offers') body = `<div class="admin-list">${d.offers.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.request_title)}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small><div class="admin-actions"><button class="btn danger small" data-admin="offer-del" data-id="${x.id}">Șterge oferta</button></div></article>`).join('')||'<p>Nu există oferte.</p>'}</div>`;
+  if(adminTab==='orders') body = `<div class="admin-list">${d.orders.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title||'Comandă')}</b><p>${money(x.price)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small><div class="admin-actions"><button class="btn danger small" data-admin="order-del" data-id="${x.id}">Șterge comanda</button></div></article>`).join('')||'<p>Nu există comenzi.</p>'}</div>`;
   if(adminTab==='listings') body = adminListingsHtml();
+  if(adminTab==='messages') body = `<div class="admin-list"><div class="info-card"><b>Moderare mesaje</b><p class="muted">Ultimele 200 de mesaje. Caută după text sau email. Ștergerea unui mesaj e definitivă și rămâne în jurnal.</p></div>${(adminData.messages||[]).map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.sender_name||'—')} → ${esc(x.recipient_name||'—')}</b><p class="muted">${esc(x.sender_email||'')} · ${evWhen(x.created_at)}</p><p>${esc(String(x.body||'').slice(0,300))}</p><div class="admin-actions"><button class="btn danger small" data-admin="msg-del" data-id="${x.id}">Șterge mesajul</button></div></article>`).join('')||'<p>Nu există mesaje.</p>'}</div>`;
   if(adminTab==='credits') body = `<div class="admin-list"><div class="info-card"><b>Credite în conturi</b><p class="muted">Adaugă credite unui utilizator (cu număr negativ le retragi). Utilizatorul le folosește la promovarea anunțurilor.</p></div>${d.users.slice().sort((a,b)=>(Number(b.credits)||0)-(Number(a.credits)||0)).map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · <b>${Number(x.credits)||0}</b> credite</p><div class="admin-actions"><button class="btn primary small" data-admin="user-credits" data-id="${x.id}">+ Credite</button></div></article>`).join('')}</div>`;
-  if(adminTab==='users') body = `<div class="admin-list">${d.users.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · ${esc(x.role)} · ${esc(x.status)}</p><div class="admin-actions"><button class=\"btn ghost small\" data-admin=\"user-credits\" data-id=\"${x.id}\">Credite: ${Number(x.credits)||0}</button>${adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked'],...(x.has_logo?[['Șterge logo','remove_logo']]:[])])}</div></article>`).join('')||'<p>Nu există utilizatori.</p>'}</div>`;
+  if(adminTab==='users') body = `<div class="admin-list">${d.users.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · ${esc(x.role)} · ${esc(x.status)}</p><div class="admin-actions"><button class=\"btn ghost small\" data-admin=\"user-credits\" data-id=\"${x.id}\">Credite: ${Number(x.credits)||0}</button>${adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked'],...(x.has_logo?[['Șterge logo','remove_logo']]:[])])}${x.role==='admin'?'':`<button class="btn danger small" data-admin="user-del" data-id="${x.id}">Șterge contul</button>`}</div></article>`).join('')||'<p>Nu există utilizatori.</p>'}</div>`;
   if(adminTab==='requests') body = `<div class="admin-list">${d.requests.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title)}</b><p>${esc(x.user_name||'—')} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`).join('')||'<p>Nu există cereri.</p>'}</div>`;
   if(adminTab==='reports') body = `<div class="admin-list">${d.reports.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${esc(x.reporter_name||'—')} · ${esc(x.status)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions">${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`).join('')||'<p>Nu există raportări.</p>'}</div>`;
   if(adminTab==='activity') body = `<div class="admin-list">${d.activity.map(x=>`<article class="info-card"><b>${esc(x.action)}</b><p>${esc(x.admin_name||'Admin')} · ${new Date(x.created_at).toLocaleString('ro-RO')}</p><small>${esc(x.target_type||'')} #${x.target_id||''} · ${esc(x.details||'')}</small></article>`).join('')||'<p>Nu există activitate.</p>'}</div>`;
@@ -2842,7 +2898,35 @@ async function adminAction(el){
   else if(kind==='approve-all'){ if(!confirm('Aprobi toate anunțurile aflate în așteptare?')) return; const r=await api('/api/admin/listings/approve-all',{method:'POST'}); toast(`Aprobate: ${r.approved}.`); }
   else if(kind==='listing-del'){ if(!confirm('Ștergi definitiv anunțul?')) return; await api(`/api/admin/listings/${id}`,{method:'DELETE'}); if(String(adminOpenId)===String(id)){ adminOpenId=null; closeModal($('#adminListingModal')); } }
   else if(kind==='user-credits'){ const v=prompt('Câte credite adaugi? (număr negativ ca să retragi)','10'); if(v===null) return; const n=Math.trunc(Number(String(v).replace(',','.'))); if(!n){ toast('Număr invalid.'); return; } const note=prompt('Notă (opțional)','')||''; await api(`/api/admin/users/${id}/credits`,{method:'POST',body:JSON.stringify({amount:n,note})}); toast('Creditele au fost actualizate.'); }
-  else if(kind==='user') await api(`/api/admin/users/${id}`,{method:'PATCH',body:JSON.stringify({status})});
+  else if(kind==='user'){
+    if(status==='blocked'){
+      const reason=prompt('Motivul blocării (obligatoriu, îl vede utilizatorul):','');
+      if(reason===null) return;
+      if(!reason.trim()){ toast('Motivul este obligatoriu.'); return; }
+      await api(`/api/admin/users/${id}`,{method:'PATCH',body:JSON.stringify({status,reason:reason.trim()})});
+    } else await api(`/api/admin/users/${id}`,{method:'PATCH',body:JSON.stringify({status})});
+  }
+  else if(kind==='user-del'){ if(!confirm('Ștergi DEFINITIV acest cont? Se șterg și anunțurile, mesajele și ofertele lui. Acțiunea nu poate fi anulată.')) return; if(prompt('Scrie ȘTERGE pentru confirmare:','')!=='ȘTERGE'){ toast('Anulat.'); return; } await api(`/api/admin/users/${id}`,{method:'DELETE'}); toast('Contul a fost șters.'); }
+  else if(kind==='listing-edit'){
+    const l=(adminData.listings||[]).find(x=>String(x.id)===String(id))||{};
+    const title=prompt('Titlu anunț:',l.title||''); if(title===null) return;
+    const price=prompt('Preț (lei):',String(l.price??'')); if(price===null) return;
+    if(!title.trim()){ toast('Titlul nu poate fi gol.'); return; }
+    if(price!==''&&(!Number.isFinite(Number(price))||Number(price)<0)){ toast('Preț invalid.'); return; }
+    await api(`/api/admin/listings/${id}`,{method:'PATCH',body:JSON.stringify({title:title.trim(),price:price===''?0:Number(price)})});
+    toast('Anunțul a fost actualizat.');
+  }
+  else if(kind==='rating-edit'){
+    const stars=prompt('Note (1-5):',String(el.dataset.stars||'')); if(stars===null) return;
+    const s=Number(stars); if(!Number.isInteger(s)||s<1||s>5){ toast('Notele trebuie să fie între 1 și 5.'); return; }
+    const comment=prompt('Textul recenziei:',el.dataset.comment||''); if(comment===null) return;
+    await api(`/api/admin/ratings/${el.dataset.rkind}/${id}`,{method:'PATCH',body:JSON.stringify({stars:s,comment})});
+    toast('Recenzia a fost actualizată.');
+  }
+  else if(kind==='rating-del'){ if(!confirm('Ștergi acest calificativ? Acțiunea rămâne în jurnalul de activitate.')) return; await api(`/api/admin/ratings/${el.dataset.rkind}/${id}`,{method:'DELETE'}); }
+  else if(kind==='msg-del'){ if(!confirm('Ștergi definitiv acest mesaj?')) return; await api(`/api/admin/messages/${id}`,{method:'DELETE'}); toast('Mesaj șters.'); }
+  else if(kind==='offer-del'){ if(!confirm('Ștergi această ofertă?')) return; await api(`/api/admin/offers/${id}`,{method:'DELETE'}); toast('Oferta a fost ștearsă.'); }
+  else if(kind==='order-del'){ if(!confirm('Ștergi această comandă? Se pierde și istoricul ei.')) return; await api(`/api/admin/orders/${id}`,{method:'DELETE'}); toast('Comanda a fost ștearsă.'); }
   else if(kind==='request') await api(`/api/admin/requests/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   else if(kind==='report') await api(`/api/admin/reports/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   else if(kind==='rating-del'){ if(!confirm('Ștergi acest calificativ? Acțiunea rămâne în jurnalul de activitate.')) return; await api(`/api/admin/ratings/${el.dataset.rkind}/${id}`,{method:'DELETE'}); }
@@ -3690,12 +3774,47 @@ document.addEventListener('change', e=>{
   }).catch(()=>{ st.className='csv-status bad'; st.textContent='Fișierul nu a putut fi citit.'; });
 });
 
+/* ===== Timp real (SSE) — mesaje și notificări fără refresh ===== */
+function initLive(){
+  const live = window.AutoPartsLive;
+  if(!live) return;            // browser fără EventSource
+  if(!currentUser){ live.stop(); return; }
+  live.start();
+
+  // Mesaj nou primit: actualizează lista dacă utilizatorul e în Mesagerie, altfel doar badge-ul.
+  live.on('message', m=>{
+    if(!m || !m.id) return;
+    const h=parseHash();
+    const onMessages = h.name==='account-tool' && h.params.get('view')==='messages';
+    if(onMessages && msgs.box==='inbox'){
+      // evită dublurile dacă mesajul a fost deja adăugat de refresh
+      if(!msgs.items.some(x=>String(x.id)===String(m.id))){
+        msgs.items.unshift({id:m.id,body:m.body,created_at:m.created_at,is_read:false,other:m.from,other_name:m.from_name,mine:false,ref_title:m.ref_title});
+        msgs.unread=(msgs.unread||0)+1;
+        renderMessages();
+      }
+    }
+    bumpUnreadBadge();
+  });
+
+  // Orice notificare nouă: reîncarcă badge-ul din server (o singură cerere, sursă de adevăr).
+  live.on('notification', ()=>{ bumpUnreadBadge(); });
+}
+
+// Refolosește contoarele existente (refreshCounts) — o singură sursă de adevăr pentru badge-uri.
+let badgeTimer=null;
+function bumpUnreadBadge(){
+  clearTimeout(badgeTimer);
+  badgeTimer=setTimeout(()=>{ try{ refreshCounts(); }catch(e){} },400);
+}
+
 (async function init(){
   initFormValidation();
   fillStaticSelects();
   wire();
   try{ const r = await api('/api/me'); currentUser = r.user || null; window.__verif = r.verification || null; }catch{ currentUser = null; }
   renderHeader();
+  initLive();
   syncFavorites();
   route();
   loadFooterLogos();

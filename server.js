@@ -20,7 +20,7 @@ const app = express();
 for(const m of ['get','post','put','patch','delete']){const orig=app[m].bind(app);app[m]=(p,...hs)=>orig(p,...hs.map(h=>typeof h==='function'&&h.length<4&&h.constructor&&h.constructor.name==='AsyncFunction'?(req,res,next)=>h(req,res,next).catch(next):h));}
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV==='production' || !!process.env.RENDER;
-const PUBLIC_FILES = ['index.html','style.css','script.js','ajutor.html','theme-init.js','analytics.js','pwa.js','sw.js','manifest.webmanifest'];
+const PUBLIC_FILES = ['index.html','style.css','script.js','ajutor.html','theme-init.js','analytics.js','pwa.js','sw.js','manifest.webmanifest','realtime.js'];
 const ASSETS_DIR = path.join(__dirname,'assets');
 const DB_URL = process.env.DATABASE_URL || '';
 const DB_LOCAL = /localhost|127\.0\.0\.1/.test(DB_URL);
@@ -281,7 +281,7 @@ CREATE TABLE IF NOT EXISTS listings (
  type TEXT NOT NULL CHECK(type IN ('piesa','masina','dezmembrari')), title TEXT NOT NULL,
  price NUMERIC(12,2) DEFAULT 0, condition TEXT, make TEXT, model TEXT, generation TEXT, year TEXT,
  engine TEXT, fuel TEXT, vehicle_id TEXT, seller_type TEXT, quantity INTEGER DEFAULT 1, negotiable BOOLEAN DEFAULT FALSE,
- county TEXT, category TEXT, oem TEXT, delivery BOOLEAN DEFAULT FALSE, description TEXT DEFAULT '',
+ county TEXT, category TEXT, oem TEXT, oem_alt TEXT, delivery BOOLEAN DEFAULT FALSE, description TEXT DEFAULT '',
  status TEXT NOT NULL DEFAULT 'pending', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS favorites (
@@ -344,6 +344,10 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS km INTEGER',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS vin TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS parts_avail TEXT',
+ 'ALTER TABLE listings ADD COLUMN IF NOT EXISTS oem_alt TEXT',
+ // Index pe codurile alternative normalizate (fără spații/liniuțe), folosit de căutarea din buildListingFilter.
+ // Fără pg_trgm: index B-tree funcțional, suficient pentru potrivire pe prefix/egalitate.
+ "CREATE INDEX IF NOT EXISTS listings_oem_alt_idx ON listings (regexp_replace(upper(COALESCE(oem_alt,'')),'[^A-Z0-9]','','g'))",
   "UPDATE listings SET category='Filtre auto' WHERE category='Filtre'",
   "UPDATE listings SET category='Faruri stopuri lumini' WHERE category='Iluminare'",
   "UPDATE listings SET category='Electrică & Electronică Auto' WHERE category='Electrică'",
@@ -387,6 +391,7 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS mail_order BOOLEAN NOT NULL DEFAULT TRUE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS vacation BOOLEAN NOT NULL DEFAULT FALSE',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS vacation_until DATE',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS block_reason TEXT',
   'CREATE TABLE IF NOT EXISTS user_blocks (blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(blocker_id,blocked_id))',
   'CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks(blocked_id)',
   "CREATE TABLE IF NOT EXISTS request_marks (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, request_id INTEGER NOT NULL REFERENCES part_requests(id) ON DELETE CASCADE, mark TEXT NOT NULL CHECK (mark IN ('later','ignored')), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(user_id,request_id))",
@@ -406,7 +411,28 @@ async function dbReady(){
   "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, body TEXT NOT NULL, is_read BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
   'CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, text TEXT NOT NULL, is_read BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
   'CREATE TABLE IF NOT EXISTS user_phones (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, phone TEXT NOT NULL, is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE, verified BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id, phone))',
-  'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)'
+  'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)',
+  // Ateliere / service-uri auto: catalog public, fiecare intrare poate fi legată de un cont de utilizator.
+  // hours = program pe zile ("L-V 08:00-18:00, S 09:00-13:00"), lat/lng opționale pentru hartă.
+  `CREATE TABLE IF NOT EXISTS services (
+     id SERIAL PRIMARY KEY,
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     title TEXT NOT NULL,
+     address TEXT,
+     city TEXT,
+     county TEXT,
+     phone TEXT,
+     type TEXT,
+     hours TEXT,
+     lat DOUBLE PRECISION,
+     lng DOUBLE PRECISION,
+     rating NUMERIC(2,1),
+     offers_count INTEGER NOT NULL DEFAULT 0,
+     status TEXT NOT NULL DEFAULT 'approved',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   )`,
+  'CREATE INDEX IF NOT EXISTS services_county_idx ON services(county)',
+  'CREATE INDEX IF NOT EXISTS services_type_idx ON services(type)'
  ];
  migrations.push(
   'CREATE TABLE IF NOT EXISTS login_attempts (key TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
@@ -504,7 +530,9 @@ function admin(req,res,next){if(req.user.role!=='admin')return res.status(403).j
 async function optUserId(req){try{const t=req.cookies&&req.cookies.session;if(!t||!pool)return null;const r=await pool.query("SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW() AND u.status='active'",[hashToken(t)]);return r.rowCount?r.rows[0].id:null;}catch{return null;}}
 function needVerified(req,res,next){if(REQUIRE_VERIFIED&&!req.user.email_verified&&req.user.role!=='admin')return res.status(403).json({error:'EMAIL_NOT_VERIFIED'});next();}
 function requireDb(req,res,next){if(!pool)return res.status(503).json({error:'DATABASE_NOT_CONFIGURED',message:'Configurează DATABASE_URL în Render.'});next();}
-const ah=fn=>(req,res)=>Promise.resolve(fn(req,res)).catch(e=>{console.error(e);if(!res.headersSent)res.status(500).json({error:'EROARE_SERVER'});});
+// Wrapper pentru handlere async: prinde erorile și le trimite la middleware-ul de erori.
+// next este pasat mai departe — altfel rutele care fac `return next()` (ex. /piese-auto fără DB) arunca „next is not a function”.
+const ah=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(e=>{console.error(e);if(!res.headersSent)res.status(500).json({error:'EROARE_SERVER'});});
 const clip=(v,n)=>v==null||v===''?null:String(v).trim().slice(0,n);
 /* ---------- statistici anunțuri (vizualizări / apăsări pe telefon) ----------
    STATS_RETENTION_DAYS (implicit 15) = câte zile apar în „Statistici anunțuri” (grafic pe zile).
@@ -1044,7 +1072,7 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,ah(async(req,res)=>{
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
+const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.oem_alt,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
 // Media calificativelor: ca vânzător (de la cumpărători) și ca cumpărător (de la vânzători).
 const RATE_SQL=(tbl,col,uid,al)=>`(SELECT ROUND(AVG(stars),1)::float FROM ${tbl} WHERE ${col}=${uid}) ${al}_avg,(SELECT COUNT(*)::int FROM ${tbl} WHERE ${col}=${uid}) ${al}_n`;
 const SELLER_RATE=(uid,al)=>RATE_SQL('seller_ratings','seller_id',uid,al);
@@ -1080,9 +1108,11 @@ function buildListingFilter(query){
  if(q){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
   for(const term of terms){
-   const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel'].map(c=>`${fold(c)} LIKE $${i}`);
-   // Coduri OEM scrise cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsesc și când sunt căutate lipite.
-   if(/\d/.test(term)&&term.length>=4)cols.push(`${flat('l.oem')} LIKE $${i}`);
+    const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel'].map(c=>`${fold(c)} LIKE $${i}`);
+    // Coduri OEM scrise cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsesc și când sunt căutate lipite.
+    if(/\d/.test(term)&&term.length>=4)cols.push(`${flat('l.oem')} LIKE $${i}`);
+    // Coduri alternative / cross-reference (ex. căutarea "1K0615301" găsește piesa cu echivalentul "1K0615301A").
+    cols.push(`${flat('COALESCE(l.oem_alt,\'\')')} LIKE $${i}`);
    where.push('('+cols.join(' OR ')+')');vals.push('%'+term+'%');i++;
   }
  }
@@ -1245,13 +1275,35 @@ app.get('/api/credits',auth,requireDb,ah(async(req,res)=>{
    Se poate conecta la o tabelă reală ulterior. Pentru acum returnează un array gol.
 */
 app.get('/api/services',requireDb,ah(async(req,res)=>{
-  try{
-    const r=await pool.query(`SELECT id,title,address,county,type,rating,offers_count,created_at FROM services ORDER BY created_at DESC LIMIT 20`);
-    res.json({services:r.rows});
-  }catch(e){
-    // tabela services nu există încă – returnează array gol (nu o eroare 503)
-    res.json({services:[]});
-  }
+  const county=String(req.query.county||'').slice(0,60);
+  const type=String(req.query.type||'').slice(0,60);
+  const q=String(req.query.q||'').trim().slice(0,80);
+  const where=["status='approved'"],params=[];
+  if(county){params.push(county);where.push(`county=$${params.length}`);}
+  if(type){params.push(type);where.push(`type=$${params.length}`);}
+  if(q){params.push('%'+q.toLowerCase()+'%');where.push(`(lower(title) LIKE $${params.length} OR lower(COALESCE(city,'')) LIKE $${params.length} OR lower(COALESCE(address,'')) LIKE $${params.length})`);}
+  const r=await pool.query(
+    `SELECT id,title,address,city,county,phone,type,hours,lat,lng,rating,offers_count,created_at
+       FROM services WHERE ${where.join(' AND ')} ORDER BY rating DESC NULLS LAST, created_at DESC LIMIT 200`,params);
+  res.json({services:r.rows});
+}));
+
+/* Înregistrare atelier/service de către un utilizator autentificat.
+   Intrarea apare imediat în catalog (status 'approved'); adminul o poate ascunde ulterior. */
+app.post('/api/services',auth,requireDb,ah(async(req,res)=>{
+  const b=req.body||{};
+  const clip=(v,n)=>String(v==null?'':v).trim().slice(0,n);
+  const title=clip(b.title,120);
+  if(title.length<3)return res.status(400).json({error:'TITLU_LIPSA'});
+  const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null;};
+  const lat=num(b.lat),lng=num(b.lng);
+  // coordonate în intervalul valid al României (altfel le ignorăm)
+  const okLat=lat!=null&&lat>=43&&lat<=49, okLng=lng!=null&&lng>=20&&lng<=30;
+  const r=await pool.query(
+    `INSERT INTO services(user_id,title,address,city,county,phone,type,hours,lat,lng,status)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'approved') RETURNING id`,
+    [req.user.id,title,clip(b.address,200),clip(b.city,80),clip(b.county,60),clip(b.phone,30),clip(b.type,60),clip(b.hours,200),okLat?lat:null,okLng?lng:null]);
+  res.json({ok:true,id:r.rows[0].id});
 }));
 
 /* ===== Întrebări pe oferte (Q&A cumpărător ↔ vânzător) ===== */
@@ -1530,10 +1582,25 @@ function parseListing(x){
  if(images.reduce((n,v)=>n+v.length,0)>4500000)return bad('POZE_PREA_MARI');
  return {v:{type:x.type,title:x.title.trim(),price,condition:x.type==='dezmembrari'?(clip(x.condition,30)||'Second-hand'):clip(x.condition,30),make:clip(x.make,60),model:clip(x.model,80),
   year:clip(x.year,10),seller_type:clip(x.seller_type,30),quantity:x.quantity==null?null:Math.min(9999,Math.max(1,Number(x.quantity)||1)),negotiable:!!x.negotiable,county:clip(x.county,60),
-  category:clip(x.category,60),subcategory:clip(x.subcategory,80),oem:clip(x.oem,60),delivery:!!x.delivery,description:String(x.description||'').slice(0,5000),images,
+   category:clip(x.category,60),subcategory:clip(x.subcategory,80),oem:clip(x.oem,60),oem_alt:cleanOemAlt(x.oem_alt),delivery:!!x.delivery,description:String(x.description||'').slice(0,5000),images,
   generation:clip(x.generation,80),engine:clip(x.engine,80),fuel:clip(x.fuel,30),vehicle_id:clip(x.vehicle_id,120),
   km:(x.km==null||String(x.km).trim()==='')?null:Math.round(Number(x.km)),vin:clip(String(x.vin||'').toUpperCase().replace(/[^A-Z0-9]/g,''),30),
   parts_avail:clip(String(x.parts_avail||'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,30).join(', '),600)}};
+}
+// Coduri OEM alternative (cross-reference): listă separată prin virgulă, normalizată și fără duplicate.
+// Acceptă și array din JSON; păstrează maximum 12 coduri de 40 caractere.
+function cleanOemAlt(raw){
+ const list=Array.isArray(raw)?raw:String(raw||'').split(/[,;\n|]+/);
+ const out=[],seen=new Set();
+ for(const item of list){
+  const code=String(item||'').toUpperCase().replace(/[^A-Z0-9 .\/-]/g,'').replace(/\s+/g,' ').trim().slice(0,40);
+  if(!code)continue;
+  const key=code.replace(/[^A-Z0-9]/g,'');
+  if(!key||seen.has(key))continue;
+  seen.add(key);out.push(code);
+  if(out.length>=12)break;
+ }
+ return out.join(', ')||null;
 }
 const imgBytes=a=>a.reduce((n,v)=>n+v.length,0);
 async function imageQuotaExceeded(userId,images,excludeId=0,excludeOfferId=0){
@@ -1557,9 +1624,9 @@ app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
  try{v.images=await storeImages(v.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
  // Cont gratuit: maximum 100 de anunțuri active (la început; schimbabil cu ACTIVE_LISTINGS_LIMIT) (publicate sau în așteptare; cele vândute nu se numără), ca pe site-urile de profil. Adminul nu are limită.
  if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);if(act.rows[0].n>=ACTIVE_LISTINGS_LIMIT)return res.status(403).json({error:'LIMITA_ANUNTURI'});}
- const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING *`,
-  [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail]);
- if(NEW_LISTING_STATUS==='approved')alertForListings([r.rows[0].id]);
+  const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,oem_alt,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING *`,
+   [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.oem_alt,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail]);
+  if(NEW_LISTING_STATUS==='approved')alertForListings([r.rows[0].id]);
  logEvent(req.user.id,'listing_create','listing',r.rows[0].id,v.title);
  res.status(201).json({listing:r.rows[0]});
 });
@@ -1590,8 +1657,8 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
    status='pending';
   }
  }
- const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24 WHERE id=$18 AND user_id=$19 RETURNING id,status',
-  [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine]);
+  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24,oem_alt=$25 WHERE id=$18 AND user_id=$19 RETURNING id,status',
+   [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine,v.oem_alt]);
  logEvent(req.user.id,'listing_edit','listing',cur.id,v.title+(status==='pending'&&cur.status!=='pending'?' (retrimis la moderare)':''));
  res.json({listing:r.rows[0],resubmitted:status==='pending'&&cur.status!=='pending'});
 });
@@ -1667,7 +1734,39 @@ app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!thrott
 
 app.get('/api/admin/overview',auth,admin,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.get('/api/admin/listings',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
-app.patch('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['pending','approved','rejected','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE listings SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_listing','listing',req.params.id,status]);if(status==='approved')alertForListings([r.rows[0].id]);res.json({listing:r.rows[0]});});
+app.patch('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
+ const id=req.params.id;
+ if(!/^\d{1,10}$/.test(String(id)))return res.status(400).json({error:'ID_INVALID'});
+ const body=req.body||{};
+ // Câmpuri de conținut pe care adminul le poate corecta direct (ex. preț greșit, titlu necorespunzător).
+ const EDIT={title:v=>clip(v,200),price:v=>{const n=Number(v);return Number.isFinite(n)&&n>=0?Math.round(n):null;},
+  description:v=>String(v||'').slice(0,5000),category:v=>clip(v,60),subcategory:v=>clip(v,80),
+  make:v=>clip(v,60),model:v=>clip(v,60),oem:v=>clip(v,60),oem_alt:v=>cleanOemAlt(v),county:v=>clip(v,60)};
+ const sets=[],vals=[],changes=[];
+ const cur=await pool.query('SELECT * FROM listings WHERE id=$1',[id]);
+ if(!cur.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ const before=cur.rows[0];
+ for(const [k,fn] of Object.entries(EDIT)){
+  if(!(k in body))continue;
+  const val=fn(body[k]);
+  if(val===null)return res.status(400).json({error:'DATE_INVALIDE',field:k});
+  if(String(before[k]??'')===String(val??''))continue;
+  vals.push(val);sets.push(`${k}=$${vals.length}`);
+  changes.push(`${k}: „${String(before[k]??'').slice(0,40)}” → „${String(val??'').slice(0,40)}”`);
+ }
+ const status=body.status;
+ if(status!==undefined){
+  if(!['pending','approved','rejected','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});
+  if(before.status!==status){vals.push(status);sets.push(`status=$${vals.length}`);changes.push(`status: ${before.status} → ${status}`);}
+ }
+ if(!sets.length)return res.json({listing:before,changed:false});
+ vals.push(Number(id));
+ const r=await pool.query(`UPDATE listings SET ${sets.join(',')} WHERE id=$${vals.length} RETURNING *`,vals);
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',
+  [req.user.id,changes.some(c=>c.startsWith('status:'))?'update_listing':'edit_listing','listing',Number(id),changes.join('; ').slice(0,900)]);
+ if(status==='approved')alertForListings([r.rows[0].id]);
+ res.json({listing:r.rows[0],changed:true,changes});
+}));
 app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved' WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
 app.get('/api/admin/listings/:id/img/:n',auth,admin,requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
@@ -1685,11 +1784,62 @@ app.get('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
 }));
 app.delete('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const d=await pool.query('DELETE FROM listings WHERE id=$1 RETURNING id',[req.params.id]);if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_listing','listing',req.params.id,'']);res.json({ok:true});});
 app.get('/api/admin/users',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,name,email,phone,role,status,created_at,credits,(store_logo IS NOT NULL) has_logo FROM users ORDER BY created_at DESC LIMIT 500');res.json({users:r.rows});});
-app.patch('/api/admin/users/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(status==='remove_logo'){const uid=Number(req.params.id)||0;const rr=await pool.query('UPDATE users SET store_logo=NULL WHERE id=$1',[uid]);if(!rr.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'remove_store_logo','user',uid,'']);return res.json({ok:true});}if(!['active','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});if(Number(req.params.id)===Number(req.user.id)&&status==='blocked')return res.status(400).json({error:'CANNOT_BLOCK_SELF'});const r=await pool.query('UPDATE users SET status=$1 WHERE id=$2 RETURNING id,name,email,phone,role,status',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,status==='blocked'?'block_user':'unblock_user','user',req.params.id,'']);res.json({user:r.rows[0]});});
+app.patch('/api/admin/users/:id',auth,admin,requireDb,ah(async(req,res)=>{
+ const uid=Number(req.params.id)||0;
+ if(!uid)return res.status(400).json({error:'ID_INVALID'});
+ const status=req.body.status;
+ if(status==='remove_logo'){const rr=await pool.query('UPDATE users SET store_logo=NULL WHERE id=$1',[uid]);if(!rr.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'remove_store_logo','user',uid,'']);return res.json({ok:true});}
+ if(!['active','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});
+ if(uid===Number(req.user.id)&&status==='blocked')return res.status(400).json({error:'CANNOT_BLOCK_SELF'});
+ // Motivul e obligatoriu la blocare: utilizatorul trebuie să afle de ce a fost blocat.
+ const reason=String((req.body||{}).reason||'').trim().slice(0,300);
+ if(status==='blocked'&&!reason)return res.status(400).json({error:'MOTIV_OBLIGATORIU'});
+ const r=await pool.query('UPDATE users SET status=$1,block_reason=$2 WHERE id=$3 RETURNING id,name,email,phone,role,status,block_reason',[status,status==='blocked'?reason:null,uid]);
+ if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,status==='blocked'?'block_user':'unblock_user','user',uid,reason]);
+ if(status==='blocked')await notify(uid,'Contul tău a fost blocat. Motiv: '+reason,'account').catch(()=>{});
+ else await notify(uid,'Contul tău a fost reactivat.','account').catch(()=>{});
+ res.json({user:r.rows[0]});
+}));
+// Ștergerea definitivă a unui cont (dreptul la ștergere / GDPR). Anunțurile, mesajele, ofertele etc.
+// dispar prin ON DELETE CASCADE; jurnalul păstrează doar id-ul, ca să nu rămână date personale.
+app.delete('/api/admin/users/:id',auth,admin,requireDb,ah(async(req,res)=>{
+ const uid=Number(req.params.id)||0;
+ if(!uid)return res.status(400).json({error:'ID_INVALID'});
+ if(uid===Number(req.user.id))return res.status(400).json({error:'CANNOT_DELETE_SELF'});
+ const u=await pool.query('SELECT id,email,role FROM users WHERE id=$1',[uid]);
+ if(!u.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ if(u.rows[0].role==='admin')return res.status(400).json({error:'CANNOT_DELETE_ADMIN'});
+ await pool.query('DELETE FROM users WHERE id=$1',[uid]);
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_user','user',uid,'cont șters la cerere']);
+ res.json({ok:true});
+}));
 app.get('/api/admin/requests',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT r.*,u.name user_name,u.email user_email FROM part_requests r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 500');res.json({requests:r.rows});});
 app.patch('/api/admin/requests/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','matched','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE part_requests SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_request','request',req.params.id,status]);res.json({request:r.rows[0]});});
 app.get('/api/admin/offers',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.price,o.status,o.created_at,q.title request_title,u.name seller_name,b.name buyer_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=q.user_id ORDER BY o.created_at DESC LIMIT 300');res.json({offers:r.rows});}));
 app.get('/api/admin/orders',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.title,o.price,o.status,o.created_at,u.name seller_name,b.name buyer_name FROM orders o LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=o.buyer_id ORDER BY o.created_at DESC LIMIT 300');res.json({orders:r.rows});}));
+// --- Moderare conținut: ștergerea mesajelor, ofertelor și comenzilor din panoul de admin ---
+// Fiecare acțiune lasă urmă în admin_activity (fără conținutul șters, ca să nu rămână date personale).
+const ADM_DEL={messages:{tbl:'messages',label:'mesaj'},offers:{tbl:'offers',label:'ofertă'},orders:{tbl:'orders',label:'comandă'}};
+for(const [kind,cfg] of Object.entries(ADM_DEL)){
+ app.delete(`/api/admin/${kind}/:id`,auth,admin,requireDb,ah(async(req,res)=>{
+  const id=Number(req.params.id)||0;
+  if(!id)return res.status(400).json({error:'ID_INVALID'});
+  const d=await pool.query(`DELETE FROM ${cfg.tbl} WHERE id=$1 RETURNING id`,[id]);
+  if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_'+cfg.tbl,cfg.label,id,'șters din moderare']);
+  res.json({ok:true});
+ }));
+}
+// Lista mesajelor pentru moderare (doar metadate — conținutul se vede la cerere, ca să nu expunem tot inboxul).
+app.get('/api/admin/messages',auth,admin,requireDb,ah(async(req,res)=>{
+ const q=String(req.query.q||'').trim().slice(0,120);
+ const r=await pool.query(`SELECT m.id,m.sender_id,m.recipient_id,m.body,m.is_read,m.created_at,s.name sender_name,s.email sender_email,rc.name recipient_name
+  FROM messages m LEFT JOIN users s ON s.id=m.sender_id LEFT JOIN users rc ON rc.id=m.recipient_id
+  ${q?'WHERE m.body ILIKE $1 OR s.email ILIKE $1 OR rc.email ILIKE $1':''}
+  ORDER BY m.created_at DESC LIMIT 200`,[q?'%'+q+'%':undefined].filter(Boolean));
+ res.json({messages:r.rows});
+}));
 app.get('/api/admin/activity',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT a.*,u.name admin_name,u.email admin_email FROM admin_activity a LEFT JOIN users u ON u.id=a.admin_id ORDER BY a.created_at DESC LIMIT 500');res.json({activity:r.rows});});
 app.get('/api/admin/reports',auth,admin,requireDb,async(req,res)=>{const r=await pool.query(`SELECT r.*,l.title listing_title,u.name reporter_name FROM reports r LEFT JOIN listings l ON l.id=r.listing_id LEFT JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`);res.json({reports:r.rows});});
 app.get('/api/admin/events',auth,admin,requireDb,ah(async(req,res)=>{
@@ -1716,6 +1866,27 @@ app.get('/api/admin/features',auth,admin,requireDb,ah(async(req,res)=>{
  res.json({vacation:vac.rows,blocks:{total:(blkN.rows[0]||{}).n||0,latest:blk.rows},ratings:{seller:sc.rows[0]||{n:0,avg:0},buyer:bc.rows[0]||{n:0,avg:0},latest:ratings},saved:ss.rows[0]||{total:0,alerts:0},sessions:ses.rows[0]||{n:0,users:0},imports30:(imp.rows[0]||{}).n||0});
 }));
 // Șterge un calificativ abuziv (rămâne urma în jurnalul de activitate).
+// Editarea unui calificativ (text și/sau stele) — pentru corectarea unui review, nu doar ștergerea lui.
+app.patch('/api/admin/ratings/:kind/:id',auth,admin,requireDb,ah(async(req,res)=>{
+ const tbl={seller:'seller_ratings',buyer:'buyer_ratings'}[req.params.kind];
+ if(!tbl||!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
+ const body=req.body||{},sets=[],vals=[],changes=[];
+ if('stars' in body){
+  const s=Number(body.stars);
+  if(!Number.isInteger(s)||s<1||s>5)return res.status(400).json({error:'STELE_INVALIDE'});
+  vals.push(s);sets.push(`stars=$${vals.length}`);changes.push('stele → '+s);
+ }
+ if('comment' in body){
+  const c=String(body.comment||'').slice(0,1000);
+  vals.push(c);sets.push(`comment=$${vals.length}`);changes.push('text actualizat');
+ }
+ if(!sets.length)return res.status(400).json({error:'NIMIC_DE_MODIFICAT'});
+ vals.push(Number(req.params.id));
+ const r=await pool.query(`UPDATE ${tbl} SET ${sets.join(',')} WHERE id=$${vals.length} RETURNING id,stars`,vals);
+ if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'edit_rating',req.params.kind+'_rating',r.rows[0].id,changes.join('; ')]);
+ res.json({ok:true,rating:r.rows[0]});
+}));
 app.delete('/api/admin/ratings/:kind/:id',auth,admin,requireDb,ah(async(req,res)=>{
  const tbl={seller:'seller_ratings',buyer:'buyer_ratings'}[req.params.kind];
  if(!tbl||!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
@@ -1746,7 +1917,13 @@ async function mailNotify(uid,kind,text){
     await sendMail(u.email,'AutoParts: '+t.slice(0,80),t+(base?'\n\nVezi detalii: '+base+'/#/account-tool':'')+'\n\nPoți opri aceste emailuri din Setări cont → Notificări pe email.');
   }catch(e){console.error('mailNotify',e.message);}
 }
-const notify=(uid,text,kind)=>{if(!uid)return null;if(kind)mailNotify(uid,kind,text);return pool.query('INSERT INTO notifications(user_id,text,kind) VALUES($1,$2,$3)',[uid,String(text).slice(0,300),kind||null]).catch(()=>{});};
+const notify=(uid,text,kind)=>{
+ if(!uid)return null;
+ if(kind)mailNotify(uid,kind,text);
+ // Push în timp real prin SSE (dacă utilizatorul are pagina deschisă) — badge-ul se actualizează instant.
+ sseSend(uid,'notification',{text:String(text).slice(0,300),kind:kind||null,created_at:new Date().toISOString()});
+ return pool.query('INSERT INTO notifications(user_id,text,kind) VALUES($1,$2,$3)',[uid,String(text).slice(0,300),kind||null]).catch(()=>{});
+};
 app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!/^\d{1,10}$/.test(req.params.id))return res.status(400).json({error:'ID_INVALID'});
  if(!throttle(authAttempts,'offer:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_OFERTE'});
@@ -1818,6 +1995,41 @@ app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
 }));
 
+/* ===== Chat în timp real prin SSE (Server-Sent Events) =====
+   Fără WebSocket și fără dependențe: o conexiune HTTP ținută deschisă per utilizator.
+   Curățare automată la deconectare; heartbeat la 25s ca proxy-urile să nu închidă legătura. */
+const sseClients=new Map(); // userId -> Set<res>
+function sseSend(userId,event,data){
+ const set=sseClients.get(Number(userId));
+ if(!set||!set.size)return 0;
+ const payload=`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+ let n=0;
+ for(const res of set){try{res.write(payload);n++;}catch{set.delete(res);}}
+ return n;
+}
+function sseCount(){let n=0;for(const s of sseClients.values())n+=s.size;return n;}
+app.get('/api/stream',auth,requireDb,(req,res)=>{
+ res.status(200).set({
+  'Content-Type':'text/event-stream; charset=utf-8',
+  'Cache-Control':'no-cache, no-transform',
+  'Connection':'keep-alive',
+  'X-Accel-Buffering':'no' // dezactivează buffering-ul la proxy (nginx/Render)
+ });
+ res.flushHeaders?.();
+ const uid=req.user.id;
+ if(!sseClients.has(uid))sseClients.set(uid,new Set());
+ sseClients.get(uid).add(res);
+ res.write('event: ready\ndata: {"ok":true}\n\n');
+ const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},25000);
+ const cleanup=()=>{
+  clearInterval(hb);
+  const set=sseClients.get(uid);
+  if(set){set.delete(res);if(!set.size)sseClients.delete(uid);}
+ };
+ req.on('close',cleanup);
+ req.on('error',cleanup);
+});
+
 app.post('/api/messages',auth,needVerified,requireDb,ah(async(req,res)=>{
  const b=req.body||{}, body=String(b.body||'').trim();
  let to=Number(b.to);
@@ -1839,9 +2051,11 @@ app.post('/api/messages',auth,needVerified,requireDb,ah(async(req,res)=>{
   const l=(await pool.query("SELECT id,title FROM listings WHERE id=$1 AND status='approved'",[Number(b.listing_id)])).rows[0];
   if(l){listingId=l.id;refTitle=l.title;}
  }
- await pool.query('INSERT INTO messages(sender_id,recipient_id,body,listing_id,ref_title) VALUES($1,$2,$3,$4,$5)',[req.user.id,to,body,listingId,refTitle]);
+ const ins=await pool.query('INSERT INTO messages(sender_id,recipient_id,body,listing_id,ref_title) VALUES($1,$2,$3,$4,$5) RETURNING id,created_at',[req.user.id,to,body,listingId,refTitle]);
  await notify(to,'Mesaj nou de la '+(req.user.nickname||req.user.name||'un utilizator'),'msg');
- res.json({ok:true});
+ // Chat în timp real: împinge mesajul către destinatar dacă are o conexiune SSE deschisă.
+ sseSend(to,'message',{id:ins.rows[0].id,from:req.user.id,from_name:req.user.nickname||req.user.name||'Utilizator',body,created_at:ins.rows[0].created_at,listing_id:listingId,ref_title:refTitle});
+ res.json({ok:true,id:ins.rows[0].id,created_at:ins.rows[0].created_at});
 }));
 // Mesagerie: lista de mesaje pe căsuțe (primite / trimise / arhivate). Definit înaintea rutei /:uid.
 app.get('/api/messages/box',auth,requireDb,ah(async(req,res)=>{
@@ -2111,8 +2325,8 @@ app.post('/api/listings/import',auth,needVerified,requireDb,ah(async(req,res)=>{
  try{
   await client.query('BEGIN');
   for(const {v} of ok){
-   const r=await client.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING id`,
-    [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail]);
+   const r=await client.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,oem_alt,delivery,description,images,status,subcategory,km,vin,parts_avail) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING id`,
+     [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.oem_alt,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail]);
    ids.push(r.rows[0].id);
   }
   await client.query('COMMIT');
@@ -2321,7 +2535,7 @@ app.get('/piese-auto',ah(async(req,res,next)=>{
 // Categorie sau marcă (categoria are prioritate la același slug).
 app.get('/piese-auto/:slug',ah(async(req,res,next)=>{
  if(!pool)return next();
- const slug=String(req.params.slug||'').toLowerCase(); if(!/^[a-z0-9-]{1,120}$/.test(slug))return next();
+ const slug=String(req.params.slug||'').toLowerCase(); if(!/^[a-z0-9-]{1,120}$/.test(slug))return seoNotFound(req,res);
  const ix=await getSeoIndex();
  const cat=ix.catBySlug.get(slug);
  if(cat){
@@ -2344,7 +2558,7 @@ app.get('/piese-auto/:slug',ah(async(req,res,next)=>{
 app.get('/piese-auto/:make/:model',ah(async(req,res,next)=>{
  if(!pool)return next();
  const ms=String(req.params.make||'').toLowerCase(),ds=String(req.params.model||'').toLowerCase();
- if(!/^[a-z0-9-]{1,120}$/.test(ms)||!/^[a-z0-9-]{1,120}$/.test(ds))return next();
+ if(!/^[a-z0-9-]{1,120}$/.test(ms)||!/^[a-z0-9-]{1,120}$/.test(ds))return seoNotFound(req,res);
  const ix=await getSeoIndex(),mk=ix.makeBySlug.get(ms),md=mk&&mk.models.get(ds);
  if(!md)return seoNotFound(req,res);
  const r=await pool.query(`SELECT l.category,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${flat('l.make')}=$1 AND ${flat('l.model')}=$2 AND COALESCE(l.category,'')<>'' GROUP BY l.category ORDER BY n DESC`,[mk.key,md.key]);
@@ -2358,7 +2572,7 @@ app.get('/piese-auto/:make/:model',ah(async(req,res,next)=>{
 app.get('/piese-auto/:make/:model/:cat',ah(async(req,res,next)=>{
  if(!pool)return next();
  const ms=String(req.params.make||'').toLowerCase(),ds=String(req.params.model||'').toLowerCase(),cs=String(req.params.cat||'').toLowerCase();
- if(![ms,ds,cs].every(v=>/^[a-z0-9-]{1,120}$/.test(v)))return next();
+ if(![ms,ds,cs].every(v=>/^[a-z0-9-]{1,120}$/.test(v)))return seoNotFound(req,res);
  const ix=await getSeoIndex(),mk=ix.makeBySlug.get(ms),md=mk&&mk.models.get(ds),ce=md&&md.cats.get(cs);
  if(!ce||ce.n<SEO_MIN_COMBO)return seoNotFound(req,res);
  const full=`${mk.name} ${md.name}`, base=`/piese-auto/${mk.slug}/${md.slug}`;

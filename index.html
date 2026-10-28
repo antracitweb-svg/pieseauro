@@ -4,7 +4,26 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>AutoParts — Piese auto și dezmembrări</title>
 <meta name="description" content="Caută piese auto noi și second-hand, cere oferte și găsește dezmembrări auto din România.">
-<meta name="theme-color" content="#232429"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f12'/%3E%3Cpath d='M16 6 L26 26 H21.5 L16 14 L10.5 26 H6 Z' fill='%23ffb020'/%3E%3C/svg%3E"><link rel="stylesheet" href="style.css?v=darkmode12">
+<meta name="theme-color" content="#232429">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<link rel="canonical" href="/">
+<!-- Partajare pe rețele sociale: fără aceste tag-uri linkul apare fără titlu și fără imagine. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AutoParts">
+<meta property="og:locale" content="ro_RO">
+<meta property="og:title" content="AutoParts — Piese auto și dezmembrări din România">
+<meta property="og:description" content="Caută piese auto noi și second-hand după cod OEM, marcă și model. Cere oferte de la dezmembrări și magazine auto din toată România.">
+<meta property="og:url" content="https://pieseauto.ro/">
+<meta property="og:image" content="https://pieseauto.ro/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="AutoParts — piese auto și dezmembrări din România">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AutoParts — Piese auto și dezmembrări din România">
+<meta name="twitter:description" content="Caută piese auto noi și second-hand după cod OEM, marcă și model. Cere oferte de la dezmembrări și magazine auto din toată România.">
+<meta name="twitter:image" content="https://pieseauto.ro/assets/og-image.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f12'/%3E%3Cpath d='M16 6 L26 26 H21.5 L16 14 L10.5 26 H6 Z' fill='%23ffb020'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=darkmode13">
 <script src="theme-init.js"></script>
 <script src="analytics.js" defer></script>
 <link rel="manifest" href="/manifest.webmanifest">
@@ -70,6 +89,7 @@
 <div class="two sell-two"><label>Tip anunț<select id="sellType"><option value="piesa">Piesă auto</option><option value="dezmembrari">Mașină la dezmembrat</option></select></label><label>Vând ca<select id="sellSellerType"><option>Persoană fizică</option><option>Firmă</option><option>Parc dezmembrări</option></select></label></div>
 <div class="two sell-two"><label id="sellConditionWrap">Stare<select id="sellCondition"><option>Second-hand</option><option>Nouă</option></select></label><label>Județ<select id="sellCounty"><option value="">Alege județul</option></select></label></div>
 <label>Cod OEM<input id="sellOem" maxlength="60" placeholder="Cod piesă, dacă există"></label>
+<label>Coduri alternative <small class="sf-hint">opțional</small><input id="sellOemAlt" maxlength="500" autocapitalize="characters" placeholder="ex. 1K0615301A, 1K0615301M"><small class="sf-hint">Coduri echivalente (cross-reference), separate prin virgulă. Cumpărătorii găsesc piesa căutând oricare dintre ele.</small></label>
 <div class="sell-checks"><label class="check"><input id="sellDelivery" type="checkbox" checked> Ofer livrare</label><label class="check"><input id="sellNegotiable" type="checkbox"> Preț negociabil</label></div>
 <div class="sell-phone" id="sellPhoneBox"><div class="sf-label">Telefon afișat în anunț</div><div id="sellPhoneInfo" class="sell-phone-info">Se încarcă…</div></div>
 <button class="btn primary full" type="submit" id="sellSubmit">Publică anunțul</button><button class="btn ghost full hidden" type="button" id="sellCancelEdit">Renunță la modificări</button><p class="form-note" id="sellMessage"></p>
@@ -277,5 +297,6 @@
   <button type="button" class="image-lightbox-nav next" id="imageLightboxNext" data-image-next aria-label="Poza următoare">›</button>
   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
 </div>
-<script src="script.js?v=darkmode3" defer></script>
+<script src="realtime.js?v=1" defer></script>
+<script src="script.js?v=darkmode4" defer></script>
 </body></html>
