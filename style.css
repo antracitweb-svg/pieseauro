@@ -544,6 +544,7 @@ body.no-scroll{overflow:hidden}
 /* ---------- design rafinat, discret ---------- */
 :root{--accent:#0b7fd1}
 .header{border-bottom:1px solid rgba(184,147,90,.2)}
+.skip-link{position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:100}.skip-link:focus{position:fixed;left:20px;top:20px;width:auto;height:auto;overflow:visible;background:#0e0f12;color:#fff;padding:8px 12px;border-radius:6px;font-size:14px;z-index:1000}
 .btn.primary{background:var(--accent);box-shadow:none}
 .btn.primary:hover{filter:brightness(1.08)}
 .eyebrow{letter-spacing:2.6px;color:#b8935a}
