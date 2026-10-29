@@ -1,4 +1,4 @@
-# AutoParts – V26
+# Cosmin Bar
 
 Marketplace de piese auto (Node.js + Express + PostgreSQL), găzduit pe Render.
 
