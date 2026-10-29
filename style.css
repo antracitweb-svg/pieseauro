@@ -1677,6 +1677,8 @@ html.menu-open,html.menu-open body{overflow:hidden}
 .ar-qty{justify-self:center;text-align:center}
 .ar-price{justify-self:end;text-align:right;font-weight:600;font-size:17px;background:none;padding:0}
 .ar-price small{display:block;font-size:11.5px;font-weight:500;color:var(--muted)}
+.ar-price del{opacity:.55;font-weight:500;font-size:.85em}
+.ar-price del+strong{color:#e5484d;font-weight:800}
 .ar-price.ar-state{font-size:14px}
 .ar-req .contact-slot{margin:2px 0 0}
 .ar-skel{cursor:default;pointer-events:none}

@@ -1203,7 +1203,7 @@ function adRowHtml(x, eager){
       <div class="ar-sub">${sub}</div>
     </div>
     <div class="ar-acts"><button type="button" class="ar-btn ar-fav${fav?' on':''}" data-fav="${x.id}" title="Favorite" aria-label="Favorite">${fav?'♥':'♡'}</button></div>
-    <div class="ar-foot"><span class="ar-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${esc(money(x.price))}${hasPrice&&x.negotiable?'<small>negociabil</small>':''}</span></div></article>`;
+    <div class="ar-foot"><span class="ar-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${disc>0&&hasPrice?`<del>${esc(money(x.price))}</del> <strong>${esc(money(Math.round(Number(x.price)*(1-disc/100))))}</strong><small>-${disc}%</small>`:`${esc(money(x.price))}${hasPrice&&x.negotiable?'<small>negociabil</small>':''}`}</span></div></article>`;
 }
 
 /* Anunțuri noi pe pagina de start */
