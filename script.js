@@ -1148,7 +1148,7 @@ function cardMine(x){
   ].join('');
   return `<article class="listing mine-row${x.promoted?' is-promoted':''}" data-open="${x.id}" tabindex="0">
     <div class="mr-top"><div class="mr-img">${img}</div>
-      <div class="mr-main"><h3 class="mr-title">${esc(x.title)}</h3>${st[0]?`<span class="badge ${st[1]}">${st[0]}</span>`:''}${x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+promoUntilTxt(x):''}</span>`:''}<div class="mr-acts">${btns}</div></div></div>
+      <div class="mr-main"><h3 class="mr-title">${esc(x.title)}</h3>${st[0]?`<span class="badge ${st[1]}">${st[0]}</span>`:''}${x.promoted?`<span class="badge promo">⭐ Promovat până pe ${esc(promoUntilTxt(x))}</span>`:''}<div class="mr-acts">${btns}</div></div></div>
     <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${money(x.price)}</b></div></article>`;
 }
 /* Format compact (ca în „Anunțurile mele”): poză stânga, titlu, butoane, apoi vizualizări · bucăți · preț. Folosit peste tot unde apar anunțuri. */
@@ -1193,7 +1193,7 @@ function adRowHtml(x, eager){
   const hasPrice = Number(x.price)>0;
   const isPromo = !!x.promoted;
   return `<article class="ar-row${isPromo?' is-promoted':''}" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}${isPromo?' (anunț promovat)':''}">
-    <div class="ar-thumb">${thumb}${isPromo?promoBadge():''}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
+    <div class="ar-thumb">${thumb}${isPromo?`<span class="promo-badge" title="Anunț promovat până pe ${esc(promoUntilTxt(x))}"><span aria-hidden="true">⭐</span> Promovat</span>`:''}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
     <div class="ar-main">
       <h3 class="ar-title">${esc(x.title)}</h3>
       <div class="ar-meta">${meta.map(esc).join(' · ')}</div>
