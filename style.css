@@ -3955,3 +3955,47 @@ html.dark .csv-help summary,html.dark details summary{color:#d4b483!important}
 html.dark #clearFilters,html.dark .filter-head button{color:#e9d3a8!important}
 html.dark .ad-main .ad-fit span,html.dark .ad-main span{--dm:1}
 html.dark .ad-main small,html.dark .ad-main .ad-label{color:#c9c3b4!important}
+
+/* ===== DARK MODE v11: audit complet (telefon + laptop) =====
+   1) --paper / --ivory nu erau redefinite în dark: tot ce le folosea rămânea alb/crem.
+   2) Pagina Recenzii: cardul .rv-hero (alb) și titlurile cu culoare fixă închisă.
+   3) Text cu culoare fixă închisă / roșu-verde închis, ilizibil pe fundal închis. */
+html.dark{--paper:#161c26;--ivory:#141922}
+
+/* Recenzii */
+html.dark .rv-hero{background:var(--card);border-color:var(--line);border-bottom-color:#b8935a;box-shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35)}
+html.dark .rv-av{background:#20262f}
+html.dark .rv-hero-title{color:var(--ink)}
+html.dark .rv-hero-name{color:#d9d4c7}
+html.dark .rv-hero-acc{background:#2a2416;border-color:#5a4a24;color:#e9d3a8}
+html.dark .rv-wrap .ord-count,html.dark .ord-count{color:#d4b483}
+
+/* Tabele și panouri rămase deschise */
+html.dark .acc-table thead th{background:#1c232e;color:var(--ink)}
+html.dark .acc-hl th,html.dark .acc-hl td{background:#20262f!important}
+html.dark .mine-bulk{background:var(--card);border-color:var(--line)}
+html.dark .ad-gal-empty{background:#1c232e;color:#7d8696}
+html.dark .adm-main-img,html.dark .adm-thumb,html.dark .adm-thumbs button,html.dark .avatar-preview img{background:#1c232e}
+html.dark .ar-skel .ar-thumb.skel{background:linear-gradient(100deg,#1a212b 30%,#232c39 50%,#1a212b 70%);background-size:200% 100%}
+html.dark .notif-row:hover,html.dark .notif-row:active{background:#1e2632}
+html.dark .is-won{background:linear-gradient(180deg,#12291c 0%,var(--card) 70%)}
+html.dark .rq-win{background:#12291c;color:#6fcf97}
+html.dark .req-win-date{color:#6fcf97}
+html.dark .auto-car{background:#12291c;color:#6fcf97}
+
+/* Chip-uri / avatare / căutare */
+html.dark .ar-av,html.dark .mrow-av{background:#20262f;color:#e9d3a8}
+html.dark .hs-x{background:#2a2416;color:#e9d3a8}
+html.dark .hs-item b{color:var(--ink)}
+html.dark .cat{color:var(--ink)}
+html.dark .msg-quick button{color:#e9d3a8;border-color:#4a3f26}
+html.dark .part-chips b{color:#e9d3a8}
+
+/* Text cu culoare fixă închisă (brun/negru) pe carduri închise */
+html.dark .mrow-head,html.dark .mine-meta,html.dark .mine-price,html.dark .listing-meta,html.dark .listing-seller{color:#d9d4c7}
+
+/* Roșu / verde: variante deschise, lizibile pe fundal închis */
+html.dark .acc-dn,html.dark .cr-amt.minus,html.dark .mr-del,html.dark .danger-text,html.dark .csv-errors b,html.dark .clean-form label.has-error{color:#e08a84}
+html.dark .error-message,html.dark .field-error-message{color:#e08a84!important}
+html.dark .acc-up,html.dark .cr-amt.plus{color:#6fcf97}
+html.dark .ok-message{color:#7fd6a0!important}

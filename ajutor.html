@@ -5,7 +5,8 @@
 <title>Ajutor și întrebări frecvente — AutoParts</title>
 <meta name="description" content="Cum cauți piese auto, cum publici un anunț, sfaturi de siguranță și răspunsuri la întrebările frecvente pe AutoParts.">
 <meta name="theme-color" content="#232429">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=darkmode14">
+<script src="theme-init.js"></script>
 <style>
 /* Doar pentru această pagină; style.css rămâne neschimbat. */
 .help-wrap{padding:42px 0 70px}
@@ -27,6 +28,13 @@
 .help-wrap td:first-child{font-weight:700;width:38%}
 .table-scroll{overflow-x:auto}
 @media(max-width:720px){.help-cols{grid-template-columns:1fr}.help-wrap h1{font-size:30px}}
+/* Dark mode (clasa html.dark vine din theme-init.js) */
+html.dark .help-wrap details,html.dark .help-wrap table{background:var(--card);border-color:var(--line)}
+html.dark .help-wrap summary{color:var(--ink)}
+html.dark .help-wrap td{border-bottom-color:var(--line)}
+html.dark .help-wrap a{color:#d4b483}
+html.dark .help-wrap .info-card{background:var(--card);border-color:var(--line)}
+html.dark .help-wrap .safe{border-left-color:#b8935a}
 </style>
 </head>
 <body>
