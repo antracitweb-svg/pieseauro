@@ -1271,9 +1271,7 @@ app.get('/api/credits',auth,requireDb,ah(async(req,res)=>{
   res.json({balance:(b.rows[0]&&b.rows[0].credits)||0,plans:Object.entries(PROMO_PLANS).map(([days,cost])=>({days:Number(days),cost})),tx:t.rows,payments_enabled:!!stripe});
 }));
 
-/* --- Endpoint pentru page-services (catolog service-uri) ---
-   Se poate conecta la o tabelă reală ulterior. Pentru acum returnează un array gol.
-*/
+/* --- Catalog public de ateliere/service-uri (tabela services); filtre opționale: county, type, q. --- */
 app.get('/api/services',requireDb,ah(async(req,res)=>{
   const county=String(req.query.county||'').slice(0,60);
   const type=String(req.query.type||'').slice(0,60);
@@ -1820,7 +1818,7 @@ app.get('/api/admin/offers',auth,admin,requireDb,ah(async(req,res)=>{const r=awa
 app.get('/api/admin/orders',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.title,o.price,o.status,o.created_at,u.name seller_name,b.name buyer_name FROM orders o LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=o.buyer_id ORDER BY o.created_at DESC LIMIT 300');res.json({orders:r.rows});}));
 // --- Moderare conținut: ștergerea mesajelor, ofertelor și comenzilor din panoul de admin ---
 // Fiecare acțiune lasă urmă în admin_activity (fără conținutul șters, ca să nu rămână date personale).
-const ADM_DEL={messages:{tbl:'messages',label:'mesaj'},offers:{tbl:'offers',label:'ofertă'},orders:{tbl:'orders',label:'comandă'}};
+const ADM_DEL={messages:{tbl:'messages',label:'mesaj'},offers:{tbl:'offers',label:'ofertă'},orders:{tbl:'orders',label:'comandă'},services:{tbl:'services',label:'atelier'}};
 for(const [kind,cfg] of Object.entries(ADM_DEL)){
  app.delete(`/api/admin/${kind}/:id`,auth,admin,requireDb,ah(async(req,res)=>{
   const id=Number(req.params.id)||0;

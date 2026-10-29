@@ -67,7 +67,7 @@ const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'m
 /* ---------- utilitare ---------- */
 function readJSON(key, def){ try{ const v=JSON.parse(localStorage.getItem(key)); return v==null?def:v; }catch{ return def; } }
 function writeJSON(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch{} }
-function esc(s=''){ return String(s).replace(/[&<>"']/g, function(c){ if(c==='&')return'&'; if(c==='<')return'<'; if(c==='>')return'>'; if(c==='"')return'\"'; if(c==="'")return"'"}); }
+function esc(s=''){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function cleanOemAlt(raw){
  const list=Array.isArray(raw)?raw:String(raw||'').split(/[,;\n|]+/);
  const out=[],seen=new Set();
@@ -1610,7 +1610,7 @@ async function loadDism(){
     $('#dismEmpty').classList.toggle('hidden', r.listings.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
-const SVC_TYPES={reparatii:'Reparări generale',paint:'Pintură și chimen',mecanic:'Mecanică',istoric:'Istoric vehicul'};
+const SVC_TYPES={reparatii:'Reparări generale',paint:'Vopsitorie și tinichigerie',mecanic:'Mecanică',istoric:'Istoric vehicul'};
 const svcState={all:[],loaded:false,loading:false,county:'',type:'',q:''};
 function svcFiltered(){
   return svcState.all.filter(s=>{
@@ -1639,7 +1639,7 @@ function svcCardHtml(s){
   return `<article class="service-card" data-id="${esc(String(s.id||''))}">
     <div class="service-info"><h3>${esc(s.title||'Service auto')}</h3>${where?`<p class="muted">📍 ${esc(where)}</p>`:''}${hours}</div>
     <div class="service-meta"><span class="badge">${esc(typeLabel)}</span>${stars}</div>
-    <div class="svc-actions">${phone}${mapLink}</div>
+    <div class="svc-actions">${phone}${mapLink}${(currentUser&&currentUser.role==='admin'&&s.id)?`<button type="button" class="btn ghost small" data-svc-del="${esc(String(s.id))}">Șterge (admin)</button>`:''}</div>
   </article>`;
 }
 function renderServices(services){
@@ -1649,8 +1649,8 @@ function renderServices(services){
   // populează lista de județe o singură dată, din datele primite
   const sel=$('#serviceCounty');
   if(sel && sel.options.length<=1){
-    const counties=[...new Set(svcState.all.map(s=>String(s.county||'')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ro'));
-    sel.insertAdjacentHTML('beforeend',counties.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''));
+    // Toate județele, nu doar cele care au deja ateliere (altfel lista e goală cât timp catalogul e gol).
+    sel.insertAdjacentHTML('beforeend',COUNTIES.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''));
   }
   const list=svcFiltered();
   if(!list.length){
@@ -1757,6 +1757,40 @@ document.addEventListener('click',e=>{
   const c=$('#serviceCounty'), t=$('#serviceType');
   if(c) c.value=''; if(t) t.value='';
   renderServices();
+});
+/* ---- Înregistrare atelier ---- */
+function openServiceModal(){
+  if(!currentUser){ openAuth('servicii'); return; }
+  const sel=$('#svcCounty');
+  if(sel && sel.options.length<2) sel.insertAdjacentHTML('beforeend',COUNTIES.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''));
+  setMsg($('#svcMsg'),'');
+  $('#serviceModal').classList.remove('hidden');
+}
+async function submitService(e){
+  e.preventDefault();
+  const v=id=>($(id).value||'').trim();
+  const msg=$('#svcMsg');
+  const title=v('#svcTitle'), phone=v('#svcPhone'), county=v('#svcCounty'), type=v('#svcType');
+  if(title.length<3){ setMsg(msg,'Scrie numele atelierului (minim 3 caractere).','error'); return; }
+  if(!type){ setMsg(msg,'Alege tipul de serviciu.','error'); return; }
+  if(!county){ setMsg(msg,'Alege județul.','error'); return; }
+  if(phone.replace(/\D/g,'').length<6){ setMsg(msg,'Scrie un număr de telefon valid.','error'); return; }
+  const btn=$('#svcSubmit'); btn.disabled=true;
+  try{
+    await api('/api/services',{method:'POST',body:JSON.stringify({title,type,county,phone,city:v('#svcCity'),address:v('#svcAddress'),hours:v('#svcHours')})});
+    $('#serviceForm').reset(); closeModal($('#serviceModal')); toast('Atelierul a fost adăugat.');
+    svcState.county=''; svcState.type=''; const c=$('#serviceCounty'), t=$('#serviceType'); if(c) c.value=''; if(t) t.value='';
+    await loadServices();
+  }catch(err){ setMsg(msg,err.message||'Nu am putut salva atelierul. Încearcă din nou.','error'); }
+  finally{ btn.disabled=false; }
+}
+document.addEventListener('submit',e=>{ if(e.target&&e.target.id==='serviceForm') submitService(e); });
+document.addEventListener('click',async e=>{
+  if(e.target.closest&&e.target.closest('#serviceAddBtn')){ openServiceModal(); return; }
+  const del=e.target.closest&&e.target.closest('[data-svc-del]'); if(!del) return;
+  if(!confirm('Ștergi acest atelier din listă?')) return;
+  try{ await api('/api/admin/services/'+encodeURIComponent(del.dataset.svcDel),{method:'DELETE'}); toast('Atelier șters.'); await loadServices(); }
+  catch(err){ toast(err.message||'Nu am putut șterge atelierul.'); }
 });
 document.addEventListener('submit',e=>{ if(e.target&&e.target.id==='rqSearchForm'){ e.preventDefault(); rqQ=$('#rqSearch').value; renderMineRequests(); } });
 document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rqSearch'){ rqQ=e.target.value; renderMineRequests(); } });
@@ -3264,7 +3298,7 @@ function wire(){
   Object.keys(FILTER_FIELDS).forEach(id=>{ if(id!=='filterMake') $('#'+id).addEventListener('change', onFilterChange); });
   $('#filterMake').addEventListener('change', async e=>{ await loadModels(e.target.value,'filterModel','Toate modelele'); onFilterChange(); });
   $('#withDelivery').addEventListener('change', onFilterChange);
-  $('#clearFilters').addEventListener('click', ()=>{ $$('#filters select').forEach(s=>s.value=''); $('#maxPrice').value=''; $('#withDelivery').checked=false; $('#sortListings').value='new'; loadModels('','filterModel','Toate modelele').then(onFilterChange); });
+  $('#clearFilters').addEventListener('click', ()=>{ $$('#filters select').forEach(s=>s.value=''); ['#minPrice','#maxPrice','#yearFrom','#yearTo'].forEach(id=>{ const el=$(id); if(el) el.value=''; }); $('#withDelivery').checked=false; $('#sortListings').value='new'; loadModels('','filterModel','Toate modelele').then(onFilterChange); });
   $('#filterToggle').addEventListener('click', ()=>$('#filters').classList.toggle('open'));
   $('#pagination').addEventListener('click', e=>{ const b=e.target.closest('[data-page]'); if(b) safe(()=>goToResultsPage(b.dataset.page))(); });
   $('#saveSearchBtn').addEventListener('click', saveCurrentSearch);
@@ -3956,7 +3990,7 @@ function addSwipe(el, onSwipe){
 
 /* === Ferestre ca pe desktop: _ □ X + mutare (doar laptop / ecrane mari, peste 820px) === */
 (function(){
-  const TITLES={detailModal:'Anunț',requestModal:'Cerere de piesă',adminListingModal:'Anunț (admin)',csvModal:'Import anunțuri CSV',garageModal:'Mașina ta'};
+  const TITLES={detailModal:'Anunț',requestModal:'Cerere de piesă',adminListingModal:'Anunț (admin)',csvModal:'Import anunțuri CSV',garageModal:'Mașina ta',serviceModal:'Adaugă atelier'};
   const mq=window.matchMedia('(min-width:821px)');
   const I_MIN='<svg viewBox="0 0 14 14"><path d="M2 10h10"/></svg>';
   const I_MAX='<svg viewBox="0 0 14 14"><rect x="2.5" y="2.5" width="9" height="9"/></svg>';
@@ -4047,7 +4081,7 @@ function addSwipe(el, onSwipe){
     paint(); updateTitle();
   }
 
-  ['detailModal','requestModal','adminListingModal','csvModal','garageModal'].forEach(id=>{ const m=document.getElementById(id); if(m) setup(m); });
+  ['detailModal','requestModal','adminListingModal','csvModal','garageModal','serviceModal'].forEach(id=>{ const m=document.getElementById(id); if(m) setup(m); });
 })();
 
 /* Sincronizare poză profil în meniu (mutat din index.html: CSP nu permite scripturi inline) */
