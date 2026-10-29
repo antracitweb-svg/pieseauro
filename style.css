@@ -4029,3 +4029,13 @@ html.dark .mine-row.is-promoted{box-shadow:inset 3px 0 0 #b8935a}
 html.dark .discount-badge{background:linear-gradient(180deg,#f06c70,#c43a3e);color:#14110c}
 html.dark .badge.discount{background:rgba(229,72,77,.2);color:#ff9a9a;border-color:rgba(229,72,77,.5)}
 html.dark .ar-row.discounted{border-color:#e5484d!important;box-shadow:0 0 0 1px #e5484d}
+
+/* ===== Reducere: preț vechi tăiat + preț nou + procent ===== */
+.price-old del{opacity:.6;font-weight:500;font-size:.8em;text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#e5484d}
+.price-new{color:#e5484d;font-weight:800}
+.price-pct{display:inline-block;margin-left:4px;padding:1px 7px;border-radius:999px;background:#e5484d;color:#fff;font-family:var(--font-sans,inherit);font-weight:800;font-size:.6em;line-height:1.5;vertical-align:middle}
+.ar-price del{text-decoration-thickness:2px;text-decoration-color:#e5484d}
+#sellDiscountEstimate del{opacity:.6}
+html.dark .price-new{color:#ff8a8d}
+html.dark .price-pct{background:rgba(229,72,77,.22);color:#ff9a9a;border:1px solid rgba(229,72,77,.5)}
+html.dark .ar-price del+strong{color:#ff8a8d}

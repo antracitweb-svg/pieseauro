@@ -82,6 +82,13 @@ function cleanOemAlt(raw){
  return out.join(', ')||null;
 }
 function money(n){ return Number(n)>0 ? new Intl.NumberFormat('ro-RO').format(Number(n))+' lei' : 'La cerere'; }
+/* Reducere: procent valid (1-50) doar dacă există preț; prețul nou se rotunjește la leu. */
+function discOf(x){ const d=Math.round(Number(x&&x.discount_percent)||0); return (Number(x&&x.price)>0 && d>0 && d<=50) ? d : 0; }
+function discPrice(x){ return Math.round(Number(x.price)*(1-discOf(x)/100)); }
+function priceHtml(x){
+  const d=discOf(x);
+  return d ? `<span class="price-old"><del>${esc(money(x.price))}</del></span> <span class="price-new">${esc(money(discPrice(x)))}</span> <span class="price-pct">-${d}%</span>` : esc(money(x.price));
+}
 /* Anunț promovat: insignă + dată de expirare */
 function promoUntilTxt(x){ const d=new Date(x&&x.promoted_until); return isNaN(d)?'':d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'}); }
 function promoBadge(){ return '<span class="promo-badge" title="Anunț promovat"><span aria-hidden="true">⭐</span> Promovat</span>'; }
@@ -581,7 +588,7 @@ async function loadToolData(view, box, withId, refId){
     const ids=cartIds(); const res=await Promise.allSettled(ids.map(id=>api('/api/listings/'+id+'?noview=1')));
     const ok=[],gone=[]; res.forEach((r,i)=>{ if(r.status==='fulfilled') ok.push(r.value.listing); else if(r.reason&&r.reason.status===404) gone.push(ids[i]); });
     if(gone.length) writeJSON('autopiese_cart',ids.filter(i=>!gone.includes(i)));
-    const total=ok.reduce((n,x)=>n+(Number(x.price)||0),0);
+    const total=ok.reduce((n,x)=>n+(discOf(x)?discPrice(x):(Number(x.price)||0)),0);
     items=ok.map(x=>{ const im=Array.isArray(x.images)&&x.images[0]?x.images[0]:''; return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}"><div class="ar-thumb">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async">`:phHtml(x)}</div><div class="ar-main"><h3 class="ar-title">${esc(x.title)}</h3><div class="ar-sub">📍 ${esc(x.county||'România')}${x.seller_name?' · '+esc(x.seller_name):''}</div></div><div class="ar-acts"><button type="button" class="ar-btn ar-wide ar-primary" data-order="${x.id}">🛍️ Comandă</button><button type="button" class="ar-btn ar-del" data-cart-del="${x.id}" title="Elimină din coș" aria-label="Elimină din coș">🗑</button></div><div class="ar-foot"><span class="ar-views">👁 ${Number(x.views)||0}</span><span class="ar-qty">${Number(x.quantity)||1} buc.</span><span class="ar-price">${esc(money(x.price))}</span></div></article>`; });
     if(ok.length) items.push(`<div class="info-card tool-item"><b>Total estimat: ${esc(money(total))}</b><p class="muted">Apasă „Comandă” la fiecare piesă ca vânzătorul să primească comanda ta cu adresa de livrare. Plata se face direct cu vânzătorul.</p></div>`);
   }else if(view==='transactions'){
@@ -1149,7 +1156,7 @@ function cardMine(x){
   return `<article class="listing mine-row${x.promoted?' is-promoted':''}" data-open="${x.id}" tabindex="0">
     <div class="mr-top"><div class="mr-img">${img}</div>
       <div class="mr-main"><h3 class="mr-title">${esc(x.title)}</h3>${st[0]?`<span class="badge ${st[1]}">${st[0]}</span>`:''}${x.promoted?`<span class="badge promo">⭐ Promovat până pe ${esc(promoUntilTxt(x))}</span>`:''}<div class="mr-acts">${btns}</div></div></div>
-    <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${money(x.price)}</b></div></article>`;
+    <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${priceHtml(x)}</b></div></article>`;
 }
 /* Format compact (ca în „Anunțurile mele”): poză stânga, titlu, butoane, apoi vizualizări · bucăți · preț. Folosit peste tot unde apar anunțuri. */
 /* Iconițe pentru anunțuri fără poză (desenate în cod, culorile site-ului) */
@@ -1533,7 +1540,7 @@ function detailHtml(x, phones, canContact){
     ${ownerBox}${gallery}
     ${x.seller_vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${x.seller_vacation_until?' până la '+esc(fmtDate(x.seller_vacation_until+'T00:00:00')):''}. Poți trimite mesaje, dar comenzile sunt oprite până se întoarce.</div>`:''}
     <div class="ad-titlerow"><h2>${esc(x.title)}</h2><div class="ad-ico-col"><button type="button" class="ad-ico${fav?' on':''}" data-fav="${x.id}" aria-label="Favorite">${fav?'♥':'♡'}</button><button type="button" class="ad-ico" data-copy-link="${x.id}" aria-label="Distribuie anunțul">⤴</button></div></div>
-    <div class="ad-price-m">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
+    <div class="ad-price-m">${priceHtml(x)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
     <p class="ad-sub">${[x.county,fmtUpdated(x.created_at)].filter(Boolean).map(esc).join(' · ')}</p>
     <div class="ad-chips">${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}${Number(x.quantity)>1?`<span class="lchip">${Number(x.quantity)} buc. disponibile</span>`:''}${x.delivery?'<span class="lchip lchip-ship">🚚 Livrare</span>':''}${x.negotiable&&Number(x.price)>0?'<span class="lchip">Preț negociabil</span>':''}</div>
     ${garageFitHtml(x)}
@@ -1546,7 +1553,7 @@ function detailHtml(x, phones, canContact){
   <aside class="ad-side">
     <div class="ad-card">
       <div class="detail-top">${x.promoted?'<span class="badge promo">⭐ Promovat</span>':''}<span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
-      <div class="detail-price">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
+      <div class="detail-price">${priceHtml(x)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
       <p class="ad-ship">${x.delivery?'🚚 Livrare disponibilă':'📍 Ridicare personală'}</p>
     </div>
     <div class="ad-card">
@@ -2459,8 +2466,16 @@ function setSellMode(editId){
   $('#sellSubmit').textContent = editId ? 'Salvează modificările' : 'Publică anunțul';
   $('#sellCancelEdit').classList.toggle('hidden', !editId);
 }
+function updateDiscountPreview(){
+  const out=$('#sellDiscountEstimate'); if(!out) return;
+  const p=Number($('#sellPrice').value)||0, d=Math.round(Number($('#sellDiscount').value)||0);
+  if(p>0 && d>0 && d<=50) out.innerHTML=`Se va afișa: <del>${esc(money(p))}</del> <b>${esc(money(Math.round(p*(1-d/100))))}</b> <b>-${d}%</b>`;
+  else if(d>50) out.textContent='Reducerea maximă este 50%.';
+  else out.textContent='0-50% reducere. Pe anunț apare prețul vechi tăiat și prețul nou.';
+}
+document.addEventListener('input',e=>{ if(e.target&&(e.target.id==='sellPrice'||e.target.id==='sellDiscount')) updateDiscountPreview(); });
 function resetSellForm(){
-  $('#sellForm').reset(); state.sellImages=[]; renderSellImages(); $('#sellDelivery').checked=true;
+  $('#sellForm').reset(); updateDiscountPreview(); state.sellImages=[]; renderSellImages(); $('#sellDelivery').checked=true;
   syncSellType(); loadModels('','sellModel'); setCategory('',''); resetCarAuto(false);
 }
 async function enterSell(editParam,mode){
@@ -2494,6 +2509,7 @@ async function enterSell(editParam,mode){
   $('#sellYear').value = x.year||''; $('#sellOem').value = x.oem||''; $('#sellOemAlt').value = x.oem_alt||'';
   $('#sellEngine').value = x.engine||''; $('#sellKm').value = x.km!=null ? String(x.km) : ''; $('#sellVin').value = x.vin||''; $('#sellParts').value = x.parts_avail||'';
   $('#sellPrice').value = Number(x.price)>0 ? String(Number(x.price)) : '';
+  $('#sellDiscount').value = Number(x.discount_percent)>0 ? String(Math.round(Number(x.discount_percent))) : ''; updateDiscountPreview();
   $('#sellCondition').value = x.condition || 'Second-hand'; $('#sellCounty').value = x.county||'';
   $('#sellDelivery').checked = !!x.delivery; $('#sellNegotiable').checked = !!x.negotiable;
   state.sellImages = Array.isArray(x.images) ? x.images.filter(Boolean) : []; renderSellImages();
@@ -2516,7 +2532,7 @@ async function submitSell(e){
   if(btn){ btn.disabled=true; btn.textContent='Se trimite…'; }
   try{
     await applySellPhone();
-    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim(),discount_percent:$('#sellDiscount').value||0});
+    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim(),discount_percent:Math.max(0,Math.min(50,Math.round(Number($('#sellDiscount').value)||0)))});
     const editing = state.editId;
     const r = editing ? await api('/api/listings/'+editing,{method:'PATCH',body:payload}) : await api('/api/listings',{method:'POST',body:payload});
     resetSellForm(); setSellMode(null); state.sellFilled=null;
@@ -3463,7 +3479,7 @@ function mineRow(x){
       ${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:(x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+esc(promoUntilTxt(x)):''}</span>`:'')}
       <div class="mine-acts">${btns}</div>
     </div>
-    <div class="mine-meta"><span class="mine-views">${MI.eye} ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${esc(money(x.price))}</b></div>
+    <div class="mine-meta"><span class="mine-views">${MI.eye} ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${priceHtml(x)}</b></div>
   </article>`;
 }
 function renderMine(){

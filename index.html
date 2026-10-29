@@ -23,7 +23,7 @@
 <meta name="twitter:description" content="Caută piese auto noi și second-hand după cod OEM, marcă și model. Cere oferte de la dezmembrări și magazine auto din toată România.">
 <meta name="twitter:image" content="https://pieseauto.ro/assets/og-image.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f12'/%3E%3Cpath d='M16 6 L26 26 H21.5 L16 14 L10.5 26 H6 Z' fill='%23ffb020'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=darkmode15">
+<link rel="stylesheet" href="style.css?v=discount1">
 <script src="theme-init.js"></script>
 <script src="analytics.js" defer></script>
 <link rel="manifest" href="/manifest.webmanifest">
@@ -87,7 +87,7 @@
 <div class="sell-vehicle-block"><div class="sf-field"><span class="sf-label">Pentru ce mașină? <button type="button" class="info-dot" data-info="Se completează automat din titlu sau descriere. Poți corecta manual." aria-label="Informații">i</button></span></div><div class="car-grid"><label>Marcă<select id="sellMake"><option value="">Alege marca</option></select></label><label>Model<select id="sellModel"><option value="">Alege modelul</option></select></label><label>An fabricație<input id="sellYear" list="yearList" autocomplete="off" inputmode="numeric" maxlength="4" placeholder="2008"></label></div><p class="auto-car hidden" id="sellAutoCar" role="status"></p></div>
 <div class="sell-dism-block hidden" id="sellDismBlock"><div class="two sell-two"><label>Motorizare<input id="sellEngine" maxlength="80" placeholder="ex. 1.5 dCi"></label><label>Kilometri<input id="sellKm" type="number" inputmode="numeric" min="0" max="3000000" placeholder="ex. 210000"></label></div><label>Serie de șasiu (VIN) <small class="sf-hint">nu se afișează public</small><input id="sellVin" maxlength="30" autocapitalize="characters" placeholder="opțional"></label><label>Piese disponibile<input id="sellParts" maxlength="600" placeholder="motor, cutie, faruri, bară față…"><small class="sf-hint">Separă piesele prin virgulă.</small></label></div>
 <label class="sf-field">Preț<span class="price-row"><input id="sellPrice" type="number" inputmode="numeric" min="0" max="10000000" placeholder="450"><em>lei</em></span><small id="sellPriceEstimate" class="price-estimate">Lasă gol dacă vrei să apară „La cerere”.</small></label>
-<label class="sf-field">Reducere<span class="price-row"><input id="sellDiscount" type="number" inputmode="numeric" min="0" max="50" placeholder="0"><em>%</em></span><small class="price-estimate">0-50% reducere afișată pe poza anunțului.</small></label>
+<label class="sf-field">Reducere<span class="price-row"><input id="sellDiscount" type="number" inputmode="numeric" min="0" max="50" placeholder="0"><em>%</em></span><small id="sellDiscountEstimate" class="price-estimate">0-50% reducere. Pe anunț apare prețul vechi tăiat și prețul nou.</small></label>
 <div class="two sell-two"><label>Tip anunț<select id="sellType"><option value="piesa">Piesă auto</option><option value="dezmembrari">Mașină la dezmembrat</option></select></label><label>Vând ca<select id="sellSellerType"><option>Persoană fizică</option><option>Firmă</option><option>Parc dezmembrări</option></select></label></div>
 <div class="two sell-two"><label id="sellConditionWrap">Stare<select id="sellCondition"><option>Second-hand</option><option>Nouă</option></select></label><label>Județ<select id="sellCounty"><option value="">Alege județul</option></select></label></div>
 <label>Cod OEM<input id="sellOem" maxlength="60" placeholder="Cod piesă, dacă există"></label>
@@ -301,5 +301,5 @@
   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
 </div>
 <script src="realtime.js?v=1" defer></script>
-<script src="script.js?v=svcfix2" defer></script>
+<script src="script.js?v=discount1" defer></script>
 </body></html>

@@ -1572,7 +1572,7 @@ function parseListing(x){
  const price=Number(x.price)||0; if(price<0||price>10000000)return bad('DATE_INVALIDE');
  // Moderare automată (ca pe site-urile de profil): fără linkuri/emailuri în text și fără prețuri neserioase.
   if(price>0&&price<5)return bad('PRET_NEREALIST');
-  const disc=Number(x.discount_percent||0); if(disc<0||disc>50)return bad('DATE_INVALIDE');
+  const disc=Math.round(Number(x.discount_percent)||0); if(disc<0||disc>50)return bad('DATE_INVALIDE');
   if(/(https?:\/\/|www\.|\b[a-z0-9-]{2,}\.(ro|com|net|org|eu|info|biz|shop|store|online|site|xyz)\b|\S+@\S+\.\S+)/i.test(String(x.title||'')+' '+String(x.description||'')))return bad('LINK_INTERZIS');
  if(x.year!=null&&String(x.year).trim()!==''){const ys=String(x.year).trim(),yr=Number(ys);if(!/^\d{4}$/.test(ys)||yr<1950||yr>new Date().getFullYear()+1)return bad('AN_INVALID');}
  if(x.seller_type&&!SELLER_TYPES.includes(x.seller_type))return bad('DATE_INVALIDE');
@@ -1658,7 +1658,7 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
    status='pending';
   }
  }
-  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24,oem_alt=$25 WHERE id=$18 AND user_id=$19 RETURNING id,status',
+  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24,oem_alt=$25,discount_percent=$26 WHERE id=$18 AND user_id=$19 RETURNING id,status',
    [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine,v.oem_alt,v.discount_percent]);
  logEvent(req.user.id,'listing_edit','listing',cur.id,v.title+(status==='pending'&&cur.status!=='pending'?' (retrimis la moderare)':''));
  res.json({listing:r.rows[0],resubmitted:status==='pending'&&cur.status!=='pending'});
@@ -2104,13 +2104,14 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!throttle(authAttempts,'order:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_COMENZI'});
  const b=req.body||{}, id=Number(b.listing_id);
  if(!Number.isInteger(id)||id<=0)return res.status(400).json({error:'ID_INVALID'});
- const l=(await pool.query('SELECT id,user_id,title,price,quantity,delivery,status FROM listings WHERE id=$1',[id])).rows[0];
+ const l=(await pool.query('SELECT id,user_id,title,price,discount_percent,quantity,delivery,status FROM listings WHERE id=$1',[id])).rows[0];
  if(!l||l.status!=='approved'||!l.user_id)return res.status(404).json({error:'NOT_FOUND'});
  if(l.user_id===req.user.id)return res.status(400).json({error:'COMANDA_PROPRIE'});
  {const bs=await blockState(req.user.id,l.user_id);if(bs.byMe||bs.byThem)return res.status(403).json({error:bs.byMe?'BLOCAT_DE_TINE':'BLOCAT'});}
  if((await pool.query('SELECT 1 FROM users u WHERE u.id=$1 AND '+VAC_SQL('u'),[l.user_id])).rowCount)return res.status(409).json({error:'VANZATOR_IN_VACANTA'});
  const avail=Math.max(1,Number(l.quantity)||1), qty=Math.floor(Number(b.quantity)||1);
  if(qty<1||qty>avail)return res.status(400).json({error:'CANTITATE_INVALIDA'});
+ const _d=Math.max(0,Math.min(50,Math.round(Number(l.discount_percent)||0))), unitPrice=Math.round((Number(l.price)||0)*(1-_d/100));
  const county=clip(b.ship_county,60), city=clip(b.ship_city,80), addr=clip(b.ship_address,300), note=clip(b.note,500);
  const rName=clip(b.recipient_name,100), rPhone=clip(b.recipient_phone,25);
  if(rPhone&&!/^\+?[0-9 ().-]{6,20}$/.test(rPhone))return res.status(400).json({error:'TELEFON_INVALID'});
@@ -2125,7 +2126,7 @@ app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
   const up=await c.query("UPDATE listings SET quantity=COALESCE(quantity,1)-$2 WHERE id=$1 AND status='approved' AND COALESCE(quantity,1)>=$2 RETURNING quantity",[l.id,qty]);
   if(!up.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'CANTITATE_INVALIDA'});}
   if(Number(up.rows[0].quantity)<=0)await c.query("UPDATE listings SET status='sold' WHERE id=$1 AND status='approved'",[l.id]);
-  r=await c.query('INSERT INTO orders(buyer_id,seller_id,listing_id,title,price,quantity,ship_county,ship_city,ship_address,note,stock_reserved,recipient_name,recipient_phone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE,$11,$12) RETURNING id',[req.user.id,l.user_id,l.id,l.title,(Number(l.price)||0)*qty,qty,county,city,addr,note,rName||null,rPhone||null]);
+  r=await c.query('INSERT INTO orders(buyer_id,seller_id,listing_id,title,price,quantity,ship_county,ship_city,ship_address,note,stock_reserved,recipient_name,recipient_phone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,TRUE,$11,$12) RETURNING id',[req.user.id,l.user_id,l.id,l.title,unitPrice*qty,qty,county,city,addr,note,rName||null,rPhone||null]);
   await c.query('COMMIT');
  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
  await notify(l.user_id,'Comandă nouă pentru „'+l.title+'” ('+qty+' buc.). Vezi „Comenzi primite”.','order');
