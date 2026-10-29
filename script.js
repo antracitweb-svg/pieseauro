@@ -3501,8 +3501,7 @@ function renderMine(){
   if(ha){
     const nAll = all.length, b = (k,l,cls)=> `<button type="button" class="btn ${cls||'ghost'} small" data-m-all="${k}">${l}</button>`;
     ha.innerHTML = !nAll ? '' : (mine.tab==='expire' ? b('renew',`Activează toate (${nAll})`,'primary')+b('del','Șterge toate','danger')
-      : mine.tab==='deleted' ? b('restore',`Reactualizează toate (${nAll})`,'primary')+b('purge','Șterge definitiv toate','danger')
-      : mine.tab==='promo' ? '' : b('del',`Șterge toate (${nAll})`,'danger'));
+      : '');
   }
   const ids = slice.map(x=>x.id);
   $('#mineAll').checked = ids.length>0 && ids.every(i=>mine.sel.has(i));
@@ -3514,7 +3513,7 @@ function renderMine(){
 }
 async function mineDo(ids, kind){
   if(kind==='del'||kind==='restore'||kind==='renew'){
-    const action = kind==='del' && mine.tab==='deleted' ? 'purge' : kind;
+    const action = kind==='del' ? (mine.tab==='deleted' ? 'purge' : 'delete') : kind;
     let msg = 'Gata.';
     try{
       let done = 0, skipped = 0, lim = false;
