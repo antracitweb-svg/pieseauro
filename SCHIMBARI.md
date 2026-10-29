@@ -25,3 +25,9 @@ Testele din `test/server.test.js` nu au fost rulate aici (nu se pot instala pach
 - Job orar `expiryTick()`: avertizare la ≤7 zile și la ≤3 zile (notificare + email, un mesaj/utilizator), apoi la expirare anunțul trece direct în „Șterse”.
 - `POST /api/listings/:id/renew` (Activează, +30 zile), `POST /api/listings/bulk` (delete / purge / restore / renew), „Reactualizează” din Șterse respectă limita de anunțuri active.
 - UI: fila „Expiră” = anunțuri care expiră în ≤7 zile, buton „Activează” pe rând, „Activează toate / Șterge toate” lângă titlu, „Șterge toate” și în Active, „Reactualizează” în Șterse. Insigna roșie din meniu numără aceleași anunțuri.
+
+## V44 — Anunțuri peste limita gratuită, cu credite („plătit până la”)
+- Variabilă nouă Render: `LISTING_COST_CREDITS` (credite / anunț / 30 de zile). Nesetată sau 0 = comportamentul vechi (peste `ACTIVE_LISTINGS_LIMIT` nu se mai publică).
+- `listings.paid_until`. Primele 100 de anunțuri fără perioadă plătită sunt gratuite; al 101-lea cere confirmare și costă credite (tranzacție atomică cu creditele).
+- Din „Șterse”: dacă `paid_until` e încă în viitor, reactualizarea e gratuită și anunțul păstrează zilele plătite rămase; altfel, dacă utilizatorul e peste limită, costă din nou. Prelungirea („Activează”) unui anunț plătit costă; UP nu prelungește un anunț plătit. Adminul nu are limită.
+- UI: insigna „Plătit până pe …”, confirmare cu costul înainte de publicare / Activează / Reactualizează.

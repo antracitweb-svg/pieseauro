@@ -59,6 +59,10 @@ const { CURATED_VEHICLES } = require('./vehicles-catalog');
 // Anunțurile noi se publică automat. Pentru moderare manuală setează AUTO_APPROVE=false în Render.
 const AUTO_APPROVE = String(process.env.AUTO_APPROVE||'true').toLowerCase()!=='false';
 const ACTIVE_LISTINGS_LIMIT = Number(process.env.ACTIVE_LISTINGS_LIMIT)||100;
+// Peste limita gratuită, un anunț costă LISTING_COST_CREDITS credite pentru 30 de zile (0 = nesetat: peste limită nu se mai poate publica).
+const LISTING_COST = Math.max(0,Math.floor(Number(process.env.LISTING_COST_CREDITS))||0);
+// Anunțuri active „gratuite” = cele fără perioadă plătită în curs.
+const UNPAID_ACTIVE_SQL = "SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending') AND (paid_until IS NULL OR paid_until<=NOW())";
 const NEW_LISTING_STATUS = AUTO_APPROVE ? 'approved' : 'pending';
 let catalogCache = null;
 let catalogLoadedAt = 0;
@@ -469,6 +473,7 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS expiry_notice SMALLINT NOT NULL DEFAULT 0',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS paid_until TIMESTAMPTZ',
   "UPDATE listings SET expires_at=GREATEST(created_at+INTERVAL '30 days',NOW()+INTERVAL '10 days') WHERE expires_at IS NULL",
   "ALTER TABLE listings ALTER COLUMN expires_at SET DEFAULT (NOW()+INTERVAL '30 days')",
   'CREATE INDEX IF NOT EXISTS listings_expires_idx ON listings(status,expires_at)',
@@ -1092,8 +1097,10 @@ const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
 const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèêëáàäãåíìïóòôöõúùûüçñšžčřěýÿ','aaisstteeeeaaaaaiiiooooouuuucnszcreyy')`;
 const flat=c=>`regexp_replace(${fold(c)},'[^a-z0-9]+','','g')`;
 app.get('/api/listings/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query(`SELECT ${LIST_COLS},l.added_at,l.expires_at FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
- res.json({listings:r.rows});
+ const r=await pool.query(`SELECT ${LIST_COLS},l.added_at,l.expires_at,l.paid_until FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
+ const q=(await pool.query(UNPAID_ACTIVE_SQL,[req.user.id])).rows[0].n;
+ const bal=(await pool.query('SELECT credits FROM users WHERE id=$1',[req.user.id])).rows[0];
+ res.json({listings:r.rows,quota:{limit:req.user.role==='admin'?null:ACTIVE_LISTINGS_LIMIT,unpaid_active:q,cost:LISTING_COST,balance:(bal&&bal.credits)||0}});
 });
 app.get('/api/favorites',auth,requireDb,async(req,res)=>{
  const r=await pool.query("SELECT listing_id FROM favorites WHERE user_id=$1",[req.user.id]);
@@ -1237,7 +1244,7 @@ app.patch('/api/listings/:id/status',auth,requireDb,async(req,res)=>{
  const to=String((req.body||{}).status||'');
  if(!['sold','approved'].includes(to))return res.status(400).json({error:'STATUS_INVALIDE'});
  // Proprietarul poate comuta doar între „publicat” și „vândut”; restul statusurilor (moderare) rămân la admin.
- const r=await pool.query("UPDATE listings SET status=$1,expires_at=CASE WHEN $1='approved' THEN GREATEST(expires_at,NOW()+INTERVAL '30 days') ELSE expires_at END,expiry_notice=CASE WHEN $1='approved' THEN 0 ELSE expiry_notice END WHERE id=$2 AND user_id=$3 AND status IN ('approved','sold') RETURNING id,status",[to,req.params.id,req.user.id]);
+ const r=await pool.query("UPDATE listings SET status=$1,expires_at=CASE WHEN $1='approved' AND (paid_until IS NULL OR paid_until<=NOW()) THEN GREATEST(expires_at,NOW()+INTERVAL '30 days') ELSE expires_at END,expiry_notice=CASE WHEN $1='approved' THEN 0 ELSE expiry_notice END WHERE id=$2 AND user_id=$3 AND status IN ('approved','sold') RETURNING id,status",[to,req.params.id,req.user.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  logEvent(req.user.id,to==='sold'?'listing_sold':'listing_resale','listing',r.rows[0].id,'');
  res.json({listing:r.rows[0]});
@@ -1250,16 +1257,17 @@ app.delete('/api/listings/:id',auth,requireDb,async(req,res)=>{
  if(!hard.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  res.json({ok:true,deleted:'hard'});
 });
-app.patch('/api/listings/:id/restore',auth,requireDb,async(req,res)=>{
-  // „Reactualizează” din Șterse: republică anunțul pentru încă 30 de zile (sau îl trimite la moderare dacă AUTO_APPROVE=false).
-  if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);if(act.rows[0].n>=ACTIVE_LISTINGS_LIMIT)return res.status(403).json({error:'LIMITA_ANUNTURI'});}
-  const r=await pool.query("UPDATE listings SET status=$3,created_at=NOW(),expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=$1 AND user_id=$2 AND status='deleted' RETURNING id,status",[req.params.id,req.user.id,NEW_LISTING_STATUS]);
-  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
-  res.json({listing:r.rows[0]});
-});
+app.patch('/api/listings/:id/restore',auth,requireDb,ah(async(req,res)=>{
+  // „Reactualizează” din Șterse (vezi extendListings).
+  const o=await extendListings(req.user,[Number(req.params.id)],'restore');
+  if(o.done)return res.json({listing:{id:Number(req.params.id),status:NEW_LISTING_STATUS},spent:o.spent});
+  if(o.insufficient)return res.status(402).json({error:'CREDITE_INSUFICIENTE'});
+  if(o.limit_hit)return res.status(403).json({error:'LIMITA_ANUNTURI'});
+  res.status(404).json({error:'NOT_FOUND'});
+}));
 app.post('/api/listings/:id/bump',auth,requireDb,async(req,res)=>{
  // Reactualizare: anunțul urcă în listă; maximum o dată la 24 de ore.
- const r=await pool.query("UPDATE listings SET created_at=NOW(),expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=$1 AND user_id=$2 AND status='approved' AND created_at<NOW()-INTERVAL '24 hours' RETURNING id,created_at",[req.params.id,req.user.id]);
+ const r=await pool.query("UPDATE listings SET created_at=NOW(),expires_at=CASE WHEN paid_until>NOW() THEN expires_at ELSE NOW()+INTERVAL '30 days' END,expiry_notice=CASE WHEN paid_until>NOW() THEN expiry_notice ELSE 0 END WHERE id=$1 AND user_id=$2 AND status='approved' AND created_at<NOW()-INTERVAL '24 hours' RETURNING id,created_at",[req.params.id,req.user.id]);
  if(!r.rowCount)return res.status(400).json({error:'REACTUALIZARE_PREA_DEVREME'});
  res.json({listing:r.rows[0]});
 });
@@ -1268,10 +1276,56 @@ app.post('/api/listings/:id/bump',auth,requireDb,async(req,res)=>{
 const LISTING_LIFE_DAYS=30, EXPIRE_WARN_DAYS=7;
 // Activează = prelungește cu încă 30 de zile, fără să mute anunțul în capul listei.
 app.post('/api/listings/:id/renew',auth,requireDb,ah(async(req,res)=>{
-  const r=await pool.query("UPDATE listings SET expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=$1 AND user_id=$2 AND status='approved' RETURNING id,expires_at",[req.params.id,req.user.id]);
-  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
-  res.json({listing:r.rows[0]});
+  const o=await extendListings(req.user,[Number(req.params.id)],'renew');
+  if(o.done)return res.json({ok:true,spent:o.spent});
+  if(o.insufficient)return res.status(402).json({error:'CREDITE_INSUFICIENTE'});
+  res.status(404).json({error:'NOT_FOUND'});
 }));
+/* Prelungire / reactualizare cu regula creditelor:
+   - anunț fără perioadă plătită: gratuit cât timp utilizatorul are sub ACTIVE_LISTINGS_LIMIT anunțuri active fără perioadă plătită; +30 zile;
+   - din „Șterse”, anunț cu perioadă plătită încă în curs: gratuit, rămân zilele plătite (expires_at = paid_until);
+   - anunț plătit care se prelungește, sau repus din „Șterse” peste limită: costă LISTING_COST credite, +30 zile (de la sfârșitul perioadei plătite, dacă e în viitor). */
+async function extendListings(user,ids,mode){
+  const uid=user.id,isAdmin=user.role==='admin',out={done:0,skipped:0,spent:0,insufficient:false,limit_hit:false};
+  ids=[...new Set((ids||[]).map(Number).filter(n=>Number.isInteger(n)&&n>0&&n<2147483647))].slice(0,1000);
+  if(!ids.length)return out;
+  const c=await pool.connect();
+  try{
+    await c.query('BEGIN');
+    await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[uid]);
+    const rows=(await c.query('SELECT id,title,paid_until FROM listings WHERE id=ANY($1::int[]) AND user_id=$2 AND status=$3 ORDER BY id',[ids,uid,mode==='restore'?'deleted':'approved'])).rows;
+    let free=Infinity;
+    if(!isAdmin)free=Math.max(0,ACTIVE_LISTINGS_LIMIT-(await c.query(UNPAID_ACTIVE_SQL,[uid])).rows[0].n);
+    const now=Date.now();
+    for(const l of rows){
+      const paidActive=!!l.paid_until&&new Date(l.paid_until).getTime()>now;
+      let kind;
+      if(isAdmin)kind='free';
+      else if(mode==='restore')kind=paidActive?'keep':(free>0?'free':'paid');
+      else kind=paidActive&&LISTING_COST>0?'paid':'free';
+      if(kind==='paid'&&!LISTING_COST){out.limit_hit=true;continue;}
+      if(kind==='paid'){
+        const bal=await creditMove(c,uid,-LISTING_COST,'listing',l.id,(mode==='restore'?'Reactualizare':'Prelungire')+' anunț peste limita gratuită: '+String(l.title).slice(0,80));
+        if(bal===null){out.insufficient=true;break;}
+        out.spent+=LISTING_COST;
+        await c.query(mode==='restore'
+          ?"UPDATE listings SET status=$2,created_at=NOW(),paid_until=GREATEST(COALESCE(paid_until,NOW()),NOW())+INTERVAL '30 days',expires_at=GREATEST(COALESCE(paid_until,NOW()),NOW())+INTERVAL '30 days',expiry_notice=0 WHERE id=$1"
+          :"UPDATE listings SET paid_until=GREATEST(COALESCE(paid_until,NOW()),NOW())+INTERVAL '30 days',expires_at=GREATEST(COALESCE(paid_until,NOW()),NOW())+INTERVAL '30 days',expiry_notice=0,status=COALESCE($2,status) WHERE id=$1",[l.id,mode==='restore'?NEW_LISTING_STATUS:null]);
+      }else if(kind==='keep'){
+        await c.query('UPDATE listings SET status=$2,created_at=NOW(),expires_at=paid_until,expiry_notice=0 WHERE id=$1',[l.id,NEW_LISTING_STATUS]);
+      }else{
+        await c.query(mode==='restore'
+          ?"UPDATE listings SET status=$2,created_at=NOW(),paid_until=NULL,expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=$1"
+          :"UPDATE listings SET paid_until=NULL,expires_at=NOW()+INTERVAL '30 days',expiry_notice=0,status=COALESCE($2,status) WHERE id=$1",[l.id,mode==='restore'?NEW_LISTING_STATUS:null]);
+        if(mode==='restore')free--;
+      }
+      out.done++;
+    }
+    await c.query('COMMIT');
+  }catch(e){try{await c.query('ROLLBACK');}catch{}throw e;}finally{c.release();}
+  out.skipped=ids.length-out.done;
+  return out;
+}
 // Acțiuni în masă (toate filele din „Anunțurile mele”): delete (mută în Șterse), purge (ștergere definitivă din Șterse), restore (Reactualizează din Șterse), renew (Activează).
 app.post('/api/listings/bulk',auth,requireDb,ah(async(req,res)=>{
   const b=req.body||{}, action=String(b.action||'');
@@ -1286,18 +1340,10 @@ app.post('/api/listings/bulk',auth,requireDb,ah(async(req,res)=>{
     const r=await pool.query("DELETE FROM listings WHERE id=ANY($1::int[]) AND user_id=$2 AND status='deleted' RETURNING id",[ids,uid]);
     return res.json({done:r.rowCount,skipped:ids.length-r.rowCount});
   }
-  if(action==='renew'){
-    const r=await pool.query("UPDATE listings SET expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=ANY($1::int[]) AND user_id=$2 AND status='approved' RETURNING id",[ids,uid]);
-    return res.json({done:r.rowCount,skipped:ids.length-r.rowCount});
-  }
-  // restore
-  let room=ids.length;
-  if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[uid]);room=Math.max(0,ACTIVE_LISTINGS_LIMIT-act.rows[0].n);}
-  if(room<=0)return res.status(403).json({error:'LIMITA_ANUNTURI'});
-  const pick=await pool.query("SELECT id FROM listings WHERE id=ANY($1::int[]) AND user_id=$2 AND status='deleted' ORDER BY id LIMIT $3",[ids,uid,room]);
-  const ok=pick.rows.map(x=>x.id);
-  if(ok.length)await pool.query("UPDATE listings SET status=$2,created_at=NOW(),expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=ANY($1::int[])",[ok,NEW_LISTING_STATUS]);
-  res.json({done:ok.length,skipped:ids.length-ok.length,limit_hit:ok.length<ids.length&&ok.length===room});
+  const o=await extendListings(req.user,ids,action);
+  if(!o.done&&o.insufficient)return res.status(402).json({error:'CREDITE_INSUFICIENTE'});
+  if(!o.done&&o.limit_hit)return res.status(403).json({error:'LIMITA_ANUNTURI'});
+  res.json({done:o.done,skipped:o.skipped,spent:o.spent,insufficient:o.insufficient,limit_hit:o.limit_hit});
 }));
 let expiryBusy=false;
 async function expiryTick(){
@@ -1327,7 +1373,7 @@ async function creditMove(db,uid,amount,kind,refId,note,lei){
 app.get('/api/credits',auth,requireDb,ah(async(req,res)=>{
   const b=await pool.query('SELECT credits FROM users WHERE id=$1',[req.user.id]);
   const t=await pool.query('SELECT id,amount,balance_after,kind,ref_id,note,amount_lei,created_at FROM credit_tx WHERE user_id=$1 ORDER BY id DESC LIMIT 100',[req.user.id]);
-  res.json({balance:(b.rows[0]&&b.rows[0].credits)||0,plans:Object.entries(PROMO_PLANS).map(([days,cost])=>({days:Number(days),cost})),tx:t.rows,payments_enabled:!!stripe});
+  res.json({balance:(b.rows[0]&&b.rows[0].credits)||0,plans:Object.entries(PROMO_PLANS).map(([days,cost])=>({days:Number(days),cost})),tx:t.rows,payments_enabled:!!stripe,listing_cost:LISTING_COST,free_limit:ACTIVE_LISTINGS_LIMIT});
 }));
 
 /* --- Catalog public de ateliere/service-uri (tabela services); filtre opționale: county, type, q. --- */
@@ -1679,12 +1725,27 @@ app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
  if(!throttle(authAttempts,'lst:'+req.user.id,30,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});
  const p=parseListing(req.body||{}); if(p.error)return res.status(p.status).json({error:p.error});
  const v=p.v;
+ // Primele ACTIVE_LISTINGS_LIMIT anunțuri sunt gratuite; peste ele fiecare costă credite pentru 30 de zile (cu confirmare). Adminul nu are limită.
+ let charge=false;
+ if(req.user.role!=='admin'){
+  const act=await pool.query(UNPAID_ACTIVE_SQL,[req.user.id]);
+  if(act.rows[0].n>=ACTIVE_LISTINGS_LIMIT){
+   if(!LISTING_COST)return res.status(403).json({error:'LIMITA_ANUNTURI'});
+   const have=((await pool.query('SELECT credits FROM users WHERE id=$1',[req.user.id])).rows[0]||{}).credits||0;
+   if(have<LISTING_COST)return res.status(402).json({error:'CREDITE_INSUFICIENTE',message:'Ai folosit cele '+ACTIVE_LISTINGS_LIMIT+' de anunțuri gratuite. Un anunț nou costă '+LISTING_COST+' credite pentru 30 de zile, iar tu ai '+have+'. Adaugă credite din Contul meu.'});
+   if((req.body||{}).confirm_cost!==true)return res.status(409).json({error:'COST_CONFIRM',message:'Ai folosit cele '+ACTIVE_LISTINGS_LIMIT+' de anunțuri gratuite. Acest anunț costă '+LISTING_COST+' credite pentru 30 de zile (ai '+have+').'});
+   charge=true;
+  }
+ }
  if(await imageQuotaExceeded(req.user.id,v.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});
  try{v.images=await storeImages(v.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
- // Cont gratuit: maximum 100 de anunțuri active (la început; schimbabil cu ACTIVE_LISTINGS_LIMIT) (publicate sau în așteptare; cele vândute nu se numără), ca pe site-urile de profil. Adminul nu are limită.
- if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);if(act.rows[0].n>=ACTIVE_LISTINGS_LIMIT)return res.status(403).json({error:'LIMITA_ANUNTURI'});}
-  const r=await pool.query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,oem_alt,delivery,description,images,status,subcategory,km,vin,parts_avail,discount_percent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
+   let r,cl=null;
+  try{
+  if(charge){cl=await pool.connect();await cl.query('BEGIN');if(await creditMove(cl,req.user.id,-LISTING_COST,'listing',null,'Anunț peste limita gratuită: '+String(v.title).slice(0,80))===null){await cl.query('ROLLBACK');return res.status(402).json({error:'CREDITE_INSUFICIENTE'});}}
+  r=await (cl||pool).query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,oem_alt,delivery,description,images,status,subcategory,km,vin,parts_avail,discount_percent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
    [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.oem_alt,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail,v.discount_percent]);
+  if(cl){await cl.query("UPDATE listings SET paid_until=NOW()+INTERVAL '30 days',expires_at=NOW()+INTERVAL '30 days' WHERE id=$1",[r.rows[0].id]);await cl.query('COMMIT');}
+  }catch(e){if(cl){try{await cl.query('ROLLBACK');}catch{}}throw e;}finally{if(cl)cl.release();}
   if(NEW_LISTING_STATUS==='approved')alertForListings([r.rows[0].id]);
  logEvent(req.user.id,'listing_create','listing',r.rows[0].id,v.title);
  res.status(201).json({listing:r.rows[0]});
@@ -1823,10 +1884,10 @@ app.patch('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
  const r=await pool.query(`UPDATE listings SET ${sets.join(',')} WHERE id=$${vals.length} RETURNING *`,vals);
  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',
   [req.user.id,changes.some(c=>c.startsWith('status:'))?'update_listing':'edit_listing','listing',Number(id),changes.join('; ').slice(0,900)]);
- if(status==='approved'){pool.query("UPDATE listings SET expires_at=GREATEST(expires_at,NOW()+INTERVAL '30 days'),expiry_notice=0 WHERE id=$1",[r.rows[0].id]).catch(()=>{});alertForListings([r.rows[0].id]);}
+ if(status==='approved'){pool.query("UPDATE listings SET expires_at=CASE WHEN paid_until>NOW() THEN expires_at ELSE GREATEST(expires_at,NOW()+INTERVAL '30 days') END,expiry_notice=0 WHERE id=$1",[r.rows[0].id]).catch(()=>{});alertForListings([r.rows[0].id]);}
  res.json({listing:r.rows[0],changed:true,changes});
 }));
-app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved',expires_at=GREATEST(expires_at,NOW()+INTERVAL '30 days') WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
+app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved',expires_at=CASE WHEN paid_until>NOW() THEN expires_at ELSE GREATEST(expires_at,NOW()+INTERVAL '30 days') END WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
 app.get('/api/admin/listings/:id/img/:n',auth,admin,requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
  const r=await pool.query('SELECT images[$2::int] img FROM listings WHERE id=$1',[req.params.id,n+1]);
@@ -2369,7 +2430,7 @@ app.post('/api/listings/import',auth,needVerified,requireDb,ah(async(req,res)=>{
  const existing=await pool.query("SELECT lower(title) t,lower(COALESCE(oem,'')) o FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);
  const seen=new Set(existing.rows.map(x=>x.t+'|'+x.o));
  let room=Infinity;
- if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);room=Math.max(0,ACTIVE_LISTINGS_LIMIT-act.rows[0].n);}
+ if(req.user.role!=='admin'){const act=await pool.query(UNPAID_ACTIVE_SQL,[req.user.id]);room=Math.max(0,ACTIVE_LISTINGS_LIMIT-act.rows[0].n);}
  const ok=[], bad=[];
  rows.forEach((raw,i)=>{
   const line=i+2, title=String((raw&&raw.title)||'').slice(0,80);

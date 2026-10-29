@@ -4048,3 +4048,6 @@ html.dark .ar-price del+strong{color:#ff8a8d}
 .mine-act.mine-act-txt span{line-height:1}
 .mine-act.mine-act-txt:last-child{border-color:inherit;color:inherit}
 html.dark .badge.expire{background:#3a2022;color:#f0b4b4}
+
+.badge.paid{background:#eef4ff;color:#2a4d8f;font-weight:700;margin-right:6px}
+html.dark .badge.paid{background:#1d2a44;color:#b9cdf5}

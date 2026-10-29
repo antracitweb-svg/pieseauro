@@ -18,7 +18,7 @@ const ERR = {
   EMAIL_REQUIRED:'Introdu o adresă de email validă.',SERVER_ERROR:'A apărut o eroare pe server.',EMAIL_NOT_VERIFIED:'Confirmă adresa de email (verifică mesajul primit) ca să poți continua.',MAX_PHONES:'Poți avea maximum 4 numere de telefon.',
   PHONE_EXISTS:'Acest număr este deja adăugat.',TELEFON_INVALID:'Telefonul destinatarului nu este valid.',PHONE_INVALID:'Număr de telefon invalid.',STARE_INVALIDA:'Alege starea piesei.',
   CALIFICATIV_INVALID:'Alege un număr de stele între 1 și 5.',COMANDA_NEFINALIZATA:'Poți da calificativ doar după ce comanda este finalizată.',CSV_GOL:'Fișierul nu conține rânduri de importat.',PREA_MULTE_RANDURI:'Fișierul are prea multe rânduri. Importă cel mult 300 odată.',
-  EDIT_EXPIRAT:'Au trecut cele 10 minute în care puteai modifica cererea.',PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',MAX_CAUTARI:'Ai atins limita de 30 de căutări salvate. Șterge una ca să poți salva alta.',BLOCAT:'Nu poți trimite acestui utilizator.',BLOCAT_DE_TINE:'Ai blocat acest utilizator. Deblochează-l din Setări cont ca să continui.',VANZATOR_IN_VACANTA:'Vânzătorul este în vacanță și nu primește comenzi acum.',DATA_INVALIDA:'Data aleasă nu este validă (cel mult 365 de zile de acum).',NU_SE_POATE_BLOCA:'Acest utilizator nu poate fi blocat.',MAX_BLOCARI:'Ai atins limita de 200 de utilizatori blocați.',BOT_CHECK:'Verificarea de securitate a expirat. Reîncarcă pagina.',PREA_MULTE_CERERI:'Prea multe cereri într-un timp scurt. Încearcă din nou peste un minut.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
+  EDIT_EXPIRAT:'Au trecut cele 10 minute în care puteai modifica cererea.',PREA_MULTE_ANUNTURI:'Ai trimis prea multe anunțuri sau cereri. Încearcă mai târziu.',NOT_FOUND:'Nu am găsit ce cauți.',MAX_CAUTARI:'Ai atins limita de 30 de căutări salvate. Șterge una ca să poți salva alta.',BLOCAT:'Nu poți trimite acestui utilizator.',BLOCAT_DE_TINE:'Ai blocat acest utilizator. Deblochează-l din Setări cont ca să continui.',VANZATOR_IN_VACANTA:'Vânzătorul este în vacanță și nu primește comenzi acum.',DATA_INVALIDA:'Data aleasă nu este validă (cel mult 365 de zile de acum).',NU_SE_POATE_BLOCA:'Acest utilizator nu poate fi blocat.',MAX_BLOCARI:'Ai atins limita de 200 de utilizatori blocați.',BOT_CHECK:'Verificarea de securitate a expirat. Reîncarcă pagina.',PREA_MULTE_CERERI:'Prea multe cereri într-un timp scurt. Încearcă din nou peste un minut.',CREDITE_INSUFICIENTE:'Nu ai destule credite pentru această acțiune. Adaugă credite din Contul meu.',LIMITA_ANUNTURI:'Ai atins limita de anunțuri active pentru contul gratuit. Șterge sau marchează ca vândute anunțurile vechi ca să poți publica altele.',LINK_INTERZIS:'Nu poți pune linkuri sau adrese de email în anunț. Cumpărătorii te contactează direct prin site.',PRET_NEREALIST:'Prețul pare prea mic. Pune un preț real sau lasă câmpul gol pentru „La cerere”.',VEHICUL_EXISTA:'Există deja un vehicul cu această marcă și acest model.',ADMIN_ONLY:'Doar administratorul are acces.',
   CUI_INVALID:'CIF / CUI invalid (ex: RO12345678 sau 12345678).',IBAN_INVALID:'Codul IBAN nu este valid.',REACTUALIZARE_PREA_DEVREME:'Poți reactualiza un anunț o singură dată la 24 de ore (și doar dacă este publicat).',STATUS_INVALIDE:'Status invalid.',PAROLA_GRESITA:'Parola curentă este greșită.',TERMENI_NEACCEPTATI:'Trebuie să accepți Termenii și Politica de confidențialitate.',PAROLA_SLABA:'Parola este prea simplă. Evită parolele comune, doar cifre sau nickname/email în parolă.',SPATIU_POZE_DEPASIT:'Ai depășit spațiul disponibil pentru poze. Șterge poze sau anunțuri vechi.',PRET_INVALID:'Preț invalid.',CERERE_PROPRIE:'Nu poți face ofertă la propria cerere.',OFERTA_NU_MAI_E_DISPONIBILA:'Oferta nu mai este disponibilă.',INTERZIS:'Nu ai voie să faci această acțiune.',PREA_MULTE_OFERTE:'Ai trimis prea multe oferte. Încearcă mai târziu.',POZA_INVALIDA:'Una dintre poze nu este validă (JPG, PNG sau WebP).',POZE_PREA_MARI:'Pozele sunt prea mari în total. Șterge una sau încarcă poze mai mici.',AN_INVALID:'Anul trebuie să fie între 1950 și anul viitor.',OFERTA_EXISTA:'Ai deja o ofertă în așteptare la această cerere.',PREA_MULTE_MESAJE:'Ai trimis prea multe mesaje. Încearcă mai târziu.',MESAJ_INVALID:'Mesajul este gol sau prea lung.',DESTINATAR_INVALID:'Destinatar invalid.',ID_INVALID:'Cerere invalidă.',EROARE_SERVER:'A apărut o eroare pe server.',COMANDA_PROPRIE:'Nu poți comanda propriul anunț.',CANTITATE_INVALIDA:'Cantitatea cerută nu este disponibilă.',ADRESA_LIPSA:'Completează județul, localitatea și adresa de livrare.',STORAGE_EROARE:'Pozele nu au putut fi încărcate. Încearcă din nou.',COMANDA_EXISTA:'Ai deja o comandă în așteptare pentru acest anunț.',COMANDA_INCHISA:'Comanda este deja închisă.',PREA_MULTE_COMENZI:'Ai trimis prea multe comenzi. Încearcă mai târziu.',CANNOT_BLOCK_SELF:'Nu îți poți bloca propriul cont.',DATABASE_NOT_CONFIGURED:'Baza de date nu este configurată pe server.',DESTINATAR_NEGASIT:'Nu am găsit niciun utilizator cu acest nickname.',
   PLATA_ONLINE_INDISPONIBILA:'Plata online nu este activată încă. Până atunci, administratorul îți poate adăuga credite în cont.',PLAN_INVALID:'Pachet de credite invalid.',SESIUNE_INVALIDA:'Sesiunea de plată nu aparține contului tău.'
 };
@@ -2534,7 +2534,15 @@ async function submitSell(e){
     await applySellPhone();
     const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim(),discount_percent:Math.max(0,Math.min(50,Math.round(Number($('#sellDiscount').value)||0)))});
     const editing = state.editId;
-    const r = editing ? await api('/api/listings/'+editing,{method:'PATCH',body:payload}) : await api('/api/listings',{method:'POST',body:payload});
+    let r;
+    if(editing) r = await api('/api/listings/'+editing,{method:'PATCH',body:payload});
+    else{
+      try{ r = await api('/api/listings',{method:'POST',body:payload}); }
+      catch(err){
+        if(err.code!=='COST_CONFIRM' || !confirm(err.message+' Continui?')) throw err;
+        r = await api('/api/listings',{method:'POST',body:JSON.stringify({...JSON.parse(payload),confirm_cost:true})});
+      }
+    }
     resetSellForm(); setSellMode(null); state.sellFilled=null;
     const live = r.listing && r.listing.status==='approved';
     setMsg(msg, editing ? (r.resubmitted ? 'Modificările au fost salvate și anunțul a fost trimis din nou la verificare.' : 'Modificările au fost salvate.') : (live ? 'Anunțul a fost publicat. Te ducem la Anunțurile mele…' : 'Anunțul a fost trimis pentru verificare. Te ducem la Anunțurile mele…'),'ok');
@@ -3399,7 +3407,7 @@ function wire(){
 
 /* ---------- Anunțurile mele (format PieseAuto.ro: tab-uri, căutare, 30 pe pagină) ---------- */
 const MINE_PER_PAGE = 30, MINE_EXPIRE_WARN_DAYS = 7;
-const mine = { items:[], tab:'active', q:'', cat:'', type:'', sort:'new', page:1, sel:new Set() };
+const mine = { quota:null, items:[], tab:'active', q:'', cat:'', type:'', sort:'new', page:1, sel:new Set() };
 
 /* ---------- Promovare anunț (cu credite) ---------- */
 async function promoDialog(id){
@@ -3426,6 +3434,23 @@ async function promoGo(el){
 }
 const MINE_TABS = [['active','Active'],['sold','Stoc epuizat'],['expire','Expiră'],['promo','Promovate'],['deleted','Șterse']];
 const mineNorm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function mineSet(r){ mine.items = (r&&r.listings)||[]; mine.quota = (r&&r.quota)||null; state.loaded = mine.items; }
+const minePaid = x => !!x.paid_until && new Date(x.paid_until).getTime() > Date.now();
+// Estimează costul în credite al unei prelungiri / reactualizări (același calcul ca pe server).
+function mineCost(ids, kind){
+  const q = mine.quota; if(!q || !q.cost || q.limit==null) return 0;
+  let free = Math.max(0, q.limit - q.unpaid_active), total = 0;
+  for(const id of ids){
+    const x = mine.items.find(i=>i.id===id); if(!x) continue;
+    if(kind==='renew'){ if(minePaid(x)) total += q.cost; }
+    else if(kind==='restore'){ if(minePaid(x)) continue; if(free>0) free--; else total += q.cost; }
+  }
+  return total;
+}
+function mineAskCost(ids, kind){
+  const c = mineCost(ids, kind); if(!c) return true;
+  return confirm(`Această acțiune costă ${c} credite (anunțuri peste cele ${mine.quota.limit} gratuite, câte ${mine.quota.cost} pentru 30 de zile). Ai ${mine.quota.balance} credite. Continui?`);
+}
 const mineExpMs = x => x.expires_at ? new Date(x.expires_at).getTime() : new Date(x.created_at).getTime()+30*86400000;
 const mineExpiring = x => x.status==='approved' && mineExpMs(x) <= Date.now()+MINE_EXPIRE_WARN_DAYS*86400000;
 const mineExpDays = x => Math.max(0, Math.ceil((mineExpMs(x)-Date.now())/86400000));
@@ -3455,7 +3480,7 @@ async function enterMine(tab){
   $('#mineList').innerHTML = '<p class="muted">Se încarcă…</p>';
   const sel = $('#mineCat'); if(sel && sel.options.length<2) sel.insertAdjacentHTML('beforeend', CATEGORIES.map(c=>`<option>${esc(c[0])}</option>`).join(''));
   const r = await api('/api/listings/mine');
-  mine.items = r.listings || []; state.loaded = mine.items; mine.sel.clear(); mine.page = 1;
+  mineSet(r); mine.sel.clear(); mine.page = 1;
   renderMine();
 }
 const MI={
@@ -3481,7 +3506,7 @@ function mineRow(x){
     <button type="button" class="mine-thumb" data-m-open="${x.id}" aria-label="Deschide anunțul">${img?`<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`:'<span>📷</span>'}</button>
     <div class="mine-body">
       <button type="button" class="mine-name" data-m-open="${x.id}">${esc(x.title)}</button>
-      ${expSoon?`<span class="badge expire">⏳ Expiră ${dd<=0?'astăzi':(dd===1?'mâine':'în '+dd+' zile')}</span>`:''}${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:(x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+esc(promoUntilTxt(x)):''}</span>`:'')}
+      ${minePaid(x)?`<span class="badge paid">💳 Plătit până pe ${esc(new Date(x.paid_until).toLocaleDateString('ro-RO',{day:'numeric',month:'short'}))}</span>`:''}${expSoon?`<span class="badge expire">⏳ Expiră ${dd<=0?'astăzi':(dd===1?'mâine':'în '+dd+' zile')}</span>`:''}${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:(x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+esc(promoUntilTxt(x)):''}</span>`:'')}
       <div class="mine-acts">${btns}</div>
     </div>
     <div class="mine-meta"><span class="mine-views">${MI.eye} ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${priceHtml(x)}</b></div>
@@ -3516,16 +3541,18 @@ async function mineDo(ids, kind){
     const action = kind==='del' ? (mine.tab==='deleted' ? 'purge' : 'delete') : kind;
     let msg = 'Gata.';
     try{
-      let done = 0, skipped = 0, lim = false;
+      let done = 0, skipped = 0, lim = false, spent = 0, poor = false;
       for(let i=0;i<ids.length;i+=500){
         const r = await api('/api/listings/bulk',{method:'POST',body:JSON.stringify({action,ids:ids.slice(i,i+500)})});
-        done += r.done||0; skipped += r.skipped||0; lim = lim || !!r.limit_hit;
+        done += r.done||0; skipped += r.skipped||0; lim = lim || !!r.limit_hit; spent += r.spent||0; poor = poor || !!r.insufficient;
       }
       msg = action==='renew' ? `${done} anunțuri active încă 30 de zile.` : action==='restore' ? `${done} anunțuri reactualizate (încă 30 de zile).` : action==='purge' ? `${done} anunțuri șterse definitiv.` : `${done} anunțuri mutate în „Șterse”.`;
+      if(spent) msg += ` Au fost folosite ${spent} credite.`;
+      if(poor) msg += ' Nu ai avut destule credite pentru toate.';
       if(lim) msg += ' Ai atins limita de anunțuri active.';
     }catch(e){ msg = e.message || 'Nu s-a putut face modificarea.'; }
     mine.sel.clear();
-    const r = await api('/api/listings/mine'); mine.items = r.listings||[]; state.loaded = mine.items; renderMine();
+    const r = await api('/api/listings/mine'); mineSet(r); renderMine();
     toast(msg); refreshCounts && refreshCounts();
     return;
   }
@@ -3540,7 +3567,7 @@ async function mineDo(ids, kind){
     }catch(e){ last = e.message; }
   }
   mine.sel.clear();
-  const r = await api('/api/listings/mine'); mine.items = r.listings||[]; state.loaded = mine.items; renderMine();
+  const r = await api('/api/listings/mine'); mineSet(r); renderMine();
   toast(ok===ids.length ? 'Gata.' : (ok? `${ok} din ${ids.length} actualizate. ${last}` : last||'Nu s-a putut face modificarea.'));
 }
 document.addEventListener('click', e=>{
@@ -3553,16 +3580,16 @@ document.addEventListener('click', e=>{
   if((el=e.target.closest('[data-m-promo]'))){ safe(promoDialog)(Number(el.dataset.mPromo)); return; }
   if((el=e.target.closest('[data-m-bump]'))){ safe(()=>mineDo([Number(el.dataset.mBump)],'bump'))(); return; }
   if((el=e.target.closest('[data-m-sold]'))){ safe(()=>mineDo([Number(el.dataset.mSold)], el.dataset.to==='sold'?'sold':'instock'))(); return; }
-  if((el=e.target.closest('[data-m-renew]'))){ safe(()=>mineDo([Number(el.dataset.mRenew)],'renew'))(); return; }
+  if((el=e.target.closest('[data-m-renew]'))){ const id=Number(el.dataset.mRenew); if(mineAskCost([id],'renew')) safe(()=>mineDo([id],'renew'))(); return; }
   if((el=e.target.closest('[data-m-all]'))){
     const k=el.dataset.mAll, ids=mineVisible().map(x=>x.id);
     const q={renew:`Activezi toate cele ${ids.length} anunțuri pentru încă 30 de zile?`,del:`Muți toate cele ${ids.length} anunțuri în „Șterse”?`,restore:`Reactualizezi toate cele ${ids.length} anunțuri pentru încă 30 de zile?`,purge:`Ștergi DEFINITIV toate cele ${ids.length} anunțuri? Nu se mai pot recupera.`}[k];
-    if(ids.length && confirm(q)) safe(()=>mineDo(ids, k==='purge'?'del':k))();
+    if(ids.length && confirm(q) && mineAskCost(ids, k)) safe(()=>mineDo(ids, k==='purge'?'del':k))();
     return;
   }
-  if((el=e.target.closest('[data-m-restore]'))){ safe(()=>mineDo([Number(el.dataset.mRestore)],'restore'))(); return; }
+  if((el=e.target.closest('[data-m-restore]'))){ const id=Number(el.dataset.mRestore); if(mineAskCost([id],'restore')) safe(()=>mineDo([id],'restore'))(); return; }
   if((el=e.target.closest('[data-m-del]'))){ const id=Number(el.dataset.mDel), hard=mine.tab==='deleted'; if(confirm(hard?'Ștergi definitiv acest anunț? Nu se mai poate recupera.':'Muți anunțul în „Șterse”?')) safe(()=>mineDo([id],'del'))(); return; }
-  if((el=e.target.closest('[data-m-bulk]'))){ const k=el.dataset.mBulk, ids=[...mine.sel]; if(k==='del' && !confirm(mine.tab==='deleted'?'Ștergi definitiv anunțurile selectate?':'Muți anunțurile selectate în „Șterse”?')) return; safe(()=>mineDo(ids,k))(); return; }
+  if((el=e.target.closest('[data-m-bulk]'))){ const k=el.dataset.mBulk, ids=[...mine.sel]; if(k==='del' && !confirm(mine.tab==='deleted'?'Ștergi definitiv anunțurile selectate?':'Muți anunțurile selectate în „Șterse”?')) return; if((k==='renew'||k==='restore') && !mineAskCost(ids,k)) return; safe(()=>mineDo(ids,k))(); return; }
   if(e.target.closest('#mineFilterBtn')){ $('#mineFilterPanel').classList.toggle('hidden'); return; }
   if(e.target.closest('#mineSortBtn')){ $('#mineSortPanel').classList.toggle('hidden'); return; }
   if(e.target.closest('#mineFilterReset')){ mine.cat=''; mine.type=''; $('#mineCat').value=''; $('#mineType').value=''; mine.page=1; renderMine(); return; }
