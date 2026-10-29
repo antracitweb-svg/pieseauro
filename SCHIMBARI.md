@@ -31,3 +31,8 @@ Testele din `test/server.test.js` nu au fost rulate aici (nu se pot instala pach
 - `listings.paid_until`. Primele 100 de anunțuri fără perioadă plătită sunt gratuite; al 101-lea cere confirmare și costă credite (tranzacție atomică cu creditele).
 - Din „Șterse”: dacă `paid_until` e încă în viitor, reactualizarea e gratuită și anunțul păstrează zilele plătite rămase; altfel, dacă utilizatorul e peste limită, costă din nou. Prelungirea („Activează”) unui anunț plătit costă; UP nu prelungește un anunț plătit. Adminul nu are limită.
 - UI: insigna „Plătit până pe …”, confirmare cu costul înainte de publicare / Activează / Reactualizează.
+
+## V45 — Roluri: administrator și moderator
+- `PATCH /api/admin/users/:id/role` (doar admin): user / moderator / admin. Nu-ți poți schimba propriul rol, nu poți retrograda contul din `ADMIN_EMAIL`, nu rămâi fără admini activi. Se scrie în jurnalul de activitate (`set_role`) și utilizatorul primește notificare.
+- Moderatorul (`role='moderator'`) are acces doar la: dashboard, anunțuri (aprobă/respinge/blochează/editează, fără ștergere definitivă), utilizatori (blocare/deblocare doar pentru conturi obișnuite, fără credite și fără ștergere conturi), cereri piese, raportări. Nu vede mesaje, oferte, comenzi, credite, evenimente, activitate, mașini.
+- UI: în Administrare → Utilizatori, butoane „Fă moderator / Fă administrator / Scoate rol”.

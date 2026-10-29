@@ -537,6 +537,8 @@ async function auth(req,res,next){
 // Jurnal de evenimente de pe site (vizibil în Admin → Evenimente). Nu blochează și nu strică niciodată cererea.
 function logEvent(uid,kind,type,id,details){if(!pool)return;const tid=id==null?null:Number(id);pool.query('INSERT INTO site_events(user_id,kind,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[uid||null,String(kind).slice(0,40),type||null,Number.isInteger(tid)?tid:null,String(details||'').slice(0,300)]).catch(e=>console.error('site_events',e.message));}
 function admin(req,res,next){if(req.user.role!=='admin')return res.status(403).json({error:'ADMIN_ONLY'});next();}
+// Moderatorii (role='moderator') au acces doar la rutele de moderare; restul rămân doar pentru administratori.
+function staff(req,res,next){if(req.user.role!=='admin'&&req.user.role!=='moderator')return res.status(403).json({error:'STAFF_ONLY'});next();}
 // Id-ul utilizatorului logat sau null (pentru rutele publice care arată și date personale, ex. „am ofertat deja”)
 async function optUserId(req){try{const t=req.cookies&&req.cookies.session;if(!t||!pool)return null;const r=await pool.query("SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW() AND u.status='active'",[hashToken(t)]);return r.rowCount?r.rows[0].id:null;}catch{return null;}}
 function needVerified(req,res,next){if(REQUIRE_VERIFIED&&!req.user.email_verified&&req.user.role!=='admin')return res.status(403).json({error:'EMAIL_NOT_VERIFIED'});next();}
@@ -1852,9 +1854,9 @@ app.patch('/api/requests/:id',auth,needVerified,requireDb,ah(async(req,res)=>{
 }));
 app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,ship_address,extra_parts,images:rawImages}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const pi=parseExtraImages(rawImages,6);if(pi.error)return res.status(400).json({error:pi.error});if(pi.images.length&&await imageQuotaExceeded(req.user.id,pi.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});try{pi.images=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts,images,ship_address) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id,title,status,created_at',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title)),pi.images,clip(ship_address,300)]);res.status(201).json({request:r.rows[0]});});
 
-app.get('/api/admin/overview',auth,admin,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
-app.get('/api/admin/listings',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
-app.patch('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
+app.get('/api/admin/overview',auth,staff,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
+app.get('/api/admin/listings',auth,staff,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
+app.patch('/api/admin/listings/:id',auth,staff,requireDb,ah(async(req,res)=>{
  const id=req.params.id;
  if(!/^\d{1,10}$/.test(String(id)))return res.status(400).json({error:'ID_INVALID'});
  const body=req.body||{};
@@ -1887,8 +1889,8 @@ app.patch('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
  if(status==='approved'){pool.query("UPDATE listings SET expires_at=CASE WHEN paid_until>NOW() THEN expires_at ELSE GREATEST(expires_at,NOW()+INTERVAL '30 days') END,expiry_notice=0 WHERE id=$1",[r.rows[0].id]).catch(()=>{});alertForListings([r.rows[0].id]);}
  res.json({listing:r.rows[0],changed:true,changes});
 }));
-app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved',expires_at=CASE WHEN paid_until>NOW() THEN expires_at ELSE GREATEST(expires_at,NOW()+INTERVAL '30 days') END WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
-app.get('/api/admin/listings/:id/img/:n',auth,admin,requireDb,ah(async(req,res)=>{
+app.post('/api/admin/listings/approve-all',auth,staff,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved',expires_at=CASE WHEN paid_until>NOW() THEN expires_at ELSE GREATEST(expires_at,NOW()+INTERVAL '30 days') END WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
+app.get('/api/admin/listings/:id/img/:n',auth,staff,requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
  const r=await pool.query('SELECT images[$2::int] img FROM listings WHERE id=$1',[req.params.id,n+1]);
 if(r.rowCount&&/^https?:\/\//.test(r.rows[0].img||''))return res.redirect(r.rows[0].img);
@@ -1896,17 +1898,18 @@ if(r.rowCount&&/^https?:\/\//.test(r.rows[0].img||''))return res.redirect(r.rows
  if(!m)return res.status(404).end();
  res.set({'Content-Type':m[1],'Cache-Control':'private, max-age=3600'}).send(Buffer.from(m[2],'base64'));
 }));
-app.get('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
+app.get('/api/admin/listings/:id',auth,staff,requireDb,ah(async(req,res)=>{
  const r=await pool.query('SELECT l.*,u.name seller_name,u.email seller_email,u.phone seller_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1',[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const x=r.rows[0]; x.image_count=Array.isArray(x.images)?x.images.length:0; delete x.images;
  res.json({listing:x});
 }));
 app.delete('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const d=await pool.query('DELETE FROM listings WHERE id=$1 RETURNING id',[req.params.id]);if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_listing','listing',req.params.id,'']);res.json({ok:true});});
-app.get('/api/admin/users',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,name,email,phone,role,status,created_at,credits,(store_logo IS NOT NULL) has_logo FROM users ORDER BY created_at DESC LIMIT 500');res.json({users:r.rows});});
-app.patch('/api/admin/users/:id',auth,admin,requireDb,ah(async(req,res)=>{
+app.get('/api/admin/users',auth,staff,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,name,email,phone,role,status,created_at,credits,(store_logo IS NOT NULL) has_logo FROM users ORDER BY created_at DESC LIMIT 500');res.json({users:req.user.role==='admin'?r.rows:r.rows.map(u=>({...u,credits:null}))});});
+app.patch('/api/admin/users/:id',auth,staff,requireDb,ah(async(req,res)=>{
  const uid=Number(req.params.id)||0;
  if(!uid)return res.status(400).json({error:'ID_INVALID'});
+ if(req.user.role!=='admin'){const t=(await pool.query('SELECT role FROM users WHERE id=$1',[uid])).rows[0];if(!t)return res.status(404).json({error:'NOT_FOUND'});if(t.role!=='user')return res.status(403).json({error:'ADMIN_ONLY'});}
  const status=req.body.status;
  if(status==='remove_logo'){const rr=await pool.query('UPDATE users SET store_logo=NULL WHERE id=$1',[uid]);if(!rr.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'remove_store_logo','user',uid,'']);return res.json({ok:true});}
  if(!['active','blocked'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});
@@ -1923,6 +1926,23 @@ app.patch('/api/admin/users/:id',auth,admin,requireDb,ah(async(req,res)=>{
 }));
 // Ștergerea definitivă a unui cont (dreptul la ștergere / GDPR). Anunțurile, mesajele, ofertele etc.
 // dispar prin ON DELETE CASCADE; jurnalul păstrează doar id-ul, ca să nu rămână date personale.
+// Schimbarea rolului: user / moderator / admin. Doar administratorii; nu-ți poți schimba singur rolul, nu poți retrograda contul principal (ADMIN_EMAIL) și nu rămâi fără administratori.
+app.patch('/api/admin/users/:id/role',auth,admin,requireDb,ah(async(req,res)=>{
+  const uid=Number(req.params.id)||0,role=String((req.body||{}).role||'');
+  if(!uid||!['user','moderator','admin'].includes(role))return res.status(400).json({error:'ROL_INVALID'});
+  if(uid===Number(req.user.id))return res.status(400).json({error:'ROL_PROPRIU'});
+  const t=(await pool.query('SELECT id,name,email,role,status FROM users WHERE id=$1',[uid])).rows[0];
+  if(!t)return res.status(404).json({error:'NOT_FOUND'});
+  if(t.role===role)return res.json({user:t,changed:false});
+  const main=String(process.env.ADMIN_EMAIL||'').toLowerCase();
+  if(t.role==='admin'&&main&&String(t.email).toLowerCase()===main)return res.status(400).json({error:'ADMIN_PRINCIPAL'});
+  if(t.role==='admin'){const n=(await pool.query("SELECT COUNT(*)::int n FROM users WHERE role='admin' AND status='active'")).rows[0].n;if(n<=1)return res.status(400).json({error:'ULTIMUL_ADMIN'});}
+  if(role!=='user'&&t.status!=='active')return res.status(400).json({error:'CONT_BLOCAT'});
+  const r=await pool.query('UPDATE users SET role=$1 WHERE id=$2 RETURNING id,name,email,role,status',[role,uid]);
+  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'set_role','user',uid,t.role+' → '+role]);
+  await notify(uid,role==='admin'?'Ai primit rolul de administrator.':role==='moderator'?'Ai primit rolul de moderator.':'Rolul tău de administrare a fost retras.','account').catch(()=>{});
+  res.json({user:r.rows[0],changed:true});
+}));
 app.delete('/api/admin/users/:id',auth,admin,requireDb,ah(async(req,res)=>{
  const uid=Number(req.params.id)||0;
  if(!uid)return res.status(400).json({error:'ID_INVALID'});
@@ -1934,8 +1954,8 @@ app.delete('/api/admin/users/:id',auth,admin,requireDb,ah(async(req,res)=>{
  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_user','user',uid,'cont șters la cerere']);
  res.json({ok:true});
 }));
-app.get('/api/admin/requests',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT r.*,u.name user_name,u.email user_email FROM part_requests r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 500');res.json({requests:r.rows});});
-app.patch('/api/admin/requests/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','matched','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE part_requests SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_request','request',req.params.id,status]);res.json({request:r.rows[0]});});
+app.get('/api/admin/requests',auth,staff,requireDb,async(req,res)=>{const r=await pool.query('SELECT r.*,u.name user_name,u.email user_email FROM part_requests r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 500');res.json({requests:r.rows});});
+app.patch('/api/admin/requests/:id',auth,staff,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','matched','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE part_requests SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_request','request',req.params.id,status]);res.json({request:r.rows[0]});});
 app.get('/api/admin/offers',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.price,o.status,o.created_at,q.title request_title,u.name seller_name,b.name buyer_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=q.user_id ORDER BY o.created_at DESC LIMIT 300');res.json({offers:r.rows});}));
 app.get('/api/admin/orders',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.title,o.price,o.status,o.created_at,u.name seller_name,b.name buyer_name FROM orders o LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=o.buyer_id ORDER BY o.created_at DESC LIMIT 300');res.json({orders:r.rows});}));
 // --- Moderare conținut: ștergerea mesajelor, ofertelor și comenzilor din panoul de admin ---
@@ -1961,7 +1981,7 @@ app.get('/api/admin/messages',auth,admin,requireDb,ah(async(req,res)=>{
  res.json({messages:r.rows});
 }));
 app.get('/api/admin/activity',auth,admin,requireDb,async(req,res)=>{const r=await pool.query('SELECT a.*,u.name admin_name,u.email admin_email FROM admin_activity a LEFT JOIN users u ON u.id=a.admin_id ORDER BY a.created_at DESC LIMIT 500');res.json({activity:r.rows});});
-app.get('/api/admin/reports',auth,admin,requireDb,async(req,res)=>{const r=await pool.query(`SELECT r.*,l.title listing_title,u.name reporter_name FROM reports r LEFT JOIN listings l ON l.id=r.listing_id LEFT JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`);res.json({reports:r.rows});});
+app.get('/api/admin/reports',auth,staff,requireDb,async(req,res)=>{const r=await pool.query(`SELECT r.*,l.title listing_title,u.name reporter_name FROM reports r LEFT JOIN listings l ON l.id=r.listing_id LEFT JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`);res.json({reports:r.rows});});
 app.get('/api/admin/events',auth,admin,requireDb,ah(async(req,res)=>{
  const kind=String(req.query.kind||'').slice(0,40);
  const r=await pool.query(`SELECT e.id,e.kind,e.target_type,e.target_id,e.details,e.created_at,e.user_id,COALESCE(u.nickname,u.name) user_name,u.email user_email FROM site_events e LEFT JOIN users u ON u.id=e.user_id ${kind?'WHERE e.kind=$1':''} ORDER BY e.created_at DESC,e.id DESC LIMIT 300`,kind?[kind]:[]);
@@ -2015,7 +2035,7 @@ app.delete('/api/admin/ratings/:kind/:id',auth,admin,requireDb,ah(async(req,res)
  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_rating',req.params.kind+'_rating',d.rows[0].id,d.rows[0].stars+' stele']);
  res.json({ok:true});
 }));
-app.patch('/api/admin/reports/:id',auth,admin,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','reviewed','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE reports SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_report','report',req.params.id,status]);res.json({report:r.rows[0]});});
+app.patch('/api/admin/reports/:id',auth,staff,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','reviewed','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE reports SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_report','report',req.params.id,status]);res.json({report:r.rows[0]});});
 app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempts,'rep:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {listing_id,reason,details}=req.body||{};if(!/^\d{1,10}$/.test(String(listing_id))||typeof reason!=='string'||!reason.trim()||reason.length>200)return res.status(400).json({error:'DATE_INVALIDE'});if(!(await pool.query('SELECT 1 FROM listings WHERE id=$1',[listing_id])).rowCount)return res.status(404).json({error:'DATE_INVALIDE'});const r=await pool.query('INSERT INTO reports(listing_id,reporter_id,reason,details) VALUES($1,$2,$3,$4) RETURNING *',[listing_id,req.user.id,reason.trim(),String(details||'').slice(0,2000)]);res.status(201).json({report:r.rows[0]});});
 
 
