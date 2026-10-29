@@ -1182,6 +1182,7 @@ function adRowHtml(x, eager){
   if(isDism && x.km!=null && x.km!=='') meta.push(Number(x.km).toLocaleString('ro-RO')+' km');
   const chips = [
     x.condition ? `<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>` : '',
+    x.discount_percent && Number(x.discount_percent)>0 ? `<span class="badge discount">-${Number(x.discount_percent)}%</span>` : '',
     x.oem ? `<span class="lchip lchip-oem" title="Cod OEM">OEM ${esc(x.oem)}</span>` : '',
     x.oem_alt ? `<span class="lchip lchip-oem" title="Coduri OEM alternative">+${String(x.oem_alt).split(',').filter(t=>t.trim()).length} coduri</span>` : '',
     x.delivery ? `<span class="lchip lchip-ship">🚚 Livrare</span>` : '',
@@ -1192,8 +1193,9 @@ function adRowHtml(x, eager){
   const sub = [`<span class="ar-loc">📍 ${esc(x.county||'România')}</span>`, dtRaw ? `<span class="ar-dt"><span class="dt-pre">Actualizat </span>${esc(dtRaw)}</span>` : '', x.seller_name ? `<span class="ar-sl">${esc(x.seller_name)+(sType?' ('+esc(sType)+')':'')}</span>` : ''].filter(Boolean).join('');
   const hasPrice = Number(x.price)>0;
   const isPromo = !!x.promoted;
-  return `<article class="ar-row${isPromo?' is-promoted':''}" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}${isPromo?' (anunț promovat)':''}">
-    <div class="ar-thumb">${thumb}${isPromo?`<span class="promo-badge" title="Anunț promovat până pe ${esc(promoUntilTxt(x))}"><span aria-hidden="true">⭐</span> Promovat</span>`:''}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
+  const disc = Number(x.discount_percent||0);
+  return `<article class="ar-row${isPromo?' is-promoted':''}${disc>0?' discounted':''}" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}${isPromo?' (anunț promovat)':''}${disc>0?' (reducere '+disc+'%)':''}">
+    <div class="ar-thumb">${thumb}${isPromo?`<span class="promo-badge" title="Anunț promovat până pe ${esc(promoUntilTxt(x))}"><span aria-hidden="true">⭐</span> Promovat</span>`:''}${disc>0?`<span class="discount-badge" title="Reducere ${disc}%">-${disc}%</span>`:''}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
     <div class="ar-main">
       <h3 class="ar-title">${esc(x.title)}</h3>
       <div class="ar-meta">${meta.map(esc).join(' · ')}</div>
@@ -2514,7 +2516,7 @@ async function submitSell(e){
   if(btn){ btn.disabled=true; btn.textContent='Se trimite…'; }
   try{
     await applySellPhone();
-    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim()});
+    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim(),discount_percent:$('#sellDiscount').value||0});
     const editing = state.editId;
     const r = editing ? await api('/api/listings/'+editing,{method:'PATCH',body:payload}) : await api('/api/listings',{method:'POST',body:payload});
     resetSellForm(); setSellMode(null); state.sellFilled=null;

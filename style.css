@@ -4019,3 +4019,11 @@ html.dark #listingGrid .ar-row.is-promoted,
 html.dark #homeFeed .ar-row.is-promoted,
 html.dark .similar-grid .ar-row.is-promoted{border-color:#b8935a!important;box-shadow:0 0 0 1px #b8935a;background:rgba(184,147,90,.08)}
 html.dark .mine-row.is-promoted{box-shadow:inset 3px 0 0 #b8935a}
+
+/* ===== Reducere preț: insignă pe imagine + chip ===== */
+.discount-badge{position:absolute;right:6px;top:6px;z-index:3;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:linear-gradient(180deg,#e5484d,#c43a3e);color:#fff;font-size:11px;font-weight:800;letter-spacing:.2px;line-height:1.4;box-shadow:0 2px 8px rgba(14,15,18,.25);pointer-events:none;max-width:70px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge.discount{background:#e5484d;color:#fff;border:1px solid #c43a3e}
+.ar-row.discounted{border-color:#e5484d!important;box-shadow:0 0 0 1px #e5484d}
+html.dark .discount-badge{background:linear-gradient(180deg,#f06c70,#c43a3e);color:#14110c}
+html.dark .badge.discount{background:rgba(229,72,77,.2);color:#ff9a9a;border-color:rgba(229,72,77,.5)}
+html.dark .ar-row.discounted{border-color:#e5484d!important;box-shadow:0 0 0 1px #e5484d}
