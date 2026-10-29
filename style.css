@@ -4039,3 +4039,12 @@ html.dark .ar-row.discounted{border-color:#e5484d!important;box-shadow:0 0 0 1px
 html.dark .price-new{color:#ff8a8d}
 html.dark .price-pct{background:rgba(229,72,77,.22);color:#ff9a9a;border:1px solid rgba(229,72,77,.5)}
 html.dark .ar-price del+strong{color:#ff8a8d}
+
+/* Expirare anunțuri: insignă, buton Activează, acțiuni în antet */
+.badge.expire{background:#fff0f1;color:#a3322b;font-weight:700;margin-right:6px}
+.mine-head{flex-wrap:wrap}
+.mine-head-acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.mine-act.mine-act-txt{width:auto;padding:0 10px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.mine-act.mine-act-txt span{line-height:1}
+.mine-act.mine-act-txt:last-child{border-color:inherit;color:inherit}
+html.dark .badge.expire{background:#3a2022;color:#f0b4b4}

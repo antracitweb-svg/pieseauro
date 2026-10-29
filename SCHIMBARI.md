@@ -19,3 +19,9 @@
 
 ## Ce nu s-a putut verifica
 Testele din `test/server.test.js` nu au fost rulate aici (nu se pot instala pachetele). Rulează `npm install` și `npm test` la tine.
+
+## V43 — Expirarea anunțurilor (30 de zile)
+- `listings.expires_at` (implicit NOW()+30 zile), `expiry_notice` (0/1/2). Anunțurile existente primesc expirare = max(creat+30z, acum+10z).
+- Job orar `expiryTick()`: avertizare la ≤7 zile și la ≤3 zile (notificare + email, un mesaj/utilizator), apoi la expirare anunțul trece direct în „Șterse”.
+- `POST /api/listings/:id/renew` (Activează, +30 zile), `POST /api/listings/bulk` (delete / purge / restore / renew), „Reactualizează” din Șterse respectă limita de anunțuri active.
+- UI: fila „Expiră” = anunțuri care expiră în ≤7 zile, buton „Activează” pe rând, „Activează toate / Șterge toate” lângă titlu, „Șterge toate” și în Active, „Reactualizează” în Șterse. Insigna roșie din meniu numără aceleași anunțuri.

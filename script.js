@@ -265,7 +265,7 @@ function route(){
   else if(name==='requests') loadRequests(params.get('t')==='mine');
   else if(name==='stores') loadStores(params.get('t')==='parks');
   else if(name==='saved') renderSaved();
-  else if(name==='anunturile-mele') safe(enterMine)();
+  else if(name==='anunturile-mele') safe(enterMine)(params.get('tab'));
   else if(name==='cont') renderAccount();
   else if(name==='settings') safe(loadSettings)();
   else if(name==='verify-email-change') safe(confirmEmailChange)(params);
@@ -3057,6 +3057,7 @@ function doAction(a){
 function accountAction(a){
   if(a==='settings') navigate('settings');
   else if(a==='listings') navigate('anunturile-mele');
+  else if(a==='listings-expire') navigate('anunturile-mele?tab=expire');
   else if(a==='favorites') navigate('rezultate?mode=fav');
   else if(a==='requests') navigate('requests?t=mine');
   else if(a==='saved') navigate('saved');
@@ -3397,7 +3398,7 @@ function wire(){
 
 
 /* ---------- Anunțurile mele (format PieseAuto.ro: tab-uri, căutare, 30 pe pagină) ---------- */
-const MINE_PER_PAGE = 30, MINE_EXPIRE_DAYS = 30;
+const MINE_PER_PAGE = 30, MINE_EXPIRE_WARN_DAYS = 7;
 const mine = { items:[], tab:'active', q:'', cat:'', type:'', sort:'new', page:1, sel:new Set() };
 
 /* ---------- Promovare anunț (cu credite) ---------- */
@@ -3425,11 +3426,13 @@ async function promoGo(el){
 }
 const MINE_TABS = [['active','Active'],['sold','Stoc epuizat'],['expire','Expiră'],['promo','Promovate'],['deleted','Șterse']];
 const mineNorm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const mineExpMs = x => x.expires_at ? new Date(x.expires_at).getTime() : new Date(x.created_at).getTime()+30*86400000;
+const mineExpiring = x => x.status==='approved' && mineExpMs(x) <= Date.now()+MINE_EXPIRE_WARN_DAYS*86400000;
+const mineExpDays = x => Math.max(0, Math.ceil((mineExpMs(x)-Date.now())/86400000));
 function mineTabItems(tab){
-  const old = Date.now() - MINE_EXPIRE_DAYS*86400000;
   if(tab==='active') return mine.items.filter(x=>x.status!=='sold' && x.status!=='deleted');
   if(tab==='sold') return mine.items.filter(x=>x.status==='sold');
-  if(tab==='expire') return mine.items.filter(x=>x.status==='approved' && new Date(x.created_at).getTime() < old);
+  if(tab==='expire') return mine.items.filter(mineExpiring);
   if(tab==='deleted') return mine.items.filter(x=>x.status==='deleted');
   if(tab==='promo') return mine.items.filter(x=>x.promoted && x.status==='approved');
   return [];
@@ -3447,7 +3450,8 @@ function mineVisible(){
   const by = {new:(x,y)=>d(y)-d(x), old:(x,y)=>d(x)-d(y), pasc:(x,y)=>p(x)-p(y), pdesc:(x,y)=>p(y)-p(x), views:(x,y)=>(y.views||0)-(x.views||0)};
   return a.slice().sort(by[mine.sort]||by.new);
 }
-async function enterMine(){
+async function enterMine(tab){
+  if(tab && MINE_TABS.some(t=>t[0]===tab)){ mine.tab = tab; } 
   $('#mineList').innerHTML = '<p class="muted">Se încarcă…</p>';
   const sel = $('#mineCat'); if(sel && sel.options.length<2) sel.insertAdjacentHTML('beforeend', CATEGORIES.map(c=>`<option>${esc(c[0])}</option>`).join(''));
   const r = await api('/api/listings/mine');
@@ -3468,15 +3472,16 @@ function mineRow(x){
   const st = STATUS_LABEL[x.status] || [x.status,''];
   const del = x.status==='deleted', locked = x.status==='blocked';
   const showBadge = x.status!=='approved';
+  const expSoon = mineExpiring(x), dd = expSoon ? mineExpDays(x) : 0;
   const btns = del
-    ? `<button type="button" class="mine-act" data-m-restore="${x.id}" title="Restaurează" aria-label="Restaurează">${MI.back}</button><button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge definitiv" aria-label="Șterge definitiv">${MI.del}</button>`
-    : `${PROMO_ON?`<button type="button" class="mine-act" data-m-promo="${x.id}" title="${x.promoted?'Prelungește promovarea':'Promovează'}" aria-label="${x.promoted?'Prelungește promovarea':'Promovează'}">${MI.promo}</button>`:''}<button type="button" class="mine-act" data-m-bump="${x.id}" title="Reactualizează" aria-label="Reactualizează">${MI.up}</button>${locked?'':`<button type="button" class="mine-act" data-m-edit="${x.id}" title="Editează" aria-label="Editează">${MI.edit}</button>`}${x.status==='approved'||x.status==='sold'?`<button type="button" class="mine-act" data-m-sold="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}" aria-label="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}">${x.status==='sold'?MI.back:MI.ok}</button>`:''}<button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge" aria-label="Șterge">${MI.del}</button>`;
+    ? `<button type="button" class="mine-act" data-m-restore="${x.id}" title="Reactualizează" aria-label="Reactualizează">${MI.up}</button><button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge definitiv" aria-label="Șterge definitiv">${MI.del}</button>`
+    : `${expSoon?`<button type="button" class="mine-act mine-act-txt" data-m-renew="${x.id}" title="Activează (încă 30 de zile)" aria-label="Activează">${MI.ok}<span>Activează</span></button>`:''}${PROMO_ON?`<button type="button" class="mine-act" data-m-promo="${x.id}" title="${x.promoted?'Prelungește promovarea':'Promovează'}" aria-label="${x.promoted?'Prelungește promovarea':'Promovează'}">${MI.promo}</button>`:''}<button type="button" class="mine-act" data-m-bump="${x.id}" title="Reactualizează" aria-label="Reactualizează">${MI.up}</button>${locked?'':`<button type="button" class="mine-act" data-m-edit="${x.id}" title="Editează" aria-label="Editează">${MI.edit}</button>`}${x.status==='approved'||x.status==='sold'?`<button type="button" class="mine-act" data-m-sold="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}" aria-label="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}">${x.status==='sold'?MI.back:MI.ok}</button>`:''}<button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge" aria-label="Șterge">${MI.del}</button>`;
   return `<article class="mine-row${x.promoted?' is-promoted':''}">
     <label class="mine-check"><input type="checkbox" data-m-check="${x.id}" ${mine.sel.has(x.id)?'checked':''} aria-label="Selectează anunțul"></label>
     <button type="button" class="mine-thumb" data-m-open="${x.id}" aria-label="Deschide anunțul">${img?`<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`:'<span>📷</span>'}</button>
     <div class="mine-body">
       <button type="button" class="mine-name" data-m-open="${x.id}">${esc(x.title)}</button>
-      ${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:(x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+esc(promoUntilTxt(x)):''}</span>`:'')}
+      ${expSoon?`<span class="badge expire">⏳ Expiră ${dd<=0?'astăzi':(dd===1?'mâine':'în '+dd+' zile')}</span>`:''}${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:(x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+esc(promoUntilTxt(x)):''}</span>`:'')}
       <div class="mine-acts">${btns}</div>
     </div>
     <div class="mine-meta"><span class="mine-views">${MI.eye} ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${priceHtml(x)}</b></div>
@@ -3489,18 +3494,42 @@ function renderMine(){
   $('#mineTabs').innerHTML = MINE_TABS.map(([k,l])=>`<button type="button" role="tab" class="mine-tab ${mine.tab===k?'on':''}" data-m-tab="${k}">${l}${` <small>${mineTabItems(k).length}</small>`}</button>`).join('');
   const titles = {active:'Anunțuri active',sold:'Anunțuri cu stoc epuizat',expire:'Anunțuri care expiră',promo:'Anunțuri promovate',deleted:'Anunțuri șterse'};
   $('#mineCount').textContent = total ? `${titles[mine.tab]} (${from+1} - ${from+slice.length} din ${total})` : titles[mine.tab];
-  const empty = {active:'Nu ai anunțuri active.',sold:'Nu ai anunțuri cu stoc epuizat.',expire:`Nu ai anunțuri publicate de peste ${MINE_EXPIRE_DAYS} de zile.`,promo:'Nu ai anunțuri promovate. Promovarea va fi disponibilă în curând.',deleted:'Nu ai anunțuri șterse.'};
+  const empty = {active:'Nu ai anunțuri active.',sold:'Nu ai anunțuri cu stoc epuizat.',expire:`Niciun anunț nu expiră în următoarele ${MINE_EXPIRE_WARN_DAYS} zile.`,promo:'Nu ai anunțuri promovate. Promovarea va fi disponibilă în curând.',deleted:'Nu ai anunțuri șterse.'};
   $('#mineList').innerHTML = slice.length ? slice.map(mineRow).join('') : `<div class="empty">${mine.q||mine.cat||mine.type?'Niciun anunț nu corespunde filtrelor.':empty[mine.tab]}</div>`;
   $('#minePager').innerHTML = pages>1 ? `<button type="button" class="btn ghost small" data-m-page="${mine.page-1}" ${mine.page<=1?'disabled':''}>‹ Înapoi</button><span>Pagina ${mine.page} din ${pages}</span><button type="button" class="btn ghost small" data-m-page="${mine.page+1}" ${mine.page>=pages?'disabled':''}>Înainte ›</button>` : '';
+  const ha = $('#mineHeadActs');
+  if(ha){
+    const nAll = all.length, b = (k,l,cls)=> `<button type="button" class="btn ${cls||'ghost'} small" data-m-all="${k}">${l}</button>`;
+    ha.innerHTML = !nAll ? '' : (mine.tab==='expire' ? b('renew',`Activează toate (${nAll})`,'primary')+b('del','Șterge toate','danger')
+      : mine.tab==='deleted' ? b('restore',`Reactualizează toate (${nAll})`,'primary')+b('purge','Șterge definitiv toate','danger')
+      : mine.tab==='promo' ? '' : b('del',`Șterge toate (${nAll})`,'danger'));
+  }
   const ids = slice.map(x=>x.id);
   $('#mineAll').checked = ids.length>0 && ids.every(i=>mine.sel.has(i));
   const n = mine.sel.size, bulk = $('#mineBulk');
   bulk.classList.toggle('hidden', !n);
   bulk.innerHTML = n ? `<span>${n} selectate</span>` + (mine.tab==='deleted'
-    ? `<button type="button" class="btn ghost small" data-m-bulk="restore">Restaurează</button><button type="button" class="btn danger small" data-m-bulk="del">Șterge definitiv</button>`
-    : `${mine.tab==='sold'?'<button type="button" class="btn ghost small" data-m-bulk="instock">Repune în stoc</button>':'<button type="button" class="btn ghost small" data-m-bulk="sold">Stoc epuizat</button>'}<button type="button" class="btn danger small" data-m-bulk="del">Șterge</button>`) : '';
+    ? `<button type="button" class="btn ghost small" data-m-bulk="restore">Reactualizează</button><button type="button" class="btn danger small" data-m-bulk="del">Șterge definitiv</button>`
+    : `${mine.tab==='expire'?'<button type="button" class="btn ghost small" data-m-bulk="renew">Activează</button>':''}${mine.tab==='sold'?'<button type="button" class="btn ghost small" data-m-bulk="instock">Repune în stoc</button>':'<button type="button" class="btn ghost small" data-m-bulk="sold">Stoc epuizat</button>'}<button type="button" class="btn danger small" data-m-bulk="del">Șterge</button>`) : '';
 }
 async function mineDo(ids, kind){
+  if(kind==='del'||kind==='restore'||kind==='renew'){
+    const action = kind==='del' && mine.tab==='deleted' ? 'purge' : kind;
+    let msg = 'Gata.';
+    try{
+      let done = 0, skipped = 0, lim = false;
+      for(let i=0;i<ids.length;i+=500){
+        const r = await api('/api/listings/bulk',{method:'POST',body:JSON.stringify({action,ids:ids.slice(i,i+500)})});
+        done += r.done||0; skipped += r.skipped||0; lim = lim || !!r.limit_hit;
+      }
+      msg = action==='renew' ? `${done} anunțuri active încă 30 de zile.` : action==='restore' ? `${done} anunțuri reactualizate (încă 30 de zile).` : action==='purge' ? `${done} anunțuri șterse definitiv.` : `${done} anunțuri mutate în „Șterse”.`;
+      if(lim) msg += ' Ai atins limita de anunțuri active.';
+    }catch(e){ msg = e.message || 'Nu s-a putut face modificarea.'; }
+    mine.sel.clear();
+    const r = await api('/api/listings/mine'); mine.items = r.listings||[]; state.loaded = mine.items; renderMine();
+    toast(msg); refreshCounts && refreshCounts();
+    return;
+  }
   let ok = 0, last = '';
   for(const id of ids){
     try{
@@ -3525,6 +3554,13 @@ document.addEventListener('click', e=>{
   if((el=e.target.closest('[data-m-promo]'))){ safe(promoDialog)(Number(el.dataset.mPromo)); return; }
   if((el=e.target.closest('[data-m-bump]'))){ safe(()=>mineDo([Number(el.dataset.mBump)],'bump'))(); return; }
   if((el=e.target.closest('[data-m-sold]'))){ safe(()=>mineDo([Number(el.dataset.mSold)], el.dataset.to==='sold'?'sold':'instock'))(); return; }
+  if((el=e.target.closest('[data-m-renew]'))){ safe(()=>mineDo([Number(el.dataset.mRenew)],'renew'))(); return; }
+  if((el=e.target.closest('[data-m-all]'))){
+    const k=el.dataset.mAll, ids=mineVisible().map(x=>x.id);
+    const q={renew:`Activezi toate cele ${ids.length} anunțuri pentru încă 30 de zile?`,del:`Muți toate cele ${ids.length} anunțuri în „Șterse”?`,restore:`Reactualizezi toate cele ${ids.length} anunțuri pentru încă 30 de zile?`,purge:`Ștergi DEFINITIV toate cele ${ids.length} anunțuri? Nu se mai pot recupera.`}[k];
+    if(ids.length && confirm(q)) safe(()=>mineDo(ids, k==='purge'?'del':k))();
+    return;
+  }
   if((el=e.target.closest('[data-m-restore]'))){ safe(()=>mineDo([Number(el.dataset.mRestore)],'restore'))(); return; }
   if((el=e.target.closest('[data-m-del]'))){ const id=Number(el.dataset.mDel), hard=mine.tab==='deleted'; if(confirm(hard?'Ștergi definitiv acest anunț? Nu se mai poate recupera.':'Muți anunțul în „Șterse”?')) safe(()=>mineDo([id],'del'))(); return; }
   if((el=e.target.closest('[data-m-bulk]'))){ const k=el.dataset.mBulk, ids=[...mine.sel]; if(k==='del' && !confirm(mine.tab==='deleted'?'Ștergi definitiv anunțurile selectate?':'Muți anunțurile selectate în „Șterse”?')) return; safe(()=>mineDo(ids,k))(); return; }
@@ -3921,7 +3957,7 @@ document.addEventListener('scroll',e=>{
 
 
 /* ---------- rezumat notificări (Contul meu) ---------- */
-const NOTIF_ROWS=[['messages','✉','mesaje necitite','messages'],['orders_seller','📦','comenzi noi din oferte','orders-seller'],['orders_buyer','🧾','comenzi în curs','orders'],['offers_received','💬','oferte primite la cereri','offers-received'],['alerts','🔔','alerte din căutări salvate','notifications'],['expire','⏳','anunțuri care expiră curând','listings']];
+const NOTIF_ROWS=[['messages','✉','mesaje necitite','messages'],['orders_seller','📦','comenzi noi din oferte','orders-seller'],['orders_buyer','🧾','comenzi în curs','orders'],['offers_received','💬','oferte primite la cereri','offers-received'],['alerts','🔔','alerte din căutări salvate','notifications'],['expire','⏳','anunțuri care expiră curând','listings-expire']];
 function toggleNotifSummary(){
   const b=$('#notifSummary'), btn=$('#notifBtn'); if(!b) return;
   const open=b.classList.toggle('hidden')===false;
@@ -4216,7 +4252,7 @@ function addSwipe(el, onSwipe){
       L('Cardul vânzătorului','Apasă pe el ca să vezi toate anunțurile lui, calificativele și datele de contact.')]},
     'page-mine':{title:'Anunțurile mele',intro:'Aici gestionezi anunțurile pe care le-ai publicat.',items:[
       L('Cum postezi un anunț','Din meniu apasă „Postează un anunț”. Completezi titlul, pozele, mașina și prețul, apoi „Publică anunțul”. Anunțul apare întâi „În așteptare”, până îl verifică echipa.'),
-      L('Filele: Active, Stoc epuizat, Expiră, Promovate, Șterse','Împart anunțurile după stare. La „Expiră” vezi anunțurile care expiră curând.'),
+      L('Filele: Active, Stoc epuizat, Expiră, Promovate, Șterse','Împart anunțurile după stare. La „Expiră” vezi anunțurile care expiră în următoarele 7 zile; le poți activa (încă 30 de zile) sau șterge. Cele expirate trec automat în „Șterse”, de unde le poți reactualiza.'),
       L('Reactualizează (săgeata în sus)','Aduce anunțul din nou sus în listă. Nu se poate face prea des.'),
       L('Editează (creionul)','Modifici anunțul. Dacă schimbi pozele, categoria, marca, modelul, anul, codul OEM sau tipul, anunțul este verificat din nou.'),
       L('Stoc epuizat / Repune în stoc','Marchezi piesa vândută, ca să nu mai fii sunat degeaba. Același buton o repune la vânzare.'),

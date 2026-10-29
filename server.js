@@ -467,6 +467,11 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS promoted_until TIMESTAMPTZ',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS expiry_notice SMALLINT NOT NULL DEFAULT 0',
+  "UPDATE listings SET expires_at=GREATEST(created_at+INTERVAL '30 days',NOW()+INTERVAL '10 days') WHERE expires_at IS NULL",
+  "ALTER TABLE listings ALTER COLUMN expires_at SET DEFAULT (NOW()+INTERVAL '30 days')",
+  'CREATE INDEX IF NOT EXISTS listings_expires_idx ON listings(status,expires_at)',
   'CREATE TABLE IF NOT EXISTS credit_tx (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, balance_after INTEGER NOT NULL, kind TEXT NOT NULL, ref_id INTEGER, note TEXT, amount_lei NUMERIC(12,2), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
   'CREATE INDEX IF NOT EXISTS credit_tx_user_idx ON credit_tx(user_id,created_at DESC)',
   'CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, session_id TEXT UNIQUE NOT NULL, pack TEXT NOT NULL, credits INTEGER NOT NULL, amount_lei NUMERIC(12,2), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
@@ -1087,7 +1092,7 @@ const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
 const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèêëáàäãåíìïóòôöõúùûüçñšžčřěýÿ','aaisstteeeeaaaaaiiiooooouuuucnszcreyy')`;
 const flat=c=>`regexp_replace(${fold(c)},'[^a-z0-9]+','','g')`;
 app.get('/api/listings/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query(`SELECT ${LIST_COLS},l.added_at FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
+ const r=await pool.query(`SELECT ${LIST_COLS},l.added_at,l.expires_at FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
  res.json({listings:r.rows});
 });
 app.get('/api/favorites',auth,requireDb,async(req,res)=>{
@@ -1232,7 +1237,7 @@ app.patch('/api/listings/:id/status',auth,requireDb,async(req,res)=>{
  const to=String((req.body||{}).status||'');
  if(!['sold','approved'].includes(to))return res.status(400).json({error:'STATUS_INVALIDE'});
  // Proprietarul poate comuta doar între „publicat” și „vândut”; restul statusurilor (moderare) rămân la admin.
- const r=await pool.query("UPDATE listings SET status=$1 WHERE id=$2 AND user_id=$3 AND status IN ('approved','sold') RETURNING id,status",[to,req.params.id,req.user.id]);
+ const r=await pool.query("UPDATE listings SET status=$1,expires_at=CASE WHEN $1='approved' THEN GREATEST(expires_at,NOW()+INTERVAL '30 days') ELSE expires_at END,expiry_notice=CASE WHEN $1='approved' THEN 0 ELSE expiry_notice END WHERE id=$2 AND user_id=$3 AND status IN ('approved','sold') RETURNING id,status",[to,req.params.id,req.user.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  logEvent(req.user.id,to==='sold'?'listing_sold':'listing_resale','listing',r.rows[0].id,'');
  res.json({listing:r.rows[0]});
@@ -1246,17 +1251,70 @@ app.delete('/api/listings/:id',auth,requireDb,async(req,res)=>{
  res.json({ok:true,deleted:'hard'});
 });
 app.patch('/api/listings/:id/restore',auth,requireDb,async(req,res)=>{
- // Restaurarea republică anunțul (sau îl trimite la moderare dacă AUTO_APPROVE=false).
- const r=await pool.query("UPDATE listings SET status=$3 WHERE id=$1 AND user_id=$2 AND status='deleted' RETURNING id,status",[req.params.id,req.user.id,NEW_LISTING_STATUS]);
- if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
- res.json({listing:r.rows[0]});
+  // „Reactualizează” din Șterse: republică anunțul pentru încă 30 de zile (sau îl trimite la moderare dacă AUTO_APPROVE=false).
+  if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[req.user.id]);if(act.rows[0].n>=ACTIVE_LISTINGS_LIMIT)return res.status(403).json({error:'LIMITA_ANUNTURI'});}
+  const r=await pool.query("UPDATE listings SET status=$3,created_at=NOW(),expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=$1 AND user_id=$2 AND status='deleted' RETURNING id,status",[req.params.id,req.user.id,NEW_LISTING_STATUS]);
+  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+  res.json({listing:r.rows[0]});
 });
 app.post('/api/listings/:id/bump',auth,requireDb,async(req,res)=>{
  // Reactualizare: anunțul urcă în listă; maximum o dată la 24 de ore.
- const r=await pool.query("UPDATE listings SET created_at=NOW() WHERE id=$1 AND user_id=$2 AND status='approved' AND created_at<NOW()-INTERVAL '24 hours' RETURNING id,created_at",[req.params.id,req.user.id]);
+ const r=await pool.query("UPDATE listings SET created_at=NOW(),expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=$1 AND user_id=$2 AND status='approved' AND created_at<NOW()-INTERVAL '24 hours' RETURNING id,created_at",[req.params.id,req.user.id]);
  if(!r.rowCount)return res.status(400).json({error:'REACTUALIZARE_PREA_DEVREME'});
  res.json({listing:r.rows[0]});
 });
+
+/* ===== Expirarea anunțurilor (30 de zile) ===== */
+const LISTING_LIFE_DAYS=30, EXPIRE_WARN_DAYS=7;
+// Activează = prelungește cu încă 30 de zile, fără să mute anunțul în capul listei.
+app.post('/api/listings/:id/renew',auth,requireDb,ah(async(req,res)=>{
+  const r=await pool.query("UPDATE listings SET expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=$1 AND user_id=$2 AND status='approved' RETURNING id,expires_at",[req.params.id,req.user.id]);
+  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+  res.json({listing:r.rows[0]});
+}));
+// Acțiuni în masă (toate filele din „Anunțurile mele”): delete (mută în Șterse), purge (ștergere definitivă din Șterse), restore (Reactualizează din Șterse), renew (Activează).
+app.post('/api/listings/bulk',auth,requireDb,ah(async(req,res)=>{
+  const b=req.body||{}, action=String(b.action||'');
+  const ids=[...new Set((Array.isArray(b.ids)?b.ids:[]).map(Number).filter(n=>Number.isInteger(n)&&n>0&&n<2147483647))].slice(0,1000);
+  if(!ids.length||!['delete','purge','restore','renew'].includes(action))return res.status(400).json({error:'DATE_INVALIDE'});
+  const uid=req.user.id;
+  if(action==='delete'){
+    const r=await pool.query("UPDATE listings SET status='deleted' WHERE id=ANY($1::int[]) AND user_id=$2 AND status<>'deleted' RETURNING id",[ids,uid]);
+    return res.json({done:r.rowCount,skipped:ids.length-r.rowCount});
+  }
+  if(action==='purge'){
+    const r=await pool.query("DELETE FROM listings WHERE id=ANY($1::int[]) AND user_id=$2 AND status='deleted' RETURNING id",[ids,uid]);
+    return res.json({done:r.rowCount,skipped:ids.length-r.rowCount});
+  }
+  if(action==='renew'){
+    const r=await pool.query("UPDATE listings SET expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=ANY($1::int[]) AND user_id=$2 AND status='approved' RETURNING id",[ids,uid]);
+    return res.json({done:r.rowCount,skipped:ids.length-r.rowCount});
+  }
+  // restore
+  let room=ids.length;
+  if(req.user.role!=='admin'){const act=await pool.query("SELECT COUNT(*)::int n FROM listings WHERE user_id=$1 AND status IN ('approved','pending')",[uid]);room=Math.max(0,ACTIVE_LISTINGS_LIMIT-act.rows[0].n);}
+  if(room<=0)return res.status(403).json({error:'LIMITA_ANUNTURI'});
+  const pick=await pool.query("SELECT id FROM listings WHERE id=ANY($1::int[]) AND user_id=$2 AND status='deleted' ORDER BY id LIMIT $3",[ids,uid,room]);
+  const ok=pick.rows.map(x=>x.id);
+  if(ok.length)await pool.query("UPDATE listings SET status=$2,created_at=NOW(),expires_at=NOW()+INTERVAL '30 days',expiry_notice=0 WHERE id=ANY($1::int[])",[ok,NEW_LISTING_STATUS]);
+  res.json({done:ok.length,skipped:ids.length-ok.length,limit_hit:ok.length<ids.length&&ok.length===room});
+}));
+let expiryBusy=false;
+async function expiryTick(){
+  if(!pool||expiryBusy)return; expiryBusy=true;
+  try{
+    // 1) Expirate -> direct în „Șterse”
+    const gone=await pool.query("UPDATE listings SET status='deleted' WHERE status='approved' AND expires_at<=NOW() RETURNING user_id");
+    const byUser=new Map(); for(const x of gone.rows)byUser.set(x.user_id,(byUser.get(x.user_id)||0)+1);
+    for(const [uid,n] of byUser)notify(uid,n+(n===1?' anunț a expirat și a fost mutat':' anunțuri au expirat și au fost mutate')+' în „Șterse”. Din „Șterse” le poți reactualiza oricând.','expire');
+    // 2) Avertisment cu 3 zile înainte, apoi cu 7 zile înainte (un mesaj pe utilizator, nu pe anunț)
+    for(const [stage,days] of [[2,3],[1,EXPIRE_WARN_DAYS]]){
+      const w=await pool.query("UPDATE listings SET expiry_notice=$1 WHERE status='approved' AND expires_at>NOW() AND expires_at<=NOW()+($2||' days')::interval AND expiry_notice<$1 RETURNING user_id",[stage,String(days)]);
+      const per=new Map(); for(const x of w.rows)per.set(x.user_id,(per.get(x.user_id)||0)+1);
+      for(const [uid,n] of per)notify(uid,(n===1?'Un anunț expiră':n+' anunțuri expiră')+' în maximum '+days+' zile. Intră la Anunțurile mele → Expiră ca să le activezi sau să le ștergi.','expire');
+    }
+  }catch(e){console.error('expiryTick',e.message);}finally{expiryBusy=false;}
+}
 
 /* ===== Credite și promovare anunțuri ===== */
 const PROMO_PLANS={3:5,7:10,30:30}; // zile -> credite
@@ -1765,10 +1823,10 @@ app.patch('/api/admin/listings/:id',auth,admin,requireDb,ah(async(req,res)=>{
  const r=await pool.query(`UPDATE listings SET ${sets.join(',')} WHERE id=$${vals.length} RETURNING *`,vals);
  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',
   [req.user.id,changes.some(c=>c.startsWith('status:'))?'update_listing':'edit_listing','listing',Number(id),changes.join('; ').slice(0,900)]);
- if(status==='approved')alertForListings([r.rows[0].id]);
+ if(status==='approved'){pool.query("UPDATE listings SET expires_at=GREATEST(expires_at,NOW()+INTERVAL '30 days'),expiry_notice=0 WHERE id=$1",[r.rows[0].id]).catch(()=>{});alertForListings([r.rows[0].id]);}
  res.json({listing:r.rows[0],changed:true,changes});
 }));
-app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved' WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
+app.post('/api/admin/listings/approve-all',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query("UPDATE listings SET status='approved',expires_at=GREATEST(expires_at,NOW()+INTERVAL '30 days') WHERE status='pending' RETURNING id");await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'approve_all','listing',null,String(r.rowCount)]);alertForListings(r.rows.map(x=>x.id));res.json({approved:r.rowCount});}));
 app.get('/api/admin/listings/:id/img/:n',auth,admin,requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
  const r=await pool.query('SELECT images[$2::int] img FROM listings WHERE id=$1',[req.params.id,n+1]);
@@ -1902,7 +1960,7 @@ app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempt
 
 /* ---------- oferte, comenzi, notificări ---------- */
 const mailGate=new Map();
-const MAIL_COL={msg:'mail_msg',offer:'mail_offer',order:'mail_order',alert:'mail_alert'};
+const MAIL_COL={msg:'mail_msg',offer:'mail_offer',order:'mail_order',alert:'mail_alert',expire:'mail_alert'};
 async function mailNotify(uid,kind,text){
   try{
     const col=MAIL_COL[kind];
@@ -2346,7 +2404,7 @@ app.get('/api/counts',auth,requireDb,ah(async(req,res)=>{
   (SELECT COUNT(*)::int FROM orders WHERE buyer_id=$1 AND status IN ('confirmed','shipped') AND buyer_seen_status IS DISTINCT FROM status) AS orders_buyer,
   (SELECT COUNT(*)::int FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE q.user_id=$1 AND q.status='open' AND o.status='pending') AS offers_received,
   (SELECT COUNT(*)::int FROM notifications WHERE user_id=$1 AND NOT is_read AND kind='alert') AS alerts,
-  (SELECT COUNT(*)::int FROM listings WHERE user_id=$1 AND status='approved' AND created_at < NOW() - INTERVAL '30 days') AS expire`,[req.user.id])).rows[0];
+  (SELECT COUNT(*)::int FROM listings WHERE user_id=$1 AND status='approved' AND expires_at <= NOW() + INTERVAL '7 days') AS expire`,[req.user.id])).rows[0];
  const total=r.messages+r.orders_seller+r.orders_buyer+r.offers_received+r.alerts+r.expire;
  res.set('Cache-Control','no-store');
  res.json({...r,total});
@@ -2618,6 +2676,7 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
   if(pool)setInterval(()=>pool.query("DELETE FROM site_events WHERE created_at<NOW()-INTERVAL '180 days'").catch(()=>{}),6*3600*1000).unref();
   if(pool)setInterval(()=>pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'").catch(()=>{}),30*60*1000).unref();
   if(pool){setInterval(flushRateState,10*1000).unref();setInterval(()=>pool.query('DELETE FROM rate_state WHERE exp<$1',[Date.now()]).catch(()=>{}),30*60*1000).unref();}
+  if(pool){setTimeout(expiryTick,45*1000).unref();setInterval(expiryTick,60*60*1000).unref();}
   if(pool){purgeStats();setInterval(purgeStats,60*60*1000).unref();}
   if(pool)setInterval(()=>pool.query('DELETE FROM sessions WHERE expires_at < NOW()').catch(e=>console.error('session cleanup',e.message)),60*60*1000).unref();
   const stop=()=>{server.close(()=>{(pool?flushRateState().catch(()=>{}).then(()=>pool.end()):Promise.resolve()).finally(()=>process.exit(0));});setTimeout(()=>process.exit(0),8000).unref();};
