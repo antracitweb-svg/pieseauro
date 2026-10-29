@@ -3999,3 +3999,23 @@ html.dark .acc-dn,html.dark .cr-amt.minus,html.dark .mr-del,html.dark .danger-te
 html.dark .error-message,html.dark .field-error-message{color:#e08a84!important}
 html.dark .acc-up,html.dark .cr-amt.plus{color:#6fcf97}
 html.dark .ok-message{color:#7fd6a0!important}
+
+
+/* ===== Anunț promovat: chenar auriu discret + insignă ===== */
+.promo-badge{position:absolute;left:6px;top:6px;z-index:3;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:linear-gradient(180deg,#c9a46a,#b8935a);color:#fff;font-size:11px;font-weight:800;letter-spacing:.2px;line-height:1.4;box-shadow:0 2px 8px rgba(14,15,18,.25);pointer-events:none}
+.badge.promo{background:#f6ead3;color:#7a5a28;border:1px solid #e0c895}
+.ar-row.is-promoted,
+#listingGrid .ar-row.is-promoted,
+#homeFeed .ar-row.is-promoted,
+.similar-grid .ar-row.is-promoted{border-color:#b8935a!important;box-shadow:0 0 0 1px #b8935a;background:#fcf8ef}
+#listingGrid .ar-row.is-promoted:hover,
+#homeFeed .ar-row.is-promoted:hover,
+.similar-grid .ar-row.is-promoted:hover{background:#fcf8ef;box-shadow:0 0 0 1px #b8935a,0 10px 28px rgba(184,147,90,.22)}
+.mine-row.is-promoted{box-shadow:inset 3px 0 0 #b8935a}
+html.dark .promo-badge{background:linear-gradient(180deg,#d4b483,#b8935a);color:#14110c}
+html.dark .badge.promo{background:rgba(184,147,90,.18);color:#e9d3a8;border-color:rgba(184,147,90,.5)}
+html.dark .ar-row.is-promoted,
+html.dark #listingGrid .ar-row.is-promoted,
+html.dark #homeFeed .ar-row.is-promoted,
+html.dark .similar-grid .ar-row.is-promoted{border-color:#b8935a!important;box-shadow:0 0 0 1px #b8935a;background:rgba(184,147,90,.08)}
+html.dark .mine-row.is-promoted{box-shadow:inset 3px 0 0 #b8935a}

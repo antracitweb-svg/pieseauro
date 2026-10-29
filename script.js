@@ -82,6 +82,9 @@ function cleanOemAlt(raw){
  return out.join(', ')||null;
 }
 function money(n){ return Number(n)>0 ? new Intl.NumberFormat('ro-RO').format(Number(n))+' lei' : 'La cerere'; }
+/* Anunț promovat: insignă + dată de expirare */
+function promoUntilTxt(x){ const d=new Date(x&&x.promoted_until); return isNaN(d)?'':d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'}); }
+function promoBadge(){ return '<span class="promo-badge" title="Anunț promovat"><span aria-hidden="true">⭐</span> Promovat</span>'; }
 function fmtDate(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('ro-RO'); }
 function fmtDateTime(iso){
   const d=new Date(iso); if(isNaN(d)) return '';
@@ -1143,9 +1146,9 @@ function cardMine(x){
     x.status!=='blocked'?`<button type="button" class="mr-btn" data-edit-listing="${x.id}" title="Editează" aria-label="Editează">✎</button>`:'',
     `<button type="button" class="mr-btn mr-del" data-del-listing="${x.id}" title="Șterge" aria-label="Șterge">🗑</button>`
   ].join('');
-  return `<article class="listing mine-row" data-open="${x.id}" tabindex="0">
+  return `<article class="listing mine-row${x.promoted?' is-promoted':''}" data-open="${x.id}" tabindex="0">
     <div class="mr-top"><div class="mr-img">${img}</div>
-      <div class="mr-main"><h3 class="mr-title">${esc(x.title)}</h3>${st[0]?`<span class="badge ${st[1]}">${st[0]}</span>`:''}<div class="mr-acts">${btns}</div></div></div>
+      <div class="mr-main"><h3 class="mr-title">${esc(x.title)}</h3>${st[0]?`<span class="badge ${st[1]}">${st[0]}</span>`:''}${x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+promoUntilTxt(x):''}</span>`:''}<div class="mr-acts">${btns}</div></div></div>
     <div class="mr-foot"><span class="mr-views" title="Vizualizări">👁 ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${money(x.price)}</b></div></article>`;
 }
 /* Format compact (ca în „Anunțurile mele”): poză stânga, titlu, butoane, apoi vizualizări · bucăți · preț. Folosit peste tot unde apar anunțuri. */
@@ -1188,8 +1191,9 @@ function adRowHtml(x, eager){
   const dtRaw = fmtUpdated(x.created_at).replace(/^Actualizat /,'').replace(/^la /,'');
   const sub = [`<span class="ar-loc">📍 ${esc(x.county||'România')}</span>`, dtRaw ? `<span class="ar-dt"><span class="dt-pre">Actualizat </span>${esc(dtRaw)}</span>` : '', x.seller_name ? `<span class="ar-sl">${esc(x.seller_name)+(sType?' ('+esc(sType)+')':'')}</span>` : ''].filter(Boolean).join('');
   const hasPrice = Number(x.price)>0;
-  return `<article class="ar-row" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}">
-    <div class="ar-thumb">${thumb}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
+  const isPromo = !!x.promoted;
+  return `<article class="ar-row${isPromo?' is-promoted':''}" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}${isPromo?' (anunț promovat)':''}">
+    <div class="ar-thumb">${thumb}${isPromo?promoBadge():''}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
     <div class="ar-main">
       <h3 class="ar-title">${esc(x.title)}</h3>
       <div class="ar-meta">${meta.map(esc).join(' · ')}</div>
@@ -1513,7 +1517,7 @@ function detailHtml(x, phones, canContact){
   const ownLbl = (STATUS_LABEL[ownSt]||[''])[0];
   const ownBtns = [];
   if(isOwner){
-    if(ownSt==='approved'&&PROMO_ON) ownBtns.push(`<button type="button" class="btn small ad-promo" data-d-promo="${x.id}">📣 Promovează</button>`);
+    if(ownSt==='approved'&&PROMO_ON) ownBtns.push(`<button type="button" class="btn small ad-promo" data-d-promo="${x.id}">${x.promoted?'📣 Prelungește promovarea':'📣 Promovează'}</button>`);
     if(ownSt!=='blocked') ownBtns.push(`<button type="button" class="btn ghost small" data-edit-listing="${x.id}">✎ Editează</button>`);
     if(ownSt==='approved') ownBtns.push(`<button type="button" class="btn ghost small" data-d-bump="${x.id}">↑ Actualizează (UP)</button>`);
     if(ownSt==='approved'||ownSt==='sold') ownBtns.push(`<button type="button" class="btn ghost small" data-sold-listing="${x.id}" data-to="${ownSt==='sold'?'approved':'sold'}">${ownSt==='sold'?'↺ Repune la vânzare':'✓ Marchează vândut'}</button>`);
@@ -1539,7 +1543,7 @@ function detailHtml(x, phones, canContact){
   </div>
   <aside class="ad-side">
     <div class="ad-card">
-      <div class="detail-top"><span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
+      <div class="detail-top">${x.promoted?'<span class="badge promo">⭐ Promovat</span>':''}<span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
       <div class="detail-price">${money(x.price)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
       <p class="ad-ship">${x.delivery?'🚚 Livrare disponibilă':'📍 Ridicare personală'}</p>
     </div>
@@ -3385,7 +3389,9 @@ async function promoDialog(id){
   try{
     const r=await api('/api/credits');
     const none=r.plans.every(p=>r.balance<p.cost);
-    b.innerHTML=`<h2>Promovează anunțul</h2><p class="form-note">Anunțul promovat apare primul în rezultate. Ai <b>${r.balance}</b> credite.</p><div class="promo-plans">${r.plans.map(p=>`<button type="button" class="btn ${r.balance>=p.cost?'primary':'ghost'} promo-plan" data-promo-go="${id}" data-days="${p.days}" ${r.balance>=p.cost?'':'disabled'}><b>${p.days} zile</b><span>${p.cost} credite</span></button>`).join('')}</div>${none?'<p class="form-note">Nu ai destule credite. <button type="button" class="text-btn" data-promo-credits>Vezi cum primești credite</button></p>':''}`;
+    const cur=(mine.items||[]).find(i=>i.id===id)||(state.loaded||[]).find(i=>i.id===id)||{};
+    const ext=!!cur.promoted;
+    b.innerHTML=`<h2>${ext?'Prelungește promovarea':'Promovează anunțul'}</h2>${ext&&promoUntilTxt(cur)?`<p class="form-note">Anunțul este promovat până pe <b>${esc(promoUntilTxt(cur))}</b>. Zilele noi se adaugă după această dată.</p>`:''}<p class="form-note">Anunțul promovat apare primul în rezultate. Ai <b>${r.balance}</b> credite.</p><div class="promo-plans">${r.plans.map(p=>`<button type="button" class="btn ${r.balance>=p.cost?'primary':'ghost'} promo-plan" data-promo-go="${id}" data-days="${p.days}" ${r.balance>=p.cost?'':'disabled'}><b>${p.days} zile</b><span>${p.cost} credite</span></button>`).join('')}</div>${none?'<p class="form-note">Nu ai destule credite. <button type="button" class="text-btn" data-promo-credits>Vezi cum primești credite</button></p>':''}`;
   }catch(e){ b.innerHTML='<p>'+esc(e.message||'Nu am putut încărca creditele.')+'</p>'; }
 }
 async function promoGo(el){
@@ -3446,13 +3452,13 @@ function mineRow(x){
   const showBadge = x.status!=='approved';
   const btns = del
     ? `<button type="button" class="mine-act" data-m-restore="${x.id}" title="Restaurează" aria-label="Restaurează">${MI.back}</button><button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge definitiv" aria-label="Șterge definitiv">${MI.del}</button>`
-    : `${PROMO_ON?`<button type="button" class="mine-act" data-m-promo="${x.id}" title="Promovează" aria-label="Promovează">${MI.promo}</button>`:''}<button type="button" class="mine-act" data-m-bump="${x.id}" title="Reactualizează" aria-label="Reactualizează">${MI.up}</button>${locked?'':`<button type="button" class="mine-act" data-m-edit="${x.id}" title="Editează" aria-label="Editează">${MI.edit}</button>`}${x.status==='approved'||x.status==='sold'?`<button type="button" class="mine-act" data-m-sold="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}" aria-label="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}">${x.status==='sold'?MI.back:MI.ok}</button>`:''}<button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge" aria-label="Șterge">${MI.del}</button>`;
-  return `<article class="mine-row">
+    : `${PROMO_ON?`<button type="button" class="mine-act" data-m-promo="${x.id}" title="${x.promoted?'Prelungește promovarea':'Promovează'}" aria-label="${x.promoted?'Prelungește promovarea':'Promovează'}">${MI.promo}</button>`:''}<button type="button" class="mine-act" data-m-bump="${x.id}" title="Reactualizează" aria-label="Reactualizează">${MI.up}</button>${locked?'':`<button type="button" class="mine-act" data-m-edit="${x.id}" title="Editează" aria-label="Editează">${MI.edit}</button>`}${x.status==='approved'||x.status==='sold'?`<button type="button" class="mine-act" data-m-sold="${x.id}" data-to="${x.status==='sold'?'approved':'sold'}" title="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}" aria-label="${x.status==='sold'?'Repune în stoc':'Stoc epuizat'}">${x.status==='sold'?MI.back:MI.ok}</button>`:''}<button type="button" class="mine-act" data-m-del="${x.id}" title="Șterge" aria-label="Șterge">${MI.del}</button>`;
+  return `<article class="mine-row${x.promoted?' is-promoted':''}">
     <label class="mine-check"><input type="checkbox" data-m-check="${x.id}" ${mine.sel.has(x.id)?'checked':''} aria-label="Selectează anunțul"></label>
     <button type="button" class="mine-thumb" data-m-open="${x.id}" aria-label="Deschide anunțul">${img?`<img src="${esc(img)}" alt="" loading="lazy" decoding="async">`:'<span>📷</span>'}</button>
     <div class="mine-body">
       <button type="button" class="mine-name" data-m-open="${x.id}">${esc(x.title)}</button>
-      ${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:''}
+      ${showBadge?`<span class="badge ${st[1]}">${esc(st[0])}</span>`:(x.promoted?`<span class="badge promo">⭐ Promovat${promoUntilTxt(x)?' până pe '+esc(promoUntilTxt(x)):''}</span>`:'')}
       <div class="mine-acts">${btns}</div>
     </div>
     <div class="mine-meta"><span class="mine-views">${MI.eye} ${Number(x.views)||0}</span><span>${Number(x.quantity)||1} buc.</span><b>${esc(money(x.price))}</b></div>
@@ -4136,7 +4142,7 @@ function addSwipe(el, onSwipe){
       L('Salvează căutarea','Salvează căutarea curentă. Primești o notificare când apare un anunț nou care i se potrivește (e nevoie de cont).'),
       L('Inimioara de pe anunț','Adaugă anunțul la Favorite, ca să îl găsești ușor mai târziu.'),
       L('Deschide un anunț','Apasă pe el ca să vezi pozele, detaliile și datele vânzătorului. De acolo îl poți contacta sau comanda.'),
-      L('Nu găsești piesa?','Folosește „Anunță ce piesă cauți”. Vânzătorii îți trimit oferte.')]},
+      L('Nu găsești piesa?','Folosește „Primește oferte piese”. Vânzătorii îți trimit oferte.')]},
     'seller':{title:'Anunțurile vânzătorului',intro:'Lista cu toate anunțurile active ale acestui vânzător.',items:[
       L('Înapoi','Te întoarce la pagina de unde ai venit.'),
       L('Calificativ și stele','Părerea cumpărătorilor care au comandat de la el. Apasă pe ele ca să vezi recenziile.'),
