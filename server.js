@@ -487,6 +487,20 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS listings_user_status_idx ON listings(user_id,status)',
   'ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ',
   "ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
+  'ALTER TABLE part_requests ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ',
+  "UPDATE part_requests SET expires_at=GREATEST(created_at+INTERVAL '7 days',NOW()+INTERVAL '3 days') WHERE expires_at IS NULL",
+  "ALTER TABLE part_requests ALTER COLUMN expires_at SET DEFAULT (NOW()+INTERVAL '7 days')",
+  'CREATE INDEX IF NOT EXISTS part_requests_expires_idx ON part_requests(status,expires_at)',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS req_posted INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS req_resolved INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS req_cancelled INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS req_expired INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS offers_sent INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS offers_won INTEGER NOT NULL DEFAULT 0',
+  'UPDATE users u SET req_posted=c.n FROM (SELECT user_id,COUNT(*)::int n FROM part_requests WHERE user_id IS NOT NULL GROUP BY user_id) c WHERE u.id=c.user_id AND u.req_posted=0',
+  "UPDATE users u SET req_resolved=c.n FROM (SELECT user_id,COUNT(*)::int n FROM part_requests WHERE user_id IS NOT NULL AND status='matched' GROUP BY user_id) c WHERE u.id=c.user_id AND u.req_resolved=0",
+  'UPDATE users u SET offers_sent=c.n FROM (SELECT seller_id,COUNT(*)::int n FROM offers WHERE seller_id IS NOT NULL GROUP BY seller_id) c WHERE u.id=c.seller_id AND u.offers_sent=0',
+  "UPDATE users u SET offers_won=c.n FROM (SELECT seller_id,COUNT(*)::int n FROM offers WHERE seller_id IS NOT NULL AND status='accepted' GROUP BY seller_id) c WHERE u.id=c.seller_id AND u.offers_won=0",
   "ALTER TABLE offers ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}'",
   'CREATE TABLE IF NOT EXISTS listing_stats (listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE, day DATE NOT NULL, views INTEGER NOT NULL DEFAULT 0, phone_clicks INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(listing_id,day))',
   'CREATE INDEX IF NOT EXISTS offers_request_idx ON offers(request_id)',
@@ -1347,6 +1361,13 @@ app.post('/api/listings/bulk',auth,requireDb,ah(async(req,res)=>{
   if(!o.done&&o.limit_hit)return res.status(403).json({error:'LIMITA_ANUNTURI'});
   res.json({done:o.done,skipped:o.skipped,spent:o.spent,insufficient:o.insufficient,limit_hit:o.limit_hit});
 }));
+// Cerere nouă de piese -> vânzătorii activi cu anunțuri publicate la aceeași marcă primesc notificare (și email, dacă au alertele pornite).
+async function notifySellersOfRequest(requesterId,make,model,title){
+  if(!make)return;
+  const q=await pool.query("SELECT DISTINCT l.user_id FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND LOWER(TRIM(l.make))=LOWER(TRIM($1)) AND u.status='active' AND l.user_id<>$2 LIMIT 300",[make,requesterId]);
+  const txt='Cerere nouă pentru '+[make,model].filter(Boolean).join(' ')+': „'+String(title).slice(0,80)+'”. O găsești la Cereri piese și poți trimite o ofertă.';
+  for(const x of q.rows)await notify(x.user_id,txt,'request');
+}
 let expiryBusy=false;
 async function expiryTick(){
   if(!pool||expiryBusy)return; expiryBusy=true;
@@ -1355,6 +1376,10 @@ async function expiryTick(){
     const gone=await pool.query("UPDATE listings SET status='deleted' WHERE status='approved' AND expires_at<=NOW() RETURNING user_id");
     const byUser=new Map(); for(const x of gone.rows)byUser.set(x.user_id,(byUser.get(x.user_id)||0)+1);
     for(const [uid,n] of byUser)notify(uid,n+(n===1?' anunț a expirat și a fost mutat':' anunțuri au expirat și au fost mutate')+' în „Șterse”. Din „Șterse” le poți reactualiza oricând.','expire');
+    // 1b) Cererile de piese expiră după 7 zile
+    const rq=await pool.query("UPDATE part_requests SET status='closed' WHERE status='open' AND expires_at<=NOW() RETURNING user_id,title");
+    for(const x of rq.rows)pool.query('UPDATE users SET req_expired=req_expired+1 WHERE id=$1',[x.user_id]).catch(()=>{});
+    for(const x of rq.rows)notify(x.user_id,'Cererea „'+String(x.title).slice(0,80)+'” a expirat după 7 zile. Poți posta oricând una nouă.','expire');
     // 2) Avertisment cu 3 zile înainte, apoi cu 7 zile înainte (un mesaj pe utilizator, nu pe anunț)
     for(const [stage,days] of [[2,3],[1,EXPIRE_WARN_DAYS]]){
       const w=await pool.query("UPDATE listings SET expiry_notice=$1 WHERE status='approved' AND expires_at>NOW() AND expires_at<=NOW()+($2||' days')::interval AND expiry_notice<$1 RETURNING user_id",[stage,String(days)]);
@@ -1787,15 +1812,15 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
 
 app.get('/api/requests',requireDb,ah(async(req,res)=>{
  const uid=await optUserId(req);
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+",(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT o.status FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer,(SELECT o.id FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer_id,(SELECT m.mark FROM request_marks m WHERE m.request_id=r.id AND m.user_id=$1::int) my_mark FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' ORDER BY r.created_at DESC LIMIT 100",[uid]);
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+",(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT o.status FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer,(SELECT o.id FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer_id,(SELECT m.mark FROM request_marks m WHERE m.request_id=r.id AND m.user_id=$1::int) my_mark FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' AND r.expires_at>NOW() ORDER BY r.created_at DESC LIMIT 100",[uid]);
  res.json({requests:r.rows});
 }));
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
- const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.description,r.extra_parts,r.status,r.created_at,r.images[1:1] images,GREATEST(0,CEIL(EXTRACT(EPOCH FROM (r.created_at+INTERVAL '10 minutes'-NOW()))))::int edit_secs,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id AND o.status='pending') offers_pending FROM part_requests r WHERE r.user_id=$1 ORDER BY r.created_at DESC LIMIT 200",[req.user.id]);
+ const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.description,r.extra_parts,r.status,r.created_at,r.expires_at,r.images[1:1] images,GREATEST(0,CEIL(EXTRACT(EPOCH FROM (r.created_at+INTERVAL '10 minutes'-NOW()))))::int edit_secs,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id AND o.status='pending') offers_pending FROM part_requests r WHERE r.user_id=$1 ORDER BY r.created_at DESC LIMIT 200",[req.user.id]);
  res.json({requests:r.rows});
 });
 app.get('/api/requests/mine/:id',auth,requireDb,ah(async(req,res)=>{
- const q=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.kind,r.county,r.city,r.ship_address,r.description,r.extra_parts,r.status,r.created_at,r.images,GREATEST(0,CEIL(EXTRACT(EPOCH FROM (r.created_at+INTERVAL '10 minutes'-NOW()))))::int edit_secs FROM part_requests r WHERE r.id=$1 AND r.user_id=$2",[req.params.id,req.user.id]);
+ const q=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.vin,r.kind,r.county,r.city,r.ship_address,r.description,r.extra_parts,r.status,r.created_at,r.expires_at,r.images,GREATEST(0,CEIL(EXTRACT(EPOCH FROM (r.created_at+INTERVAL '10 minutes'-NOW()))))::int edit_secs FROM part_requests r WHERE r.id=$1 AND r.user_id=$2",[req.params.id,req.user.id]);
  if(!q.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  const o=await pool.query("SELECT o.id,o.price,o.message,o.images,o.status,o.created_at,o.updated_at,o.seller_id,CASE WHEN o.status='accepted' THEN COALESCE(NULLIF(u.bill_company,''),NULLIF(u.name,''),u.nickname) ELSE COALESCE(NULLIF(u.bill_company,''),u.nickname,u.name) END seller_name,COALESCE(u.nickname,u.name) seller_nick,NULLIF(u.bill_company,'') company,CASE WHEN o.status='accepted' THEN u.name END seller_person,(u.store_logo IS NOT NULL) seller_has_logo,(u.avatar IS NOT NULL OR u.store_logo IS NOT NULL) seller_has_avatar,u.phone user_phone,(SELECT od.id FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_id,(SELECT od.created_at FROM orders od WHERE od.offer_id=o.id LIMIT 1) resolved_at,(SELECT od.status FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_status,(SELECT od.status_reason FROM orders od WHERE od.offer_id=o.id LIMIT 1) order_reason,(SELECT sr.stars FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_stars,(SELECT sr.comment FROM seller_ratings sr JOIN orders od ON od.id=sr.order_id WHERE od.offer_id=o.id LIMIT 1) given_comment,"+SELLER_RATE('o.seller_id','seller_rating')+" FROM offers o LEFT JOIN users u ON u.id=o.seller_id WHERE o.request_id=$1 ORDER BY (o.status='accepted') DESC,(o.status='pending') DESC,o.price ASC,o.created_at DESC",[req.params.id]);
  const ids=[...new Set(o.rows.filter(x=>x.status!=='rejected'&&x.seller_id).map(x=>x.seller_id))];
@@ -1834,9 +1859,18 @@ app.delete('/api/requests/:id(\\d+)/mark',auth,requireDb,ah(async(req,res)=>{
  await pool.query('DELETE FROM request_marks WHERE user_id=$1 AND request_id=$2',[req.user.id,req.params.id]);
  res.json({ok:true});
 }));
+// Reactivare: o cerere inactivă (expirată după 7 zile sau închisă) devine din nou activă pentru încă 7 zile și urcă în capul listei.
+app.post('/api/requests/:id(\\d+)/reactivate',auth,needVerified,requireDb,ah(async(req,res)=>{
+  if(!throttle(authAttempts,'reqre:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});
+  const r=await pool.query("UPDATE part_requests SET status='open',created_at=NOW(),expires_at=NOW()+INTERVAL '7 days' WHERE id=$1 AND user_id=$2 AND status='closed' RETURNING id,status,expires_at",[req.params.id,req.user.id]);
+  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+  res.json({request:r.rows[0]});
+}));
 app.delete('/api/requests/:id',auth,requireDb,async(req,res)=>{
- const d=await pool.query('DELETE FROM part_requests WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.id]);
+ const d=await pool.query('DELETE FROM part_requests WHERE id=$1 AND user_id=$2 RETURNING id,status',[req.params.id,req.user.id]);
  if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+ // „Anulată” = ștearsă de cumpărător cât era încă activă (cererile expirate sau rezolvate șterse nu se numără).
+ if(d.rows[0].status==='open')pool.query('UPDATE users SET req_cancelled=req_cancelled+1 WHERE id=$1',[req.user.id]).catch(()=>{});
  res.json({ok:true});
 });
 app.patch('/api/requests/:id',auth,needVerified,requireDb,ah(async(req,res)=>{
@@ -1852,7 +1886,7 @@ app.patch('/api/requests/:id',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!r.rowCount){const ex=await pool.query('SELECT 1 FROM part_requests WHERE id=$1 AND user_id=$2',[req.params.id,req.user.id]);return ex.rowCount?res.status(403).json({error:'EDIT_EXPIRAT'}):res.status(404).json({error:'NOT_FOUND'});}
  res.json({request:r.rows[0]});
 }));
-app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,ship_address,extra_parts,images:rawImages}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const pi=parseExtraImages(rawImages,6);if(pi.error)return res.status(400).json({error:pi.error});if(pi.images.length&&await imageQuotaExceeded(req.user.id,pi.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});try{pi.images=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts,images,ship_address) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id,title,status,created_at',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title)),pi.images,clip(ship_address,300)]);res.status(201).json({request:r.rows[0]});});
+app.post('/api/requests',auth,needVerified,requireDb,async(req,res)=>{if(!throttle(authAttempts,'req:'+req.user.id,10,60*60*1000))return res.status(429).json({error:'PREA_MULTE_ANUNTURI'});const {title,make,model,year,description,variant,engine,vin,kind,county,city,ship_address,extra_parts,images:rawImages}=req.body||{};if(typeof title!=='string'||title.trim().length<3||title.length>150)return res.status(400).json({error:'DATE_INVALIDE'});const pi=parseExtraImages(rawImages,6);if(pi.error)return res.status(400).json({error:pi.error});if(pi.images.length&&await imageQuotaExceeded(req.user.id,pi.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});try{pi.images=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}const r=await pool.query('INSERT INTO part_requests(user_id,title,make,model,year,description,variant,engine,vin,kind,county,city,extra_parts,images,ship_address) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id,title,status,created_at',[req.user.id,title.trim(),clip(make,60),clip(model,80),clip(year,10),String(description||'').slice(0,5000),clip(variant,60),clip(engine,60),clip(vin,30),['noi','second-hand','ambele'].includes(kind)?kind:'ambele',clip(county,60),clip(city,80),JSON.stringify((Array.isArray(extra_parts)?extra_parts:[]).slice(0,9).map(p=>({title:clip(p&&p.title,150),details:clip(p&&p.details,500)})).filter(p=>p.title)),pi.images,clip(ship_address,300)]);pool.query('UPDATE users SET req_posted=req_posted+1 WHERE id=$1',[req.user.id]).catch(()=>{});notifySellersOfRequest(req.user.id,clip(make,60),clip(model,80),r.rows[0].title).catch(()=>{});res.status(201).json({request:r.rows[0]});});
 
 app.get('/api/admin/overview',auth,staff,requireDb,async(req,res)=>{try{const q=async(s)=>Number((await pool.query(s)).rows[0].n);const recent=await pool.query(`SELECT l.id,l.title,l.price,l.status,l.type,l.created_at,u.name seller_name FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 8`);res.json({stats:{users:await q('SELECT COUNT(*) n FROM users'),activeUsers:await q("SELECT COUNT(*) n FROM users WHERE status='active'"),listings:await q('SELECT COUNT(*) n FROM listings'),approved:await q("SELECT COUNT(*) n FROM listings WHERE status='approved'"),pending:await q("SELECT COUNT(*) n FROM listings WHERE status='pending'"),rejected:await q("SELECT COUNT(*) n FROM listings WHERE status='rejected'"),reports:await q("SELECT COUNT(*) n FROM reports WHERE status='open'"),requests:await q("SELECT COUNT(*) n FROM part_requests WHERE status='open'"),offers:await q('SELECT COUNT(*) n FROM offers'),orders:await q('SELECT COUNT(*) n FROM orders'),messages:await q('SELECT COUNT(*) n FROM messages')},recent:recent.rows});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.get('/api/admin/listings',auth,staff,requireDb,async(req,res)=>{const r=await pool.query('SELECT l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.year,l.county,l.category,l.oem,l.description,l.status,l.created_at,l.views,COALESCE(array_length(l.images,1),0) image_count,u.name seller_name,u.email seller_email,u.phone seller_phone,u.show_phone seller_show_phone FROM listings l LEFT JOIN users u ON u.id=l.user_id ORDER BY (l.status=\'pending\') DESC, l.created_at DESC LIMIT 300');res.json({listings:r.rows});});
@@ -1905,7 +1939,7 @@ app.get('/api/admin/listings/:id',auth,staff,requireDb,ah(async(req,res)=>{
  res.json({listing:x});
 }));
 app.delete('/api/admin/listings/:id',auth,admin,requireDb,async(req,res)=>{const d=await pool.query('DELETE FROM listings WHERE id=$1 RETURNING id',[req.params.id]);if(!d.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'delete_listing','listing',req.params.id,'']);res.json({ok:true});});
-app.get('/api/admin/users',auth,staff,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,name,email,phone,role,status,created_at,credits,(store_logo IS NOT NULL) has_logo FROM users ORDER BY created_at DESC LIMIT 500');res.json({users:req.user.role==='admin'?r.rows:r.rows.map(u=>({...u,credits:null}))});});
+app.get('/api/admin/users',auth,staff,requireDb,async(req,res)=>{const r=await pool.query('SELECT id,name,email,phone,role,status,created_at,credits,req_posted,req_resolved,req_cancelled,req_expired,offers_sent,offers_won,(store_logo IS NOT NULL) has_logo FROM users ORDER BY created_at DESC LIMIT 500');res.json({users:req.user.role==='admin'?r.rows:r.rows.map(u=>({...u,credits:null}))});});
 app.patch('/api/admin/users/:id',auth,staff,requireDb,ah(async(req,res)=>{
  const uid=Number(req.params.id)||0;
  if(!uid)return res.status(400).json({error:'ID_INVALID'});
@@ -1955,7 +1989,7 @@ app.delete('/api/admin/users/:id',auth,admin,requireDb,ah(async(req,res)=>{
  res.json({ok:true});
 }));
 app.get('/api/admin/requests',auth,staff,requireDb,async(req,res)=>{const r=await pool.query('SELECT r.*,u.name user_name,u.email user_email FROM part_requests r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 500');res.json({requests:r.rows});});
-app.patch('/api/admin/requests/:id',auth,staff,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','matched','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query('UPDATE part_requests SET status=$1 WHERE id=$2 RETURNING *',[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_request','request',req.params.id,status]);res.json({request:r.rows[0]});});
+app.patch('/api/admin/requests/:id',auth,staff,requireDb,async(req,res)=>{const status=req.body.status;if(!['open','matched','closed'].includes(status))return res.status(400).json({error:'STATUS_INVALIDE'});const r=await pool.query("UPDATE part_requests SET status=$1,expires_at=CASE WHEN $1='open' THEN NOW()+INTERVAL '7 days' ELSE expires_at END WHERE id=$2 RETURNING *",[status,req.params.id]);if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,'update_request','request',req.params.id,status]);res.json({request:r.rows[0]});});
 app.get('/api/admin/offers',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.price,o.status,o.created_at,q.title request_title,u.name seller_name,b.name buyer_name FROM offers o JOIN part_requests q ON q.id=o.request_id LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=q.user_id ORDER BY o.created_at DESC LIMIT 300');res.json({offers:r.rows});}));
 app.get('/api/admin/orders',auth,admin,requireDb,ah(async(req,res)=>{const r=await pool.query('SELECT o.id,o.title,o.price,o.status,o.created_at,u.name seller_name,b.name buyer_name FROM orders o LEFT JOIN users u ON u.id=o.seller_id LEFT JOIN users b ON b.id=o.buyer_id ORDER BY o.created_at DESC LIMIT 300');res.json({orders:r.rows});}));
 // --- Moderare conținut: ștergerea mesajelor, ofertelor și comenzilor din panoul de admin ---
@@ -2041,7 +2075,7 @@ app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempt
 
 /* ---------- oferte, comenzi, notificări ---------- */
 const mailGate=new Map();
-const MAIL_COL={msg:'mail_msg',offer:'mail_offer',order:'mail_order',alert:'mail_alert',expire:'mail_alert'};
+const MAIL_COL={msg:'mail_msg',offer:'mail_offer',order:'mail_order',alert:'mail_alert',expire:'mail_alert',request:'mail_alert'};
 async function mailNotify(uid,kind,text){
   try{
     const col=MAIL_COL[kind];
@@ -2078,6 +2112,7 @@ app.post('/api/requests/:id/offers',auth,needVerified,requireDb,ah(async(req,res
  if((await pool.query("SELECT 1 FROM offers WHERE request_id=$1 AND seller_id=$2 AND status='pending'",[r.id,req.user.id])).rowCount)return res.status(409).json({error:'OFERTA_EXISTA'});
  try{pi.images=await storeImages(pi.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
  const o=await pool.query('INSERT INTO offers(request_id,seller_id,price,message,images) VALUES($1,$2,$3,$4,$5) RETURNING id',[r.id,req.user.id,price,message,pi.images]);
+ pool.query('UPDATE users SET offers_sent=offers_sent+1 WHERE id=$1',[req.user.id]).catch(()=>{});
  await notify(r.user_id,'Ofertă nouă la cererea „'+r.title+'”: '+price+' lei','offer');
  res.json({ok:true,id:o.rows[0].id});
 }));
@@ -2128,6 +2163,8 @@ app.post('/api/offers/:id/accept',auth,requireDb,ah(async(req,res)=>{
   await c.query("UPDATE offers SET status='accepted' WHERE id=$1",[o.id]);
   await c.query("UPDATE offers SET status='rejected' WHERE request_id=$1 AND id<>$2 AND status='pending'",[o.request_id,o.id]);
   await c.query("UPDATE part_requests SET status='matched' WHERE id=$1",[o.request_id]);
+  await c.query('UPDATE users SET req_resolved=req_resolved+1 WHERE id=$1',[o.buyer_id]);
+  await c.query('UPDATE users SET offers_won=offers_won+1 WHERE id=$1',[o.seller_id]);
   const ord=await c.query('INSERT INTO orders(offer_id,request_id,buyer_id,seller_id,title,price) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[o.id,o.request_id,o.buyer_id,o.seller_id,o.title,o.price]);
   await c.query('COMMIT');
   await notify(o.seller_id,'Oferta ta pentru „'+o.title+'” a fost acceptată. Comandă nouă.','offer');

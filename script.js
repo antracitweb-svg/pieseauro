@@ -967,6 +967,7 @@ function drawStats(){
 }
 
 /* ---------- cereri: fereastră cu detalii + oferte ---------- */
+function reqExpTxt(d){ const n=Math.ceil((new Date(d).getTime()-Date.now())/86400000); return n<=0?'astăzi':(n===1?'mâine':'în '+n+' zile'); }
 const REQ_ST={open:'Deschisă',matched:'Ofertă acceptată',closed:'Închisă'}, REQ_KIND={noi:'Piese noi','second-hand':'Piese second-hand',ambele:'Noi sau second-hand'};
 function reqDetailsHtml(x){
   const rows=[['Marcă',x.make],['Model',x.model],['An',x.year],['Variantă',x.variant],['Motor',x.engine],['Serie șasiu (VIN)',x.vin],['Caut',REQ_KIND[x.kind]],['Locație',[x.city,x.county].filter(Boolean).join(', ')],['Adresa de livrare',x.ship_address],['Publicată',x.created_at?fmtDate(x.created_at):'']].filter(r=>r[1]);
@@ -1001,13 +1002,14 @@ function myRequestHtml(x, offers){
   }).join('');
   const btns=[];
   if(Number(x.edit_secs)>0) btns.push(`<button type="button" class="btn ghost small" data-edit-request="${x.id}" data-edit-until="${Date.now()+Number(x.edit_secs)*1000}">✎ Editează (mai ai ${Math.ceil(Number(x.edit_secs)/60)} min)</button>`);
+  if(x.status==='closed') btns.push(`<button type="button" class="btn primary small" data-react-request="${x.id}">↻ Reactivează (7 zile)</button>`);
   btns.push(`<button type="button" class="btn danger small" data-del-request="${x.id}">🗑 Șterge cererea</button>`);
   const per=btns.length<=3?Math.max(btns.length,1):Math.ceil(btns.length/2);
   const np=offers.filter(o=>o.status==='pending').length;
   return `<div class="ad rq">
   <div class="ad-main">
     ${reqCrumbs('Cererile mele',x.make,x.model)}
-    <div class="ad-owner"><div class="ad-owner-btns" style="--per:${per}">${btns.join('')}</div><p class="ad-owner-info">${esc(REQ_ST[x.status]||x.status)} · ${offers.length} ${offers.length===1?'ofertă':'oferte'}${np?` (${np} în așteptare)`:''}</p><p class="ad-owner-dates">Data publicării: ${esc(fmtDateTime(x.created_at))}</p></div>
+    <div class="ad-owner"><div class="ad-owner-btns" style="--per:${per}">${btns.join('')}</div><p class="ad-owner-info">${esc(REQ_ST[x.status]||x.status)}${x.status==='open'&&x.expires_at?' · expiră '+reqExpTxt(x.expires_at):''} · ${offers.length} ${offers.length===1?'ofertă':'oferte'}${np?` (${np} în așteptare)`:''}</p><p class="ad-owner-dates">Data publicării: ${esc(fmtDateTime(x.created_at))}</p></div>
     ${imgGalleryHtml(x.images,x.title||'Cerere',true)}
     <div class="ad-titlerow"><h2>${esc(x.title)}</h2></div>
     <p class="ad-sub">${esc(reqCarSub(x))}</p>
@@ -1719,7 +1721,7 @@ function reqRowHtml(x, mine){
       <h3 class="rq-title">${esc(x.title)}</h3>
       <div class="rq-car">${esc(car0)}</div>
       <div class="rq-line"><span>${n} ${n===1?'ofertă':'oferte'}${np?` (${np} noi)`:''}</span><span>${esc(fmtDateTime(x.created_at))}</span></div>
-      <div class="rq-acts">${main}${edit}<button type="button" class="rq-btn rq-icon" data-del-request="${x.id}" title="Șterge" aria-label="Șterge cererea">🗑</button></div></article>`;
+      <div class="rq-acts">${main}${edit}${x.status==='closed'?`<button type="button" class="rq-btn" data-react-request="${x.id}" title="Reactivează pentru încă 7 zile">↻ Reactivează</button>`:''}<button type="button" class="rq-btn rq-icon" data-del-request="${x.id}" title="Șterge" aria-label="Șterge cererea">🗑</button></div></article>`;
   }
   const carBase=[x.make,x.model,x.year].filter(Boolean).join(' '), carTail=[x.variant,x.engine].filter(Boolean).join(' · ');
   const carTitle=(carBase+(carTail?(carBase?', ':'')+carTail:''))||'Orice mașină';
@@ -2889,7 +2891,7 @@ function renderAdmin(){
     body = `<div class="admin-list">${d.users.map(x=>{
       const canAct = isAd || x.role==='user', self = Number(x.id)===Number(currentUser.id);
       const roleBtns = (isAd && !self) ? ['user','moderator','admin'].filter(r=>r!==x.role).map(r=>`<button class="btn ghost small" data-admin="user-role" data-id="${x.id}" data-role="${r}">${r==='user'?(x.role==='admin'?'Scoate admin':'Scoate moderator'):('Fă '+ROLE_LBL[r])}</button>`).join('') : '';
-      return `<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · ${esc(ROLE_LBL[x.role]||x.role)} · ${esc(x.status)}</p><div class="admin-actions">${isAd?`<button class="btn ghost small" data-admin="user-credits" data-id="${x.id}">Credite: ${Number(x.credits)||0}</button>`:''}${canAct?adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked'],...(x.has_logo?[['Șterge logo','remove_logo']]:[])]):''}${roleBtns}${isAd&&x.role!=='admin'?`<button class="btn danger small" data-admin="user-del" data-id="${x.id}">Șterge contul</button>`:''}</div></article>`;
+      return `<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · ${esc(ROLE_LBL[x.role]||x.role)} · ${esc(x.status)}</p>${(x.req_posted||x.offers_sent)?`<p class="muted">${x.req_posted?`Cumpărător: ${x.req_posted} cereri · ${x.req_resolved||0} rezolvate · ${x.req_cancelled||0} anulate · ${x.req_expired||0} expirate`:''}${x.req_posted&&x.offers_sent?' | ':''}${x.offers_sent?`Vânzător: ${x.offers_sent} oferte · ${x.offers_won||0} câștigate`:''}</p>`:''}<div class="admin-actions">${isAd?`<button class="btn ghost small" data-admin="user-credits" data-id="${x.id}">Credite: ${Number(x.credits)||0}</button>`:''}${canAct?adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked'],...(x.has_logo?[['Șterge logo','remove_logo']]:[])]):''}${roleBtns}${isAd&&x.role!=='admin'?`<button class="btn danger small" data-admin="user-del" data-id="${x.id}">Șterge contul</button>`:''}</div></article>`;
     }).join('')||'<p>Nu există utilizatori.</p>'}</div>`;
   }
   if(adminTab==='requests') body = `<div class="admin-list">${d.requests.map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.title)}</b><p>${esc(x.user_name||'—')} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`).join('')||'<p>Nu există cereri.</p>'}</div>`;
@@ -3154,6 +3156,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-sold-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.soldListing), to=el.dataset.to; safe(async()=>{ await api('/api/listings/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:to})}); const it=state.loaded.find(x=>x.id===id); if(it) it.status=to; renderList(); { const dm=$('#detailModal'); if(dm&&!dm.classList.contains('hidden')) openDetail(id,true); } toast(to==='sold'?'Anunțul a fost marcat ca vândut.':'Anunțul este din nou la vânzare.'); })(); return; }
   if((el=t.closest('[data-del-listing]'))){ e.stopPropagation(); const id=Number(el.dataset.delListing); if(confirm('Ștergi acest anunț?')) safe(async()=>{ await api('/api/listings/'+id,{method:'DELETE'}); state.loaded=state.loaded.filter(x=>x.id!==id); state.total=state.loaded.length; renderList(); { const dm=$('#detailModal'); if(dm) dm.classList.add('hidden'); } toast('Anunțul a fost șters.'); })(); return; }
   if((el=t.closest('[data-edit-request]'))){ if(Date.now()>Number(el.dataset.editUntil||0)){ toast('Au trecut cele 10 minute în care puteai modifica cererea.'); loadRequests(true); return; } navigate('cerere-noua?edit='+el.dataset.editRequest); return; }
+  if((el=t.closest('[data-react-request]'))){ const id=el.dataset.reactRequest; safe(async()=>{ await api('/api/requests/'+id+'/reactivate',{method:'POST'}); { const rm=$('#requestModal'); if(rm) rm.classList.add('hidden'); } toast('Cererea e din nou activă pentru încă 7 zile.'); rqTab='open'; loadRequests(true); })(); return; }
   if((el=t.closest('[data-del-request]'))){ const id=el.dataset.delRequest; if(confirm('Ștergi această cerere?')) safe(async()=>{ await api('/api/requests/'+id,{method:'DELETE'}); { const rm=$('#requestModal'); if(rm) rm.classList.add('hidden'); } toast('Cererea a fost ștearsă.'); loadRequests(true); })(); return; }
   if((el=t.closest('[data-track-phone]'))){ try{ fetch('/api/listings/'+Number(el.dataset.trackPhone)+'/phone-click',{method:'POST',keepalive:true,credentials:'same-origin'}).catch(()=>{}); }catch{} }
   if((el=t.closest('[data-order]'))){ e.stopPropagation(); safe(openOrder)(Number(el.dataset.order)); return; }
