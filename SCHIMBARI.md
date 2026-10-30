@@ -36,3 +36,8 @@ Testele din `test/server.test.js` nu au fost rulate aici (nu se pot instala pach
 - `PATCH /api/admin/users/:id/role` (doar admin): user / moderator / admin. Nu-ți poți schimba propriul rol, nu poți retrograda contul din `ADMIN_EMAIL`, nu rămâi fără admini activi. Se scrie în jurnalul de activitate (`set_role`) și utilizatorul primește notificare.
 - Moderatorul (`role='moderator'`) are acces doar la: dashboard, anunțuri (aprobă/respinge/blochează/editează, fără ștergere definitivă), utilizatori (blocare/deblocare doar pentru conturi obișnuite, fără credite și fără ștergere conturi), cereri piese, raportări. Nu vede mesaje, oferte, comenzi, credite, evenimente, activitate, mașini.
 - UI: în Administrare → Utilizatori, butoane „Fă moderator / Fă administrator / Scoate rol”.
+
+## V46 — Carduri de anunțuri
+- Chenarul auriu al anunțurilor promovate înconjoară doar poza, nu tot cardul.
+- Insigna „-X%” stă sub „Promovat” când anunțul e promovat; altfel ocupă colțul stânga-sus.
+- Preț vechi: text și linie de tăiere roșii; preț nou: alb (în tema deschisă, culoarea normală a textului).
