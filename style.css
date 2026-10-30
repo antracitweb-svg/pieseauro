@@ -1678,7 +1678,7 @@ html.menu-open,html.menu-open body{overflow:hidden}
 .ar-price{justify-self:end;text-align:right;font-weight:600;font-size:17px;background:none;padding:0}
 .ar-price small{display:block;font-size:11.5px;font-weight:500;color:var(--muted)}
 .ar-price del{opacity:.55;font-weight:500;font-size:.85em}
-.ar-price del+strong{color:#e5484d;font-weight:800}
+.ar-price del+strong{color:#14110c;font-weight:800}
 .ar-price.ar-state{font-size:14px}
 .ar-req .contact-slot{margin:2px 0 0}
 .ar-skel{cursor:default;pointer-events:none}
@@ -4006,24 +4006,31 @@ html.dark .ok-message{color:#7fd6a0!important}
 /* ===== Anunț promovat: chenar auriu discret + insignă ===== */
 .promo-badge{position:absolute;left:6px;top:6px;z-index:3;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:linear-gradient(180deg,#c9a46a,#b8935a);color:#fff;font-size:11px;font-weight:800;letter-spacing:.2px;line-height:1.4;box-shadow:0 2px 8px rgba(14,15,18,.25);pointer-events:none;max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .badge.promo{background:#f6ead3;color:#7a5a28;border:1px solid #e0c895}
-.ar-row.is-promoted .ar-thumb::after{content:"";position:absolute;inset:0;z-index:2;border:2px solid #b8935a;border-radius:inherit;pointer-events:none}
-#listingGrid .ar-row.is-promoted .ar-thumb::after,
-#homeFeed .ar-row.is-promoted .ar-thumb::after,
-.similar-grid .ar-row.is-promoted .ar-thumb::after{border-radius:14px 14px 0 0}
+.ar-row.is-promoted,
+#listingGrid .ar-row.is-promoted,
+#homeFeed .ar-row.is-promoted,
+.similar-grid .ar-row.is-promoted{border-color:#b8935a!important;box-shadow:0 0 0 1px #b8935a;background:#fcf8ef}
+#listingGrid .ar-row.is-promoted:hover,
+#homeFeed .ar-row.is-promoted:hover,
+.similar-grid .ar-row.is-promoted:hover{background:#fcf8ef;box-shadow:0 0 0 1px #b8935a,0 10px 28px rgba(184,147,90,.22)}
 .mine-row.is-promoted{box-shadow:inset 3px 0 0 #b8935a}
 html.dark .promo-badge{background:linear-gradient(180deg,#d4b483,#b8935a);color:#14110c}
 html.dark .badge.promo{background:rgba(184,147,90,.18);color:#e9d3a8;border-color:rgba(184,147,90,.5)}
+html.dark .ar-row.is-promoted,
+html.dark #listingGrid .ar-row.is-promoted,
+html.dark #homeFeed .ar-row.is-promoted,
+html.dark .similar-grid .ar-row.is-promoted{border-color:#b8935a!important;box-shadow:0 0 0 1px #b8935a;background:rgba(184,147,90,.08)}
 html.dark .mine-row.is-promoted{box-shadow:inset 3px 0 0 #b8935a}
 
 /* ===== Reducere preț: insignă pe imagine + chip ===== */
 .discount-badge{position:absolute;left:6px;top:6px;z-index:3;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:linear-gradient(180deg,#e5484d,#c43a3e);color:#fff;font-size:11px;font-weight:800;letter-spacing:.2px;line-height:1.4;box-shadow:0 2px 8px rgba(14,15,18,.25);pointer-events:none;max-width:70px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .badge.discount{background:#e5484d;color:#fff;border:1px solid #c43a3e}
-.ar-row.discounted:not(.is-promoted){border-color:#e5484d!important;box-shadow:0 0 0 1px #e5484d}
+.ar-row.discounted{border-color:#e5484d!important;box-shadow:0 0 0 1px #e5484d}
 /* sub „Promovat”, când anunțul e promovat; altfel rămâne în colțul stânga-sus */
 .promo-badge~.discount-badge{top:33px}
 html.dark .discount-badge{background:linear-gradient(180deg,#f06c70,#c43a3e);color:#14110c}
 html.dark .badge.discount{background:rgba(229,72,77,.2);color:#ff9a9a;border-color:rgba(229,72,77,.5)}
-html.dark .ar-row.discounted:not(.is-promoted){border-color:#e5484d!important;box-shadow:0 0 0 1px #e5484d}
+html.dark .ar-row.discounted{border-color:#e5484d!important;box-shadow:0 0 0 1px #e5484d}
 
 /* ===== Reducere: preț vechi tăiat + preț nou + procent ===== */
 .price-old del{opacity:1;color:#e5484d;font-weight:500;font-size:.8em;text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#e5484d}
@@ -4033,7 +4040,7 @@ html.dark .ar-row.discounted:not(.is-promoted){border-color:#e5484d!important;bo
 #sellDiscountEstimate del{opacity:.6}
 html.dark .price-new{color:#fff}
 html.dark .price-pct{background:rgba(229,72,77,.22);color:#ff9a9a;border:1px solid rgba(229,72,77,.5)}
-html.dark .ar-price del+strong{color:#ff8a8d}
+html.dark .ar-price del+strong{color:#fff}
 
 /* Expirare anunțuri: insignă, buton Activează, acțiuni în antet */
 .badge.expire{background:#fff0f1;color:#a3322b;font-weight:700;margin-right:6px}
