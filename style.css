@@ -4082,3 +4082,8 @@ html.dark .adm-msg{background:#1c2430;border-color:#2e3a4b}
 html.dark .adm-msg.right{background:#243246}
 html.dark .adm-link{color:#e9d3a8}
 html.dark .adm-edit input,html.dark .adm-edit select,html.dark .adm-edit textarea{background:#141b25;border-color:#2e3a4b}
+
+/* Buton „Admin” în bara de jos (doar moderatori și administratori) */
+.bottom-nav button[hidden]{display:none!important}
+.bottom-nav.has-admin{grid-template-columns:repeat(6,1fr)}
+.bottom-nav .bn-admin{color:#e9d3a8}

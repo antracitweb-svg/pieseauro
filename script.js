@@ -240,7 +240,7 @@ function navigate(x){ const target='#/'+x; if(location.hash===target) route(); e
 function needsAuth(name, params){ return AUTH_ROUTES.has(name) || (name==='account-tool' && !['cart','reviews'].includes(params.get('view'))) || (name==='requests' && params.get('t')==='mine') || (name==='rezultate' && ['mine'].includes(params.get('mode'))); }
 function showPage(id){ $$('.page').forEach(p=>p.classList.toggle('active',p.id===id)); window.scrollTo(0,0); }
 
-const BN_MAP={home:'home',rezultate:'rezultate',saved:'rezultate',vinde:'vinde',mesagerie:'mesagerie',cont:'cont',settings:'cont','anunturile-mele':'cont'};
+const BN_MAP={home:'home',rezultate:'rezultate',saved:'rezultate',vinde:'vinde',mesagerie:'mesagerie',cont:'cont',settings:'cont','anunturile-mele':'cont',admin:'admin'};
 function setBottomNav(name){ const t=BN_MAP[name]||''; $$('#bottomNav [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t)); }
 const SKEL=Array(6).fill('<div class="ar-row ar-skel"><div class="skel ar-thumb"></div><div class="ar-main"><div class="skel skel-line"></div><div class="skel skel-line short"></div></div></div>').join('');
 function route(){
@@ -310,6 +310,7 @@ function renderHeader(){
   $('#menuAccountText').textContent = currentUser ? label : 'Intră în cont';
   const isAdmin = !!(currentUser && (currentUser.role==='admin' || currentUser.role==='moderator'));
   $('#adminMenu').classList.toggle('hidden', !isAdmin);
+  const bnA = $('#bnAdmin'); if(bnA){ bnA.hidden = !isAdmin; const bn = $('#bottomNav'); if(bn) bn.classList.toggle('has-admin', isAdmin); }
   const ad = $('#accountAdmin'); if(ad) ad.classList.toggle('hidden', !isAdmin);
   $('#favCount').textContent = favorites.length;
   renderVerifyBanner();
