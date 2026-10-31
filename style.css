@@ -4059,3 +4059,26 @@ html.dark .badge.paid{background:#1d2a44;color:#b9cdf5}
 .garage-search input{flex:1;min-width:0}
 .garage-search .btn{flex:none}
 .garage-search-note{margin:0 0 10px;font-size:.9em}
+
+/* ---------- admin: rânduri deschise, ferestre de detalii, conversații, formular de editare ---------- */
+.adm-click{cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.adm-click:hover{border-color:#d4b483;box-shadow:0 8px 22px rgba(60,45,20,.1)}
+.adm-link{background:none;border:0;padding:0;margin:0;font:inherit;font-weight:800;color:#7a5a28;text-decoration:underline;text-underline-offset:2px;cursor:pointer;text-align:left}
+.adm-link:hover{color:#14110c}
+.adm-userbar{margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.adm-userbar .admin-actions{margin:0}
+.adm-thread{display:grid;gap:10px;margin:12px 0;max-height:55vh;overflow-y:auto;padding:4px}
+.adm-msg{max-width:88%;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:#fffefb}
+.adm-msg.left{justify-self:start;border-bottom-left-radius:4px}
+.adm-msg.right{justify-self:end;border-bottom-right-radius:4px;background:#f6efe1}
+.adm-msg p{margin:4px 0 6px;overflow-wrap:anywhere}
+.adm-msg .admin-actions{margin:0}
+.adm-edit{display:grid;gap:2px;margin-top:10px}
+.adm-edit label{display:grid;gap:4px;margin:0 0 10px;font-size:13px;font-weight:700}
+.adm-edit input,.adm-edit select,.adm-edit textarea{width:100%;padding:10px;border:1px solid #d6e1ec;border-radius:10px;font:inherit;font-weight:400;box-sizing:border-box;background:#fff;color:inherit}
+.adm-edit .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.adm-edit .two{grid-template-columns:1fr}.adm-msg{max-width:96%}}
+html.dark .adm-msg{background:#1c2430;border-color:#2e3a4b}
+html.dark .adm-msg.right{background:#243246}
+html.dark .adm-link{color:#e9d3a8}
+html.dark .adm-edit input,html.dark .adm-edit select,html.dark .adm-edit textarea{background:#141b25;border-color:#2e3a4b}
