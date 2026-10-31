@@ -4053,3 +4053,9 @@ html.dark .badge.expire{background:#3a2022;color:#f0b4b4}
 
 .badge.paid{background:#eef4ff;color:#2a4d8f;font-weight:700;margin-right:6px}
 html.dark .badge.paid{background:#1d2a44;color:#b9cdf5}
+
+/* Garaj: căutare doar pentru mașina activă */
+.garage-search{display:flex;gap:8px;align-items:center;margin:12px 0 4px}
+.garage-search input{flex:1;min-width:0}
+.garage-search .btn{flex:none}
+.garage-search-note{margin:0 0 10px;font-size:.9em}

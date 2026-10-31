@@ -1292,8 +1292,6 @@ function enterResults(params){
   for(const k of ['q','type','category','make','model','condition','county','minPrice','maxPrice','yearFrom','yearTo','fuel','seller_type','sort','delivery']) if(params.get(k)) state.filters[k]=params.get(k);
   for(const k of ['seller_id','sname']) if(params.get(k)) state.extra[k]=params.get(k);
   if(params.get('g')==='0') state.extra.g='0';
-  const g = garageActive();
-  if(g && state.mode==='search' && !state.extra.seller_id && !params.get('make') && params.get('g')!=='0'){ state.filters.make = g.make; state.filters.model = g.model; }
   renderGarageBanner();
   applyFiltersToUI().then(()=>loadResults(true));
 }
@@ -2998,7 +2996,13 @@ function updateGarageUI(){
   const c = garageActive(), el = $('#garageLabel'); if(!el) return;
   el.textContent = c ? [c.make,c.model].filter(Boolean).join(' ') : 'Garajul meu';
   $('#garageBtn').classList.toggle('on', !!c);
+  syncGarageSearch();
   const hm = $('#homeMake'); if(c && hm && !hm.value){ hm.value = c.make; loadModels(c.make,'homeModel').then(()=>{ $('#homeModel').value = c.model; }); }
+}
+function syncGarageSearch(){
+  const a = garageActive(), f = $('#garageSearchForm'), n = $('#garageSearchNote');
+  if(f) f.classList.toggle('hidden', !a);
+  if(n){ n.classList.toggle('hidden', !a); if(a) n.textContent = 'Cauți doar piese pentru: ' + garageName(a) + '.'; }
 }
 function renderGarageList(){
   const g = garageData(), box = $('#garageList');
@@ -3006,7 +3010,7 @@ function renderGarageList(){
     + (g.active ? '<button type="button" class="text-btn" data-garage-off>Fără mașină activă</button>' : '')
     : '<p class="muted">Garajul e gol. Adaugă prima mașină mai jos.</p>';
 }
-function openGarage(){ renderGarageList(); setMsg($('#garageMsg'),''); $('#garageModal').classList.remove('hidden'); }
+function openGarage(){ renderGarageList(); syncGarageSearch(); setMsg($('#garageMsg'),''); $('#garageModal').classList.remove('hidden'); }
 function renderGarageBanner(){
   const b = $('#garageBanner'); if(!b) return;
   const g = garageActive(), f = state.filters||{};
@@ -3311,6 +3315,13 @@ function wire(){
   $('#homeRequestBtn').addEventListener('click', ()=>doAction('request'));
   $('#garageBtn').addEventListener('click', openGarage);
   $('#garageForm').addEventListener('submit', garageSave);
+  $('#garageSearchForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    const a = garageActive(); if(!a){ toast('Alege mai întâi o mașină.'); return; }
+    const q = $('#garageSearchInput').value.trim();
+    $('#garageSearchInput').value = ''; $('#garageModal').classList.add('hidden');
+    openSearch({q, make:a.make, model:a.model});
+  });
   $('#garageModal').addEventListener('click', e=>{
     const u=e.target.closest('[data-garage-use]'), d=e.target.closest('[data-garage-del]'), o=e.target.closest('[data-garage-off]'), p=e.target.closest('[data-garage-parts]');
     if(p){ const car=garageData().cars.find(c=>c.id===p.dataset.garageParts); if(car){ garageUse(car.id); $('#garageModal').classList.add('hidden'); openSearch({make:car.make, model:car.model}); } }
@@ -3951,6 +3962,7 @@ document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminSearch'
    - închiderea cu ×, Escape sau click pe fundal elimină intrarea (history.back), fără „Înapoi” inutil */
 (function modalHistory(){
   const AUTH='authModal';                       // login-ul nu are intrare în istoric (are propriul flux: __afterAuth)
+  const OVERLAY=new Set([AUTH,'phonesModal']);  // ferestrele mici care se deschid peste anunț: nu închid anunțul din spate și nu au intrare în istoric
   const all=[...document.querySelectorAll('.modal')];
   if(!all.length || !window.MutationObserver) return;
   const shown=new Set();
@@ -3963,9 +3975,9 @@ document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminSearch'
       const el=r.target, id=el.id, open=isOpen(el);
       if(open && !shown.has(id)){
         shown.add(id);
-        if(id===AUTH) continue;
-        // închide celelalte ferestre din spate (login-ul rămâne)
-        all.forEach(m=>{ if(m!==el && m.id!==AUTH && isOpen(m)) m.classList.add('hidden'); });
+        if(OVERLAY.has(id)) continue;
+        // închide celelalte ferestre din spate (login-ul și fereastra de contact rămân)
+        all.forEach(m=>{ if(m!==el && !OVERLAY.has(m.id) && isOpen(m)) m.classList.add('hidden'); });
         try{
           const st={modal:id};
           if(hasEntry()) history.replaceState(st,'',location.href);   // înlocuiește fereastra anterioară
@@ -3973,7 +3985,7 @@ document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminSearch'
         }catch{}
       }else if(!open && shown.has(id)){
         shown.delete(id);
-        if(id===AUTH) continue;
+        if(OVERLAY.has(id)) continue;
         // dacă între timp s-a făcut o navigare sau s-a deschis altă fereastră, nu mai facem back
         setTimeout(()=>{ const s=history.state; if(s && s.modal===id && !shown.has(id)) history.back(); },0);
       }
