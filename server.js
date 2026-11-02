@@ -814,7 +814,7 @@ let smtpTransport=null;
 async function sendMailSmtp(to,subject,text,html){
  if(!smtpTransport){
   const port=Number(process.env.SMTP_PORT)||465;
-  smtpTransport=nodemailer.createTransport({host:process.env.SMTP_HOST||'smtp.gmail.com',port,secure:port===465,auth:{user:process.env.SMTP_USER,pass:String(process.env.SMTP_PASS).replace(/\s+/g,'')}});
+  smtpTransport=nodemailer.createTransport({host:process.env.SMTP_HOST||'smtp.gmail.com',port,secure:port===465,connectionTimeout:10000,greetingTimeout:10000,socketTimeout:15000,auth:{user:process.env.SMTP_USER,pass:String(process.env.SMTP_PASS).replace(/\s+/g,'')}});
  }
  try{
   return await smtpTransport.sendMail({from:process.env.SMTP_FROM||('AutoParts <'+process.env.SMTP_USER+'>'),to,subject,text,html});
@@ -824,14 +824,36 @@ async function sendMailSmtp(to,subject,text,html){
   throw new Error('EMAIL_SEND_FAILED');
  }
 }
+/* Email prin API HTTPS (merge și pe Render gratuit, unde porturile SMTP sunt blocate): Brevo.
+   BREVO_API_KEY = cheia API (începe cu xkeysib-), BREVO_FROM = „AutoParts <adresa@confirmata-in-Brevo>”. Prioritate: Brevo > SMTP > Resend. */
+const BREVO_READY=!!(process.env.BREVO_API_KEY&&/@/.test(String(process.env.BREVO_FROM||'')));
+async function sendMailBrevo(to,subject,text,html){
+ const m=/^\s*(?:"?([^"<]*?)"?\s*)?<?([^<>\s]+@[^<>\s]+)>?\s*$/.exec(String(process.env.BREVO_FROM));
+ if(!m)throw new Error('EMAIL_SENDER_INVALID');
+ const sender={email:m[2]};if(m[1]&&m[1].trim())sender.name=m[1].trim();
+ let resp;
+ try{
+  resp=await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',signal:AbortSignal.timeout(15000),headers:{'api-key':process.env.BREVO_API_KEY,'Content-Type':'application/json',accept:'application/json'},body:JSON.stringify({sender,to:[{email:to}],subject,textContent:text,...(html?{htmlContent:html}:{})})});
+ }catch(e){console.error('Brevo network error',e.name,e.message);throw new Error('EMAIL_SEND_FAILED');}
+ let data={};try{data=await resp.json();}catch{}
+ if(!resp.ok){
+  console.error('Brevo error',resp.status,JSON.stringify(data));
+  if(resp.status===401)throw new Error('EMAIL_SMTP_AUTH');
+  if(resp.status===429)throw new Error('EMAIL_RATE_LIMIT');
+  if(resp.status===403)throw new Error('EMAIL_PROVIDER_FORBIDDEN');
+  throw new Error('EMAIL_SEND_FAILED');
+ }
+ return data;
+}
 async function sendMail(to,subject,text,html){
+ if(BREVO_READY)return sendMailBrevo(to,subject,text,html);
  if(SMTP_READY)return sendMailSmtp(to,subject,text,html);
  const apiKey=process.env.RESEND_API_KEY;
  const from=String(process.env.RESEND_FROM||'').trim();
  if(!apiKey) throw new Error('EMAIL_NOT_CONFIGURED');
  if(!from) throw new Error('EMAIL_SENDER_NOT_CONFIGURED');
  if(!from.includes('@')) throw new Error('EMAIL_SENDER_INVALID');
- const resp=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
+ const resp=await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(15000),headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,text,html})});
  let data={}; try{data=await resp.json();}catch{}
  if(!resp.ok){
    console.error('Resend error',resp.status,JSON.stringify(data));
@@ -855,7 +877,7 @@ function appBaseUrl(req){
 
 // ---- Confirmare email la înregistrare ----
 // Se trimite doar dacă Resend e configurat. Obligativitatea se activează cu REQUIRE_VERIFIED_EMAIL=true (și doar dacă emailurile funcționează).
-const MAIL_READY=SMTP_READY||!!(process.env.RESEND_API_KEY&&String(process.env.RESEND_FROM||'').includes('@'));
+const MAIL_READY=BREVO_READY||SMTP_READY||!!(process.env.RESEND_API_KEY&&String(process.env.RESEND_FROM||'').includes('@'));
 const REQUIRE_VERIFIED=process.env.REQUIRE_VERIFIED_EMAIL==='true'&&MAIL_READY;
 if(process.env.REQUIRE_VERIFIED_EMAIL==='true'&&!MAIL_READY)console.warn('REQUIRE_VERIFIED_EMAIL=true este ignorat: RESEND_API_KEY/RESEND_FROM nu sunt configurate.');
 const VERIF={enabled:MAIL_READY,required:REQUIRE_VERIFIED};
