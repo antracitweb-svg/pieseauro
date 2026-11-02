@@ -4087,3 +4087,5 @@ html.dark .adm-edit input,html.dark .adm-edit select,html.dark .adm-edit textare
 .bottom-nav button[hidden]{display:none!important}
 .bottom-nav.has-admin{grid-template-columns:repeat(6,1fr)}
 .bottom-nav .bn-admin{color:#e9d3a8}
+
+#pushBox[hidden]{display:none!important}

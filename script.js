@@ -216,7 +216,7 @@ function scheduleCounts(){ clearTimeout(countsTimer); countsTimer = setTimeout(r
 function badgeText(n){ n = Number(n)||0; return n<=0 ? '' : (n>99 ? '99+' : String(n)); }
 function renderCounts(){
   const c = counts || {};
-  const map = { total:c.total, expire:c.expire, messages:c.messages, orders_seller:c.orders_seller, orders_buyer:c.orders_buyer, offers_received:c.offers_received, alerts:c.alerts, sec_seller:(c.expire||0)+(c.orders_seller||0), sec_buyer:(c.offers_received||0)+(c.orders_buyer||0), sec_msgs:(c.messages||0)+(c.alerts||0) };
+  const map = { total:c.total, expire:c.expire, messages:c.messages, orders_seller:c.orders_seller, orders_buyer:c.orders_buyer, offers_received:c.offers_received, alerts:c.alerts, account:c.account, notif_all:(c.alerts||0)+(c.account||0), sec_seller:(c.expire||0)+(c.orders_seller||0), sec_buyer:(c.offers_received||0)+(c.orders_buyer||0), sec_msgs:(c.messages||0)+(c.alerts||0)+(c.account||0) };
   const mb = document.getElementById('menuBadge'); if(mb) mb.textContent = badgeText(c.total);
   document.querySelectorAll('[data-cnt]').forEach(el=>{ el.textContent = badgeText(map[el.dataset.cnt]); });
   renderNotifSummary();
@@ -2017,6 +2017,8 @@ function registerStep1(){
   $$('#registerStep2 input').forEach(clearFieldError); $('#registerStep1').classList.add('hidden'); $('#registerStep2').classList.remove('hidden'); $('#regNickname').focus();
 }
 async function logout(){
+  // Dispozitivul nu mai primește push pentru contul care iese (altfel notificările ar apărea pe un telefon/PC partajat).
+  try{ if('serviceWorker' in navigator && 'PushManager' in window){ const sub=await (await navigator.serviceWorker.ready).pushManager.getSubscription(); if(sub){ await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{}); await sub.unsubscribe().catch(()=>{}); } } }catch{}
   try{ await api('/api/auth/logout',{method:'POST'}); }catch{}
   currentUser = null; renderHeader(); navigate('home'); toast('Ai ieșit din cont.');
 }
@@ -2577,7 +2579,46 @@ async function loadSettings(){
   $('#vacationUntil').min = new Date().toISOString().slice(0,10); $('#vacationUntil').disabled = !u.vacation; setMsg($('#vacationMsg'),'');
   renderPhones();
   loadSessions().catch(()=>{}); loadBlocks().catch(()=>{});
+  initPushState().catch(()=>{});
 }
+/* ---------- Web Push ---------- */
+function b64ToU8(b64){ const pad='='.repeat((4-b64.length%4)%4); const raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(raw,c=>c.charCodeAt(0)); }
+const pushSupported = ()=> 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+async function pushReg(){ return navigator.serviceWorker.ready; }
+async function initPushState(){
+  const box=$('#pushBox'), tg=$('#pushToggle'); if(!box||!tg) return;
+  box.hidden=true; if(!pushSupported()) return;
+  let cfg; try{ cfg=await api('/api/push/key'); }catch{ return; }
+  if(!cfg||!cfg.enabled||!cfg.key) return;
+  box.hidden=false;
+  const sub=await (await pushReg()).pushManager.getSubscription();
+  tg.checked=!!sub && Notification.permission==='granted';
+  if(sub && Notification.permission==='granted'){ // reînnoiește abonamentul pe server (idempotent)
+    api('/api/push/subscribe',{method:'POST',body:JSON.stringify(sub.toJSON())}).catch(()=>{});
+  }
+  if(Notification.permission==='denied'){ tg.disabled=true; setMsg($('#pushMsg'),'Notificările sunt blocate în setările browserului pentru acest site.','error'); }
+}
+async function togglePush(){
+  const tg=$('#pushToggle'), msg=$('#pushMsg'); setMsg(msg,''); tg.disabled=true;
+  try{
+    const reg=await pushReg();
+    if(tg.checked){
+      const perm=await Notification.requestPermission();
+      if(perm!=='granted') throw new Error('Nu ai permis notificările în browser.');
+      const cfg=await api('/api/push/key');
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(cfg.key)});
+      await api('/api/push/subscribe',{method:'POST',body:JSON.stringify(sub.toJSON())});
+      setMsg(msg,'Notificările push sunt active pe acest dispozitiv.','ok');
+    }else{
+      const sub=await reg.pushManager.getSubscription();
+      if(sub){ await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{}); await sub.unsubscribe().catch(()=>{}); }
+      setMsg(msg,'Notificările push au fost dezactivate.','ok');
+    }
+  }catch(err){ tg.checked=!tg.checked; setMsg(msg,err.message||'Nu s-a putut actualiza.','error'); }
+  tg.disabled=Notification.permission==='denied';
+}
+document.addEventListener('change',e=>{ if(e.target&&e.target.id==='pushToggle') togglePush(); });
 async function saveNotifPrefs(e){
   e.preventDefault(); const msg=$('#notifMsg'); setMsg(msg,'');
   try{ await api('/api/account/notif-prefs',{method:'PUT',body:JSON.stringify({mail_msg:$('#mailMsg').checked,mail_offer:$('#mailOffer').checked,mail_order:$('#mailOrder').checked,mail_alert:$('#mailAlert').checked})}); setMsg(msg,'Preferințele au fost salvate.','ok'); }
@@ -4152,7 +4193,7 @@ document.addEventListener('scroll',e=>{
 
 
 /* ---------- rezumat notificări (Contul meu) ---------- */
-const NOTIF_ROWS=[['messages','✉','mesaje necitite','messages'],['orders_seller','📦','comenzi noi din oferte','orders-seller'],['orders_buyer','🧾','comenzi în curs','orders'],['offers_received','💬','oferte primite la cereri','offers-received'],['alerts','🔔','alerte din căutări salvate','notifications'],['expire','⏳','anunțuri care expiră curând','listings-expire']];
+const NOTIF_ROWS=[['messages','✉','mesaje necitite','messages'],['orders_seller','📦','comenzi noi din oferte','orders-seller'],['orders_buyer','🧾','comenzi în curs','orders'],['offers_received','💬','oferte primite la cereri','offers-received'],['alerts','🔔','alerte din căutări salvate','notifications'],['account','⚠','alte notificări din cont (administrare, credite, calificative)','notifications'],['expire','⏳','anunțuri care expiră curând','listings-expire']];
 function toggleNotifSummary(){
   const b=$('#notifSummary'), btn=$('#notifBtn'); if(!b) return;
   const open=b.classList.toggle('hidden')===false;

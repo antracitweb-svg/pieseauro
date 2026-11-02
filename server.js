@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 let compression=null;try{compression=require('compression');}catch{}
+let webpush=null;try{webpush=require('web-push');}catch{}
 // Plăți online cu cardul (Stripe Checkout). Fără cheie, plățile rămân dezactivate și site-ul funcționează normal.
 let stripe=null;
 try{
@@ -415,6 +416,8 @@ async function dbReady(){
   'ALTER TABLE orders ADD COLUMN IF NOT EXISTS note TEXT',
   "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, body TEXT NOT NULL, is_read BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
   'CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, text TEXT NOT NULL, is_read BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE TABLE IF NOT EXISTS push_subscriptions (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, ua TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions(user_id)',
   'CREATE TABLE IF NOT EXISTS user_phones (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, phone TEXT NOT NULL, is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE, verified BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id, phone))',
   'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)',
   // Ateliere / service-uri auto: catalog public, fiecare intrare poate fi legată de un cont de utilizator.
@@ -1977,7 +1980,7 @@ app.patch('/api/admin/users/:id',auth,staff,requireDb,ah(async(req,res)=>{
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
  await pool.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,status==='blocked'?'block_user':'unblock_user','user',uid,(status==='blocked'?(days?days+' zile · ':'definitiv · '):'')+reason]);
  if(status==='blocked'){
-  await notify(uid,'Contul tău a fost blocat'+(until?' până la '+until.toLocaleDateString('ro-RO'):' definitiv')+'. Motiv: '+reason,'account').catch(()=>{});
+  await notify(uid,'Contul tău a fost blocat'+(until?' până la '+until.toLocaleDateString('ro-RO'):' definitiv')+'. Motiv: '+reason,'warn').catch(()=>{});
   // Un moderator care blochează un cont anunță administratorii (pot reveni asupra deciziei).
   if(req.user.role==='moderator'){
    const ad=await pool.query("SELECT id FROM users WHERE role='admin' AND status='active'").catch(()=>({rows:[]}));
@@ -2071,7 +2074,7 @@ app.post('/api/admin/users/:id/warn',auth,staff,requireDb,ah(async(req,res)=>{
  const t=(await pool.query('SELECT id,role FROM users WHERE id=$1',[req.params.id])).rows[0];
  if(!t)return res.status(404).json({error:'NOT_FOUND'});
  if(req.user.role!=='admin'&&t.role!=='user')return res.status(403).json({error:'ADMIN_ONLY'});
- await notify(t.id,'Mesaj de la administrare: '+text,'account');
+ await notify(t.id,'Mesaj de la administrare: '+text,'warn');
  await admLog(req,'warn_user','user',t.id,text);
  res.json({ok:true});
 }));
@@ -2177,25 +2180,65 @@ app.post('/api/reports',auth,requireDb,async(req,res)=>{if(!throttle(authAttempt
 
 /* ---------- oferte, comenzi, notificări ---------- */
 const mailGate=new Map();
+// Mesaje de la administrare (avertisment, blocare): se trimit pe email mereu, indiferent de preferințe și de starea contului.
+const MAIL_FORCE=new Set(['warn']);
 const MAIL_COL={msg:'mail_msg',offer:'mail_offer',order:'mail_order',alert:'mail_alert',expire:'mail_alert',request:'mail_alert'};
 async function mailNotify(uid,kind,text){
   try{
-    const col=MAIL_COL[kind];
+    const force=MAIL_FORCE.has(kind);
+    const col=force?'TRUE':MAIL_COL[kind];
     if(!uid||!col||!process.env.RESEND_API_KEY||!process.env.RESEND_FROM)return;
     const k=uid+':'+kind,now=Date.now();
-    if(now-(mailGate.get(k)||0)<10*60*1000)return;
+    if(now-(mailGate.get(k)||0)<(force?30*1000:10*60*1000))return;
     const u=(await pool.query('SELECT email,email_verified,status,'+col+' pref FROM users WHERE id=$1',[uid])).rows[0];
-    if(!u||u.status!=='active'||!u.email_verified||!u.pref)return;
+    if(!u||!u.email_verified||(!force&&(u.status!=='active'||!u.pref)))return;
     if(mailGate.size>5000)mailGate.clear();
     mailGate.set(k,now);
     const t=String(text).replace(/[\r\n]+/g,' ').slice(0,300);
     const base=String(process.env.APP_URL||process.env.RENDER_EXTERNAL_URL||'').replace(/\/+$/,'');
-    await sendMail(u.email,'AutoParts: '+t.slice(0,80),t+(base?'\n\nVezi detalii: '+base+'/#/account-tool':'')+'\n\nPoți opri aceste emailuri din Setări cont → Notificări pe email.');
+    await sendMail(u.email,'AutoParts: '+t.slice(0,80),t+(base?'\n\nVezi detalii: '+base+'/#/account-tool':'')+(force?'':'\n\nPoți opri aceste emailuri din Setări cont → Notificări pe email.'));
   }catch(e){console.error('mailNotify',e.message);}
 }
+/* ===== Web Push (notificări pe telefon/desktop chiar și cu site-ul închis) =====
+   Activ doar dacă pachetul `web-push` e instalat și sunt setate VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (+ VAPID_SUBJECT, ex. mailto:contact@site.ro).
+   Chei noi: npx web-push generate-vapid-keys */
+const PUSH_READY=!!(webpush&&process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY);
+if(PUSH_READY){try{webpush.setVapidDetails(process.env.VAPID_SUBJECT||('mailto:'+(process.env.ADMIN_EMAIL||'admin@example.com')),process.env.VAPID_PUBLIC_KEY,process.env.VAPID_PRIVATE_KEY);}catch(e){console.error('VAPID invalid:',e.message);}}
+else if(process.env.VAPID_PUBLIC_KEY&&!webpush)console.warn('VAPID_* sunt setate, dar pachetul web-push nu e instalat: notificările push sunt dezactivate.');
+const PUSH_TITLES={msg:'Mesaj nou',offer:'Ofertă / întrebare',order:'Comandă',alert:'Alertă căutare',expire:'Anunț care expiră',request:'Cerere nouă',warn:'Mesaj de la administrare',account:'Cont',rating:'Calificativ'};
+async function pushNotify(uid,kind,text){
+  try{
+    if(!PUSH_READY||!uid)return;
+    const subs=(await pool.query('SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=$1',[uid])).rows;
+    if(!subs.length)return;
+    const payload=JSON.stringify({title:PUSH_TITLES[kind]||'AutoParts',body:String(text).slice(0,160),url:kind==='msg'?'/#/account-tool?view=messages':'/#/account-tool?view=notifications',tag:'ap-'+(kind||'n')});
+    await Promise.all(subs.map(async s=>{
+      try{await webpush.sendNotification({endpoint:s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},payload,{TTL:86400,urgency:kind==='warn'?'high':'normal'});}
+      catch(e){if(e&&(e.statusCode===404||e.statusCode===410))await pool.query('DELETE FROM push_subscriptions WHERE id=$1',[s.id]).catch(()=>{});else console.error('push',e&&e.statusCode||e.message);}
+    }));
+  }catch(e){console.error('pushNotify',e.message);}
+}
+app.get('/api/push/key',auth,(req,res)=>{res.set('Cache-Control','no-store');res.json({enabled:PUSH_READY,key:PUSH_READY?process.env.VAPID_PUBLIC_KEY:null});});
+app.post('/api/push/subscribe',auth,requireDb,ah(async(req,res)=>{
+  if(!PUSH_READY)return res.status(503).json({error:'PUSH_INDISPONIBIL'});
+  if(!throttle(authAttempts,'pushsub:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+  const b=req.body||{},k=b.keys||{},ep=String(b.endpoint||'');
+  if(!/^https:\/\/[^\s]{10,1000}$/.test(ep)||typeof k.p256dh!=='string'||typeof k.auth!=='string'||k.p256dh.length>200||k.auth.length>100)return res.status(400).json({error:'DATE_INVALIDE'});
+  const n=(await pool.query('SELECT COUNT(*)::int n FROM push_subscriptions WHERE user_id=$1',[req.user.id])).rows[0].n;
+  if(n>=10)await pool.query('DELETE FROM push_subscriptions WHERE id IN (SELECT id FROM push_subscriptions WHERE user_id=$1 ORDER BY created_at LIMIT $2)',[req.user.id,n-9]);
+  await pool.query('INSERT INTO push_subscriptions(user_id,endpoint,p256dh,auth,ua) VALUES($1,$2,$3,$4,$5) ON CONFLICT (endpoint) DO UPDATE SET user_id=EXCLUDED.user_id,p256dh=EXCLUDED.p256dh,auth=EXCLUDED.auth,ua=EXCLUDED.ua',[req.user.id,ep,k.p256dh,k.auth,String(req.headers['user-agent']||'').slice(0,200)]);
+  res.json({ok:true});
+}));
+app.post('/api/push/unsubscribe',auth,requireDb,ah(async(req,res)=>{
+  const ep=String((req.body||{}).endpoint||'');
+  if(ep)await pool.query('DELETE FROM push_subscriptions WHERE user_id=$1 AND endpoint=$2',[req.user.id,ep]);
+  else await pool.query('DELETE FROM push_subscriptions WHERE user_id=$1',[req.user.id]);
+  res.json({ok:true});
+}));
 const notify=(uid,text,kind)=>{
  if(!uid)return null;
  if(kind)mailNotify(uid,kind,text);
+ pushNotify(uid,kind,text);
  // Push în timp real prin SSE (dacă utilizatorul are pagina deschisă) — badge-ul se actualizează instant.
  sseSend(uid,'notification',{text:String(text).slice(0,300),kind:kind||null,created_at:new Date().toISOString()});
  return pool.query('INSERT INTO notifications(user_id,text,kind) VALUES($1,$2,$3)',[uid,String(text).slice(0,300),kind||null]).catch(()=>{});
@@ -2624,8 +2667,9 @@ app.get('/api/counts',auth,requireDb,ah(async(req,res)=>{
   (SELECT COUNT(*)::int FROM orders WHERE buyer_id=$1 AND status IN ('confirmed','shipped') AND buyer_seen_status IS DISTINCT FROM status) AS orders_buyer,
   (SELECT COUNT(*)::int FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE q.user_id=$1 AND q.status='open' AND o.status='pending') AS offers_received,
   (SELECT COUNT(*)::int FROM notifications WHERE user_id=$1 AND NOT is_read AND kind='alert') AS alerts,
+  (SELECT COUNT(*)::int FROM notifications WHERE user_id=$1 AND NOT is_read AND (kind IS NULL OR kind NOT IN ('alert','msg','offer','order','request','expire'))) AS account,
   (SELECT COUNT(*)::int FROM listings WHERE user_id=$1 AND status='approved' AND expires_at <= NOW() + INTERVAL '7 days') AS expire`,[req.user.id])).rows[0];
- const total=r.messages+r.orders_seller+r.orders_buyer+r.offers_received+r.alerts+r.expire;
+ const total=r.messages+r.orders_seller+r.orders_buyer+r.offers_received+r.alerts+r.account+r.expire;
  res.set('Cache-Control','no-store');
  res.json({...r,total});
 }));

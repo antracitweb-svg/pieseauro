@@ -4,7 +4,7 @@
    - Navigarea: network-first, cu fallback la index.html din cache când e offline.
    - Shell static (css/js/iconițe): stale-while-revalidate.
 */
-const VERSION = 'autoparts-v9';
+const VERSION = 'autoparts-v11';
 const SHELL = [
   '/',
   '/index.html',
@@ -72,4 +72,43 @@ self.addEventListener('fetch', (e) => {
       return cached || network;
     })
   );
+});
+
+/* ===== Web Push ===== */
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
+  const title = d.title || 'AutoParts';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      // Dacă site-ul e deschis și vizibil, badge-ul din pagină (SSE) e suficient — nu afișăm notificare dublă.
+      if (wins.some((c) => c.visibilityState === 'visible')) return;
+      return self.registration.showNotification(title, {
+        body: d.body || '',
+        icon: '/assets/icon-192.svg',
+        badge: '/assets/icon-192.svg',
+        tag: d.tag || 'autoparts',
+        renotify: true,
+        data: { url: d.url || '/#/account-tool?view=notifications' }
+      });
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const c of wins) {
+        if ('focus' in c) { c.navigate(url).catch(() => {}); return c.focus(); }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
+self.addEventListener('pushsubscriptionchange', (e) => {
+  // Abonamentul s-a reînnoit în browser: pagina îl retrimite la următoarea deschidere (initPushState).
+  e.waitUntil(Promise.resolve());
 });
