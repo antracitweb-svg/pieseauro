@@ -2812,7 +2812,7 @@ async function confirmEmail(params){
   const token = params.get('token'), el = $('#verifyEmailMsg');
   if(!token){ el.textContent='Link invalid.'; return; }
   try{ const r = await api('/api/auth/verify-email',{method:'POST',body:JSON.stringify({token})}); if(currentUser) currentUser.email_verified = true; renderHeader(); el.textContent = r.message; }
-  catch(e){ el.textContent = e.message; }
+  catch(e){ el.textContent = (e.message||'').indexOf('expirat')>=0 ? 'Linkul de confirmare a expirat sau nu mai este valid. Intră în Contul meu și apasă „Retrimite emailul de confirmare”, apoi folosește linkul din cel mai nou email.' : e.message; }
 }
 function renderVerifyBanner(){
   const b = $('#verifyBanner'); if(!b) return;

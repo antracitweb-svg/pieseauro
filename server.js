@@ -883,7 +883,8 @@ if(process.env.REQUIRE_VERIFIED_EMAIL==='true'&&!MAIL_READY)console.warn('REQUIR
 const VERIF={enabled:MAIL_READY,required:REQUIRE_VERIFIED};
 async function sendVerificationEmail(req,user){
  const raw=crypto.randomBytes(32).toString('base64url');
- await pool.query('DELETE FROM email_verifications WHERE user_id=$1 OR expires_at<NOW()',[user.id]);
+ await pool.query('DELETE FROM email_verifications WHERE expires_at<NOW()');
+ await pool.query('DELETE FROM email_verifications WHERE user_id=$1 AND id NOT IN (SELECT id FROM email_verifications WHERE user_id=$1 ORDER BY id DESC LIMIT 4)',[user.id]);
  await pool.query("INSERT INTO email_verifications(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '24 hours')",[user.id,hashToken(raw)]);
  const link=`${appBaseUrl(req)}/#/verify-email?token=${encodeURIComponent(raw)}`;
  try{
@@ -928,8 +929,9 @@ app.post('/api/auth/verify-email',requireDb,async(req,res)=>{
  try{
   const token=String((req.body||{}).token||'');
   if(!token||token.length>200)return res.status(400).json({error:'RESET_EXPIRED'});
-  const r=await pool.query('SELECT id,user_id FROM email_verifications WHERE token_hash=$1 AND expires_at>NOW() AND verified_at IS NULL LIMIT 1',[hashToken(token)]);
+  const r=await pool.query('SELECT id,user_id,verified_at FROM email_verifications WHERE token_hash=$1 AND expires_at>NOW() LIMIT 1',[hashToken(token)]);
   if(!r.rowCount)return res.status(400).json({error:'RESET_EXPIRED'});
+  if(r.rows[0].verified_at)return res.json({ok:true,message:'Adresa de email este deja confirmată. Mulțumim!'});
   await pool.query('UPDATE users SET email_verified=TRUE WHERE id=$1',[r.rows[0].user_id]);
   await pool.query('UPDATE email_verifications SET verified_at=NOW() WHERE id=$1',[r.rows[0].id]);
   res.json({ok:true,message:'Adresa de email a fost confirmată. Mulțumim!'});
