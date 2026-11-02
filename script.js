@@ -4204,6 +4204,10 @@ function renderNotifSummary(){
   const b=$('#notifSummary'); if(!b||b.classList.contains('hidden')) return;
   const c=counts||{};
   const rows=NOTIF_ROWS.filter(r=>Number(c[r[0]])>0);
+  // Plasă de siguranță: dacă totalul e mai mare decât suma rândurilor cunoscute, arătăm restul ca „notificări noi”, ca bulina să nu rămână fără explicație.
+  const known=NOTIF_ROWS.reduce((n,r)=>n+(Number(c[r[0]])||0),0), extra=(Number(c.total)||0)-known;
+  if(extra>0) rows.push(['__extra','🔔','notificări noi în cont','notifications']);
+  if(extra>0) c.__extra=extra;
   b.innerHTML=rows.length?rows.map(r=>`<button type="button" class="notif-row" data-notif-go="${r[3]}"><span class="nr-ico">${r[1]}</span><span class="nr-txt"><b>${Number(c[r[0]])}</b> ${r[2]}</span><i>›</i></button>`).join(''):'<p class="muted notif-empty">Nu ai noutăți. Totul este la zi ✓</p>';
 }
 
