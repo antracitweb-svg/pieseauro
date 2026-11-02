@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 let compression=null;try{compression=require('compression');}catch{}
 let webpush=null;try{webpush=require('web-push');}catch{}
+let nodemailer=null;try{nodemailer=require('nodemailer');}catch{}
 // Plăți online cu cardul (Stripe Checkout). Fără cheie, plățile rămân dezactivate și site-ul funcționează normal.
 let stripe=null;
 try{
@@ -806,7 +807,25 @@ app.get('/api/me',async(req,res)=>{
   res.json({user:u,verification:VERIF});
  }catch{res.json({user:null,verification:VERIF});}
 });
+/* Email prin Gmail/SMTP (fără domeniu propriu): setează SMTP_USER (adresa Gmail) și SMTP_PASS (parolă de aplicație Google, 16 caractere).
+   Opțional SMTP_HOST (implicit smtp.gmail.com), SMTP_PORT (implicit 465), SMTP_FROM (implicit „AutoParts <SMTP_USER>”). Are prioritate față de Resend. */
+const SMTP_READY=!!(nodemailer&&process.env.SMTP_USER&&process.env.SMTP_PASS);
+let smtpTransport=null;
+async function sendMailSmtp(to,subject,text,html){
+ if(!smtpTransport){
+  const port=Number(process.env.SMTP_PORT)||465;
+  smtpTransport=nodemailer.createTransport({host:process.env.SMTP_HOST||'smtp.gmail.com',port,secure:port===465,auth:{user:process.env.SMTP_USER,pass:String(process.env.SMTP_PASS).replace(/\s+/g,'')}});
+ }
+ try{
+  return await smtpTransport.sendMail({from:process.env.SMTP_FROM||('AutoParts <'+process.env.SMTP_USER+'>'),to,subject,text,html});
+ }catch(e){
+  console.error('SMTP error',e.code||'',e.responseCode||'',e.message);
+  if(e.code==='EAUTH'||e.responseCode===535)throw new Error('EMAIL_SMTP_AUTH');
+  throw new Error('EMAIL_SEND_FAILED');
+ }
+}
 async function sendMail(to,subject,text,html){
+ if(SMTP_READY)return sendMailSmtp(to,subject,text,html);
  const apiKey=process.env.RESEND_API_KEY;
  const from=String(process.env.RESEND_FROM||'').trim();
  if(!apiKey) throw new Error('EMAIL_NOT_CONFIGURED');
@@ -836,7 +855,7 @@ function appBaseUrl(req){
 
 // ---- Confirmare email la înregistrare ----
 // Se trimite doar dacă Resend e configurat. Obligativitatea se activează cu REQUIRE_VERIFIED_EMAIL=true (și doar dacă emailurile funcționează).
-const MAIL_READY=!!(process.env.RESEND_API_KEY&&String(process.env.RESEND_FROM||'').includes('@'));
+const MAIL_READY=SMTP_READY||!!(process.env.RESEND_API_KEY&&String(process.env.RESEND_FROM||'').includes('@'));
 const REQUIRE_VERIFIED=process.env.REQUIRE_VERIFIED_EMAIL==='true'&&MAIL_READY;
 if(process.env.REQUIRE_VERIFIED_EMAIL==='true'&&!MAIL_READY)console.warn('REQUIRE_VERIFIED_EMAIL=true este ignorat: RESEND_API_KEY/RESEND_FROM nu sunt configurate.');
 const VERIF={enabled:MAIL_READY,required:REQUIRE_VERIFIED};
@@ -876,7 +895,7 @@ app.post('/api/auth/forgot-password',requireDb,async(req,res)=>{
   res.json({ok:true,message:'Dacă adresa există, vei primi instrucțiunile de resetare pe email.'});
  }catch(e){
   console.error('Password recovery error:',e);
-  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT'];
+  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SMTP_AUTH'];
   if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});
   if(e.message==='RECOVERY_RATE_LIMIT')return res.status(429).json({error:e.message});
   res.status(500).json({error:'SERVER_ERROR'});
@@ -902,7 +921,7 @@ app.post('/api/auth/resend-verification',auth,requireDb,async(req,res)=>{
   res.json({ok:true,message:'Ți-am trimis un email de confirmare. Verifică și folderul Spam.'});
  }catch(e){
   console.error('Verification mail error:',e.message);
-  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT'];
+  const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SMTP_AUTH'];
   if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});
   res.status(500).json({error:'SERVER_ERROR'});
  }
@@ -986,7 +1005,7 @@ app.post('/api/account/email-change',requireDb,auth,async(req,res)=>{
    `<p>Ai cerut schimbarea adresei de email pentru contul AutoParts.</p><p><a href="${link}">Confirmă noua adresă de email</a></p><p>Linkul este valabil 30 de minute.</p>`);
   }catch(mailErr){ await pool.query('DELETE FROM email_change_requests WHERE user_id=$1',[req.user.id]); throw mailErr; }
   res.json({ok:true,message:'Ți-am trimis un link de confirmare pe noua adresă de email.'});
- }catch(e){console.error(e);const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SEND_FAILED'];if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});res.status(500).json({error:'SERVER_ERROR'});}
+ }catch(e){console.error(e);const known=['EMAIL_NOT_CONFIGURED','EMAIL_SENDER_NOT_CONFIGURED','EMAIL_SENDER_INVALID','EMAIL_SENDER_NOT_VERIFIED','EMAIL_PROVIDER_FORBIDDEN','EMAIL_RATE_LIMIT','EMAIL_SEND_FAILED','EMAIL_SMTP_AUTH'];if(known.includes(e.message))return res.status(e.message==='EMAIL_RATE_LIMIT'?429:503).json({error:e.message});res.status(500).json({error:'SERVER_ERROR'});}
 });
 app.post('/api/account/email-change/confirm',requireDb,async(req,res)=>{
  try{
@@ -2187,7 +2206,7 @@ async function mailNotify(uid,kind,text){
   try{
     const force=MAIL_FORCE.has(kind);
     const col=force?'TRUE':MAIL_COL[kind];
-    if(!uid||!col||!process.env.RESEND_API_KEY||!process.env.RESEND_FROM)return;
+    if(!uid||!col||!MAIL_READY)return;
     const k=uid+':'+kind,now=Date.now();
     if(now-(mailGate.get(k)||0)<(force?30*1000:10*60*1000))return;
     const u=(await pool.query('SELECT email,email_verified,status,'+col+' pref FROM users WHERE id=$1',[uid])).rows[0];
