@@ -4147,3 +4147,17 @@ html.dark .avar-chips button.on{background:linear-gradient(180deg,#d9b36a,#b98a3
 
 /* „Defectă” = bandă albastră, „Avariată” = bandă roșie */
 .avar-badge.defecta{background:rgba(25,118,210,.95)}
+
+/* Panoul Filtre de pe pagina Mașini avariate / defecte */
+.avar-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;margin-left:4px;border-radius:999px;background:#b98a3e;color:#fff;font-size:12px;font-weight:800}
+.avar-count.hidden{display:none}
+.avar-sheet{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-end;justify-content:center}
+.avar-sheet.hidden{display:none}
+.avar-sheet-back{position:absolute;inset:0;background:rgba(10,12,16,.55)}
+.avar-sheet-card{position:relative;width:min(560px,100%);max-height:90vh;overflow:auto;background:#fffdf8;color:#2b2112;border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.35)}
+html.dark .avar-sheet-card{background:#141a24;color:#e9e7e2}
+.avar-sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:20px}
+.avar-sheet-x{border:0;background:none;color:inherit;font-size:30px;line-height:1;cursor:pointer;padding:0 6px}
+.avar-sheet .avar-chips{margin-bottom:12px}
+.avar-sheet-go{width:100%;margin-top:6px}
+@media(min-width:700px){.avar-sheet{align-items:center}.avar-sheet-card{border-radius:20px}}

@@ -1226,7 +1226,7 @@ function buildListingFilter(query){
  if(q){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
   for(const term of terms){
-    const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel'].map(c=>`${fold(c)} LIKE $${i}`);
+    const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel','l.parts_avail'].map(c=>`${fold(c)} LIKE $${i}`);
     // Coduri OEM scrise cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsesc și când sunt căutate lipite.
     if(/\d/.test(term)&&term.length>=4)cols.push(`${flat('l.oem')} LIKE $${i}`);
     // Coduri alternative / cross-reference (ex. căutarea "1K0615301" găsește piesa cu echivalentul "1K0615301A").

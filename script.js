@@ -1660,6 +1660,8 @@ async function loadAvar(){
   }
   if(qs.has('minPrice')||qs.has('maxPrice')) qs.set('priceCur', v('avarCur')==='RON'?'RON':'EUR');
   empty.classList.add('hidden');
+  const nF=['avarCounty','avarFuel','avarPriceMin','avarPriceMax','avarYearMin','avarYearMax'].filter(id=>v(id)).length + ((state.avarType||'masini')!=='masini'?1:0);
+  const cnt=$('#avarFilterCount'); if(cnt){ cnt.textContent=String(nF); cnt.classList.toggle('hidden',!nF); }
   const seq=(loadAvar.seq=(loadAvar.seq||0)+1);
   try{
     const r=await api('/api/listings?'+qs.toString());
@@ -1674,7 +1676,14 @@ const AVAR_TYPED=['avarQ','avarPriceMin','avarPriceMax','avarYearMin','avarYearM
 document.addEventListener('input',e=>{ if(e.target&&AVAR_TYPED.includes(e.target.id)){ clearTimeout(avarTimer); avarTimer=setTimeout(loadAvar,400); } });
 document.addEventListener('change',e=>{ if(e.target&&AVAR_PICK.includes(e.target.id)) loadAvar(); });
 document.addEventListener('submit',e=>{ if(e.target&&e.target.id==='avarFilters'){ e.preventDefault(); clearTimeout(avarTimer); loadAvar(); } });
+function avarSheet(open){
+  const sh=$('#avarSheet'), b=$('#avarOpenFilters'); if(!sh) return;
+  sh.classList.toggle('hidden',!open); if(b) b.setAttribute('aria-expanded',open?'true':'false');
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const sh=$('#avarSheet'); if(sh&&!sh.classList.contains('hidden')) avarSheet(false); } });
 document.addEventListener('click',e=>{
+  if(e.target.closest&&e.target.closest('#avarOpenFilters')){ avarSheet(true); return; }
+  if(e.target.closest&&e.target.closest('[data-avar-close]')){ avarSheet(false); return; }
   const chip=e.target.closest&&e.target.closest('[data-avar-type]');
   if(chip){ state.avarType=chip.dataset.avarType; $$('#avarChips button').forEach(b=>b.classList.toggle('on',b===chip)); loadAvar(); return; }
   if(e.target.closest&&e.target.closest('#avarReset')){
@@ -2549,6 +2558,12 @@ function resetSellForm(){
   $('#sellForm').reset(); updateDiscountPreview(); state.sellImages=[]; renderSellImages(); $('#sellDelivery').checked=true;
   syncSellType(); loadModels('','sellModel'); setCategory('',''); resetCarAuto(false);
 }
+function setSellTypeGroup(g){
+  const sel=$('#sellType'); if(!sel || sel.dataset.group===g) return;
+  const opts = g==='cars' ? [['avariata','Mașină avariată'],['defecta','Mașină defectă']] : [['piesa','Piesă auto'],['dezmembrari','Mașină la dezmembrat']];
+  sel.innerHTML = opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('');
+  sel.dataset.group = g;
+}
 async function enterSell(editParam,mode){
   const id = Number(editParam)||0;
   loadSellPhone();
@@ -2556,15 +2571,16 @@ async function enterSell(editParam,mode){
     if(state.editId){ resetSellForm(); } state.sellFilled=null; setSellMode(null);
     const dism = mode==='dism', avar = mode==='avar', special = dism||avar;
     if(dism){
-      $('#sellType').value='dezmembrari'; syncSellType();
+      setSellTypeGroup('parts'); $('#sellType').value='dezmembrari'; syncSellType();
       $('#sellHeading').textContent='Adaugă o mașină la dezmembrat';
       $('#sellSub').textContent='Spune ce mașină dezmembrezi și ce piese sunt disponibile.';
     } else if(avar){
-      $('#sellType').value='avariata'; syncSellType();
+      setSellTypeGroup('cars'); $('#sellType').value='avariata'; syncSellType();
       $('#sellHeading').textContent='Vinde o mașină avariată / defectă';
       $('#sellSub').textContent='Spune ce mașină vinzi și ce are: lovită, nu pornește, cutie defectă etc.';
-    } else if(state.sellDism){
-      $('#sellType').value='piesa'; syncSellType();
+    } else {
+      const need = $('#sellType').dataset.group!=='parts'; setSellTypeGroup('parts');
+      if(need || state.sellDism){ $('#sellType').value='piesa'; syncSellType(); }
     }
     state.sellDism = special; return;
   }
@@ -2574,7 +2590,7 @@ async function enterSell(editParam,mode){
   if(!r) return;
   if(wasEditing && state.sellFilled===id) return;
   const x = r.listing;
-  if(x.type==='dezmembrari' && ![...$('#sellType').options].some(o=>o.value==='dezmembrari')) $('#sellType').add(new Option('Mașină la dezmembrat (vechi)','dezmembrari'));
+  setSellTypeGroup(isCarT(x.type)?'cars':'parts');
   $('#sellType').value = x.type; $('#sellSellerType').value = x.seller_type || 'Persoană fizică';
   syncSellType();
   $('#sellTitle').value = x.title||''; $('#sellDescription').value = x.description||'';
