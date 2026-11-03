@@ -4112,3 +4112,11 @@ html.dark{color-scheme:dark}
 .avar-filters{display:grid;grid-template-columns:1fr 200px;gap:10px;margin:0 0 16px}
 .avar-filters input,.avar-filters select{width:100%;min-width:0}
 @media(max-width:600px){.avar-filters{grid-template-columns:1fr}}
+
+/* Prima pagină: butoanele de sub căutare stau pe un singur rând (mobil și laptop) */
+#page-home .home-links{flex-direction:row!important;flex-wrap:nowrap!important;justify-content:center;align-items:center;gap:10px!important}
+#page-home .home-links button{white-space:nowrap;flex:0 1 auto;min-width:0;font-size:clamp(12px,3.4vw,14px)!important;padding:9px clamp(10px,3vw,18px)!important}
+/* Eticheta de pe poză pentru mașinile avariate / defecte: bandă jos, pe toată poza (nu se suprapune cu inima, „Promovat" sau reducerea) */
+.avar-badge{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;justify-content:center;gap:3px;padding:3px 4px;border-radius:0;background:rgba(198,40,40,.94);color:#fff;font-size:11px;font-weight:800;letter-spacing:.2px;line-height:1.4;pointer-events:none;white-space:nowrap}
+.avar-badge~.photo-count{bottom:27px}
+.mine-thumb{position:relative}
