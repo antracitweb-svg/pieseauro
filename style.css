@@ -4089,3 +4089,18 @@ html.dark .adm-edit input,html.dark .adm-edit select,html.dark .adm-edit textare
 .bottom-nav .bn-admin{color:#e9d3a8}
 
 #pushBox[hidden]{display:none!important}
+
+
+/* ===== Dark mode — corecturi (v3) =====
+   1) Lista de categorii din „Adaugă piesă” rămânea albă în tema întunecată.
+   2) Tema deschisă declară explicit „only light”, ca modul întunecat forțat al telefonului/browserului
+      să nu mai întunece pagina pe jumătate; tema întunecată declară „dark”. */
+html.dark .catpick-list{background:#161c26!important;border-color:#2b323d!important}
+html.dark .catpick-list li{border-color:#2b323d!important}
+html.dark .catpick-row{background:#161c26!important;color:#e9e7e2!important}
+html.dark .catpick-row:hover,html.dark .catpick-row:focus-visible,html.dark .catpick-row:active{background:#20262f!important}
+html.dark .catpick-empty{color:#a29e93!important}
+html.dark .catpick-back,html.dark .catpick-x{color:#e9e7e2!important}
+html:not(.dark){color-scheme:only light}
+html.dark{color-scheme:dark}
+#themeBtn svg{width:1.05em;height:1.05em;display:block;pointer-events:none}

@@ -3543,14 +3543,26 @@ function wire(){
   $('#favoritesBtn').addEventListener('click', ()=>navigate('rezultate?mode=fav'));
   $('#accountBtn').addEventListener('click', ()=>doAction('account'));
   $('#menuBtn').addEventListener('click', ()=>{ if($('#menuDrawer').classList.contains('open')) closeMenu(); else openMenu(); });
-  // Dark mode — buton din header, preferință salvată în localStorage
+  // Dark mode — buton din header. Fără alegere salvată urmează setarea telefonului (prefers-color-scheme);
+  // după ce utilizatorul apasă butonul, alegerea lui se salvează în localStorage și are prioritate.
   (function initTheme(){
     const btn=$('#themeBtn'); if(!btn) return;
-    const root=document.documentElement;
-    const apply=on=>{ root.classList.toggle('dark',on); btn.textContent=on?'☀️':'🌙'; btn.setAttribute('aria-pressed',on?'true':'false'); };
-    let on=false; try{on=localStorage.getItem('theme')==='dark';}catch(e){}
+    const root=document.documentElement, meta=document.querySelector('meta[name="theme-color"]');
+    // Iconițe SVG cu culori proprii: emoji-urile 🌙/☀️ se desenau negre (glif text) pe unele telefoane.
+    const MOON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z" fill="#f2d9a6" stroke="#d4b483" stroke-width="1" stroke-linejoin="round"/></svg>';
+    const SUN='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.6" fill="#f5c542"/><g stroke="#f5c542" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7"/></g></svg>';
+    const apply=on=>{
+      root.classList.toggle('dark',on);
+      btn.innerHTML=on?SUN:MOON;
+      btn.setAttribute('aria-pressed',on?'true':'false');
+      if(meta) meta.setAttribute('content',on?'#0d1117':'#232429');
+    };
+    const saved=()=>{ try{ return localStorage.getItem('theme'); }catch(e){ return null; } };
+    const mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+    let on=saved()?saved()==='dark':!!(mq&&mq.matches);
     apply(on);
     btn.addEventListener('click',()=>{ on=!on; apply(on); try{localStorage.setItem('theme',on?'dark':'light');}catch(e){} });
+    if(mq){ const f=e=>{ if(!saved()){ on=e.matches; apply(on); } }; if(mq.addEventListener) mq.addEventListener('change',f); else if(mq.addListener) mq.addListener(f); }
   })();
   $('#closeMenu').addEventListener('click', ()=>closeMenu());
   $('#menuScrim').addEventListener('click', ()=>closeMenu());
