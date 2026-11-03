@@ -4104,3 +4104,6 @@ html.dark .catpick-back,html.dark .catpick-x{color:#e9e7e2!important}
 html:not(.dark){color-scheme:only light}
 html.dark{color-scheme:dark}
 #themeBtn svg{width:1.05em;height:1.05em;display:block;pointer-events:none}
+
+/* Butonul „Admin” din bara de jos: ascuns pentru oricine nu e administrator/moderator, indiferent de ordinea regulilor sau de un CSS vechi din cache */
+.bottom-nav .bn-admin[hidden]{display:none!important}

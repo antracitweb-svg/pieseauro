@@ -310,7 +310,7 @@ function renderHeader(){
   $('#menuAccountText').textContent = currentUser ? label : 'Intră în cont';
   const isAdmin = !!(currentUser && (currentUser.role==='admin' || currentUser.role==='moderator'));
   $('#adminMenu').classList.toggle('hidden', !isAdmin);
-  const bnA = $('#bnAdmin'); if(bnA){ bnA.hidden = !isAdmin; const bn = $('#bottomNav'); if(bn) bn.classList.toggle('has-admin', isAdmin); }
+  const bnA = $('#bnAdmin'); if(bnA){ bnA.hidden = !isAdmin; bnA.style.display = isAdmin ? '' : 'none'; const bn = $('#bottomNav'); if(bn) bn.classList.toggle('has-admin', isAdmin); }
   const ad = $('#accountAdmin'); if(ad) ad.classList.toggle('hidden', !isAdmin);
   $('#favCount').textContent = favorites.length;
   renderVerifyBanner();
