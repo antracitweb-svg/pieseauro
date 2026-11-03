@@ -4568,7 +4568,7 @@ function addSwipe(el, onSwipe){
     'page-avariate':{title:'Mașini avariate / defecte',intro:'Autoturisme avariate, accidentate sau cu defecte, de vânzare.',items:[
       L('Căutare și județ','Caută după marcă, model, an sau combustibil și alege județul.'),
       L('Cardul mașinii','Arată mașina, anul, motorul, kilometrii și prețul. Apasă pe el ca să vezi ce defecte are și să contactezi vânzătorul.'),
-      L('＋ Vinde o mașină avariată / defectă','Publici mașina cu o descriere a avariilor sau a defectelor.')]},
+      L('＋ Vinde o mașină','Publici mașina cu o descriere a avariilor sau a defectelor.')]},
     'page-services':{title:'Ateliere și montaj',intro:'Zona pentru service-uri și reparații.',items:[
       L('În curând','Vom putea căuta service-uri după județ, localitate și tip de lucrare. Deocamdată pagina nu are funcții.')]},
     'page-match':{title:'Se potrivește mașinii mele?',intro:'Verifici ce piese sunt compatibile cu mașina ta.',items:[
