@@ -122,7 +122,7 @@ app.use(helmet({
 if(compression)app.use(compression());
 // Limită mare (6 MB) doar pe rutele care primesc poze/CSV; restul primesc maximum 256 KB.
 const JSON_SMALL=express.json({limit:'256kb'}),JSON_BIG=express.json({limit:'6mb'});
-const BIG_JSON_RE=/^\/api\/(listings(\/(\d+|import))?|requests(\/\d+\/offers)?|offers\/\d+|account\/store)\/?$/;
+const BIG_JSON_RE=/^\/api\/(listings(\/(\d+|import))?|requests(\/\d+\/offers)?|offers\/\d+|account\/store|account\/business-verification)\/?$/;
 app.use((req,res,next)=>(['POST','PUT','PATCH'].includes(req.method)&&BIG_JSON_RE.test(req.path))?JSON_BIG(req,res,next):JSON_SMALL(req,res,next));
 app.use(cookieParser());
 // Protecție CSRF suplimentară (pe lângă sameSite=lax): cererile care modifică date și vin cu un Origin străin sunt respinse.
@@ -421,6 +421,10 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions(user_id)',
   'CREATE TABLE IF NOT EXISTS user_phones (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, phone TEXT NOT NULL, is_whatsapp BOOLEAN NOT NULL DEFAULT FALSE, verified BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id, phone))',
   'CREATE TABLE IF NOT EXISTS email_change_requests (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, new_email TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ)',
+  "CREATE TABLE IF NOT EXISTS business_verifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, cui TEXT, company TEXT, status TEXT NOT NULL DEFAULT 'pending', reject_reason TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), reviewed_at TIMESTAMPTZ, reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL)",
+  'CREATE TABLE IF NOT EXISTS business_docs (id SERIAL PRIMARY KEY, verification_id INTEGER NOT NULL REFERENCES business_verifications(id) ON DELETE CASCADE, kind TEXT NOT NULL, data TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE INDEX IF NOT EXISTS business_verifications_user_idx ON business_verifications(user_id,status)',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS biz_verified BOOLEAN NOT NULL DEFAULT FALSE',
   // Ateliere / service-uri auto: catalog public, fiecare intrare poate fi legată de un cont de utilizator.
   // hours = program pe zile ("L-V 08:00-18:00, S 09:00-13:00"), lat/lng opționale pentru hartă.
   `CREATE TABLE IF NOT EXISTS services (
@@ -1630,7 +1634,7 @@ app.post('/api/admin/users/:id/credits',auth,admin,requireDb,ah(async(req,res)=>
   res.json({ok:true,balance:bal});
 }));
 app.get('/api/sellers',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name ORDER BY n DESC LIMIT 100");
+ const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified ORDER BY n DESC LIMIT 100");
  res.json({sellers:r.rows});
 });
 /* ===== Notificări email, export date, ștergere cont ===== */
@@ -1681,6 +1685,75 @@ app.post('/api/account/delete',requireDb,auth,ah(async(req,res)=>{
   res.clearCookie('session',{httpOnly:true,sameSite:'lax',secure:IS_PROD,path:'/'});
   res.json({ok:true});
 }));
+/* ===== Verificare firmă (CUI + acte) =====
+   Documentele se păstrează în baza de date (NU în bucketul public), sunt vizibile doar pentru administratori/moderatori
+   și se șterg imediat după decizie. Contul primește insigna „Firmă verificată” (users.biz_verified). */
+const BIZ_KINDS=new Set(['cui','autorizatie','alt']);
+const BIZ_DOC_MAX=700000;
+app.get('/api/account/business-verification',auth,requireDb,ah(async(req,res)=>{
+  const u=(await pool.query('SELECT biz_verified FROM users WHERE id=$1',[req.user.id])).rows[0]||{};
+  const v=(await pool.query('SELECT id,cui,company,status,reject_reason,created_at,reviewed_at FROM business_verifications WHERE user_id=$1 ORDER BY id DESC LIMIT 1',[req.user.id])).rows[0]||null;
+  const docs=v?(await pool.query('SELECT kind FROM business_docs WHERE verification_id=$1 ORDER BY id',[v.id])).rows.map(r=>r.kind):[];
+  res.set('Cache-Control','no-store');
+  res.json({verified:!!u.biz_verified,request:v?{...v,docs}:null});
+}));
+app.post('/api/account/business-verification',auth,needVerified,requireDb,ah(async(req,res)=>{
+  if(!throttle(authAttempts,'biz:'+req.user.id,5,60*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+  const b=req.body||{}, cui=String(b.cui||'').trim(), company=String(b.company||'').trim().slice(0,120);
+  if(!/^(RO)?\s?\d{2,10}$/i.test(cui))return res.status(400).json({error:'CUI_INVALID'});
+  if(company.length<2)return res.status(400).json({error:'DATE_INVALIDE'});
+  const docs=Array.isArray(b.docs)?b.docs.slice(0,4):[];
+  if(!docs.length||docs.some(d=>!d||!BIZ_KINDS.has(d.kind)||!isDataImg(d.image)||d.image.length>BIZ_DOC_MAX))return res.status(400).json({error:'POZA_INVALIDA'});
+  const cur=(await pool.query('SELECT biz_verified FROM users WHERE id=$1',[req.user.id])).rows[0];
+  if(cur&&cur.biz_verified)return res.status(409).json({error:'DEJA_VERIFICAT'});
+  const cl=await pool.connect();
+  try{
+    await cl.query('BEGIN');
+    await cl.query("DELETE FROM business_verifications WHERE user_id=$1 AND status='pending'",[req.user.id]);
+    const ins=await cl.query('INSERT INTO business_verifications(user_id,cui,company) VALUES($1,$2,$3) RETURNING id',[req.user.id,cui.toUpperCase().replace(/\s+/g,''),company]);
+    for(const d of docs)await cl.query('INSERT INTO business_docs(verification_id,kind,data) VALUES($1,$2,$3)',[ins.rows[0].id,d.kind,d.image]);
+    await cl.query('COMMIT');
+  }catch(e){try{await cl.query('ROLLBACK');}catch{} throw e;}finally{cl.release();}
+  try{const st=await pool.query("SELECT id FROM users WHERE role IN ('admin','moderator') AND status='active'");for(const a of st.rows)notify(a.id,'Cerere nouă de verificare firmă: '+company,'account');}catch{}
+  res.json({ok:true,message:'Am primit documentele. Le verificăm în cel mai scurt timp și te anunțăm aici, în notificări.'});
+}));
+app.delete('/api/account/business-verification',auth,requireDb,ah(async(req,res)=>{
+  await pool.query("DELETE FROM business_verifications WHERE user_id=$1 AND status='pending'",[req.user.id]);
+  res.json({ok:true});
+}));
+app.get('/api/admin/business-verifications',auth,staff,requireDb,ah(async(req,res)=>{
+  const r=await pool.query(`SELECT v.id,v.user_id,v.cui,v.company,v.status,v.reject_reason,v.created_at,v.reviewed_at,COALESCE(u.nickname,u.name) name,u.email,u.biz_verified,
+    COALESCE((SELECT json_agg(json_build_object('id',d.id,'kind',d.kind) ORDER BY d.id) FROM business_docs d WHERE d.verification_id=v.id),'[]'::json) docs
+    FROM business_verifications v JOIN users u ON u.id=v.user_id
+    ORDER BY (v.status='pending') DESC, COALESCE(v.reviewed_at,v.created_at) DESC LIMIT 60`);
+  res.set('Cache-Control','no-store');
+  res.json({items:r.rows});
+}));
+app.get('/api/admin/business-docs/:id(\\d+)',auth,staff,requireDb,ah(async(req,res)=>{
+  const r=await pool.query('SELECT data FROM business_docs WHERE id=$1',[Number(req.params.id)]);
+  const m=r.rows[0]&&/^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(r.rows[0].data);
+  if(!m)return res.status(404).json({error:'NOT_FOUND'});
+  res.set({'Content-Type':'image/'+m[1],'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex','Content-Disposition':'inline'}).send(Buffer.from(m[2],'base64'));
+}));
+app.post('/api/admin/business-verifications/:id(\\d+)/decision',auth,staff,requireDb,ah(async(req,res)=>{
+  const id=Number(req.params.id), approve=!!req.body&&req.body.approve===true, reason=String((req.body&&req.body.reason)||'').trim().slice(0,300);
+  if(!approve&&reason.length<3)return res.status(400).json({error:'MOTIV_OBLIGATORIU'});
+  const v=(await pool.query('SELECT id,user_id,company,status FROM business_verifications WHERE id=$1',[id])).rows[0];
+  if(!v)return res.status(404).json({error:'NOT_FOUND'});
+  if(approve&&v.status==='approved')return res.json({ok:true});
+  const cl=await pool.connect();
+  try{
+    await cl.query('BEGIN');
+    await cl.query('UPDATE business_verifications SET status=$1,reject_reason=$2,reviewed_at=NOW(),reviewed_by=$3 WHERE id=$4',[approve?'approved':'rejected',approve?null:reason,req.user.id,id]);
+    await cl.query('UPDATE users SET biz_verified=$1 WHERE id=$2',[approve,v.user_id]);
+    await cl.query('DELETE FROM business_docs WHERE verification_id=$1',[id]);
+    await cl.query('INSERT INTO admin_activity(admin_id,action,target_type,target_id,details) VALUES($1,$2,$3,$4,$5)',[req.user.id,approve?'biz_approve':'biz_reject','user',v.user_id,(v.company||'')+(approve?'':' · '+reason)]);
+    await cl.query('COMMIT');
+  }catch(e){try{await cl.query('ROLLBACK');}catch{} throw e;}finally{cl.release();}
+  notify(v.user_id,approve?'Firma ta a fost verificată. Pe profil apare acum „Firmă verificată”.':'Verificarea firmei a fost respinsă: '+reason+'. Poți retrimite documentele din Setări → Verificare firmă.','account');
+  res.json({ok:true});
+}));
+
 /* ===== Poză de profil (avatar) ===== */
 const AVATAR_MAX=200000;
 app.get('/api/users/:id(\\d+)/avatar',requireDb,ah(async(req,res)=>{
@@ -1735,7 +1808,7 @@ app.put('/api/account/store',requireDb,auth,ah(async(req,res)=>{
 app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const id=Number(req.params.id);
  if(!Number.isInteger(id)||id<=0)return res.status(404).json({error:'NOT_FOUND'});
- const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
+ const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,biz_verified,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
  const s=(await pool.query("SELECT COUNT(*)::int n,COALESCE(BOOL_OR(type='dezmembrari'),FALSE) dism,(ARRAY_AGG(seller_type ORDER BY created_at DESC))[1] seller_type,(ARRAY_AGG(county ORDER BY created_at DESC) FILTER (WHERE county IS NOT NULL AND county<>''))[1] county FROM listings WHERE user_id=$1 AND status='approved'",[id])).rows[0];
  const phones=u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[id])).rows:[];
@@ -1743,7 +1816,7 @@ app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const me=await optUserId(req); const blocked=me&&me!==id?(await blockState(me,id)).byMe:false;
  const rt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM seller_ratings WHERE seller_id=$1',[id])).rows[0];
  const bt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM buyer_ratings WHERE buyer_id=$1',[id])).rows[0];
- res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked}});
+ res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified}});
 }));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 function parseListing(x){

@@ -216,6 +216,21 @@
 <div class="set-field"><label for="storeLogoFile">Logo sau poză firmă:</label><div class="store-logo-edit"><img id="storeLogoPreview" class="hidden" alt="Logo magazin"><input id="storeLogoFile" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="text-btn hidden" id="storeLogoRemove">Șterge poza</button></div></div>
 <button class="btn primary">Salvează profilul de magazin</button><p class="form-note" id="storeMsg"></p>
 </form>
+<form class="set-form" id="bizForm">
+<h3 class="set-h">Verificare firmă (CUI și acte)</h3>
+<small class="sf-hint">Pentru firme și parcuri de dezmembrări. Încarcă poze clare cu certificatul de înregistrare (CUI) și, dacă ai, autorizația de dezmembrare. Documentele sunt văzute doar de administratori, doar pentru verificare, și se șterg imediat după decizie. După aprobare apare insigna „Firmă verificată” pe profilul tău.</small>
+<div class="form-note" id="bizStatus"></div>
+<div id="bizFields">
+<div class="set-field"><label for="bizCui">CIF / CUI:</label><input id="bizCui" maxlength="20" placeholder="ex. RO12345678"></div>
+<div class="set-field"><label for="bizCompany">Denumirea firmei:</label><input id="bizCompany" maxlength="120" placeholder="ex. Dezmembrări Auto SRL"></div>
+<div class="set-field"><label for="bizDocCui">Certificat de înregistrare / CUI (poză):</label><input id="bizDocCui" type="file" accept="image/png,image/jpeg,image/webp"></div>
+<div class="set-field"><label for="bizDocAut">Autorizație de dezmembrare (poză, dacă ai):</label><input id="bizDocAut" type="file" accept="image/png,image/jpeg,image/webp"></div>
+<div class="set-field"><label for="bizDocAlt">Alt document (opțional):</label><input id="bizDocAlt" type="file" accept="image/png,image/jpeg,image/webp"></div>
+<button class="btn primary">Trimite pentru verificare</button>
+</div>
+<button type="button" class="text-btn hidden" id="bizWithdraw">Retrage cererea</button>
+<p class="form-note" id="bizMsg"></p>
+</form>
 <form class="set-form" id="notifForm">
 <h3 class="set-h">5. Notificări pe email</h3>
 <small class="sf-hint">Se trimit doar către o adresă confirmată, cel mult un email la 10 minute pentru fiecare tip. Notificările din site rămân active.</small>

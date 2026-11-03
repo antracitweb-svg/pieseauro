@@ -11,7 +11,7 @@ const ERR = {
   NICKNAME_EXISTS:'Nickname-ul este deja folosit.',COMENZI_ACTIVE:'Ai comenzi în curs. Finalizează sau anulează comenzile înainte de a șterge contul.',ADMIN_NU_SE_STERGE:'Conturile de administrator nu se pot șterge din interfață.',SITE_INVALID:'Adresa site-ului trebuie să înceapă cu http:// sau https://.',LOGO_INVALID:'Logo invalid sau prea mare (maximum ~450 KB după comprimare).',NICKNAME_INVALID:'Nickname-ul trebuie să aibă 3–30 de caractere (litere, cifre, _ . -).',
   DATE_INVALIDE:'Verifică datele introduse.',AUTH_REQUIRED:'Trebuie să te autentifici.',
   EMAIL_NOT_CONFIGURED:'Trimiterea emailurilor nu este configurată încă pe server.',EMAIL_SENDER_NOT_CONFIGURED:'Lipsește expeditorul email (RESEND_FROM).',
-  EMAIL_SENDER_INVALID:'Adresa configurată pentru RESEND_FROM nu este validă.',EMAIL_SENDER_NOT_VERIFIED:'Expeditorul email nu este verificat în Resend.',EMAIL_SMTP_AUTH:'Serviciul de email a refuzat autentificarea. Verifică cheia/parola configurată pe server.',
+  EMAIL_SENDER_INVALID:'Adresa configurată pentru RESEND_FROM nu este validă.',EMAIL_SENDER_NOT_VERIFIED:'Expeditorul email nu este verificat în Resend.',EMAIL_SMTP_AUTH:'Serviciul de email a refuzat autentificarea. Verifică cheia/parola configurată pe server.',DEJA_VERIFICAT:'Firma ta este deja verificată.',MOTIV_OBLIGATORIU:'Scrie motivul (minimum 3 caractere).',
   EMAIL_PROVIDER_FORBIDDEN:'Serviciul de email a refuzat trimiterea. Verifică cheia API și expeditorul.',EMAIL_RATE_LIMIT:'Prea multe cereri către serviciul de email. Încearcă peste câteva minute.',
   EMAIL_SEND_FAILED:'Emailul nu a putut fi trimis. Încearcă din nou.',RECOVERY_RATE_LIMIT:'Ai cerut prea multe resetări. Încearcă peste 15 minute.',
   LOGIN_RATE_LIMIT:'Prea multe încercări. Încearcă din nou mai târziu.',RESET_EXPIRED:'Linkul a expirat sau a fost deja folosit.',
@@ -1921,7 +1921,7 @@ async function loadStores(parks){
   try{
     let list = (await api('/api/sellers')).sellers || [];
     if(parks) list = list.filter(s=>s.dism);
-    grid.innerHTML = list.map(s=>`<article class="info-card"><div class="seller-head">${avatarSpan(s.id,s.name,'seller-avatar')}<div><span class="badge">${s.dism?'DEZMEMBRĂRI':'VÂNZĂTOR'}</span><h3>${esc(s.name)}</h3></div></div><p class="rate-line">${ratingLine({avg:s.rating_avg,count:s.rating_n},s.id,'seller')}</p><p>${s.n} ${s.n===1?'anunț':'anunțuri'}${s.county?' · '+esc(s.county):''}</p><button class="btn ghost small" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`).join('');
+    grid.innerHTML = list.map(s=>`<article class="info-card"><div class="seller-head">${avatarSpan(s.id,s.name,'seller-avatar')}<div><span class="badge">${s.dism?'DEZMEMBRĂRI':'VÂNZĂTOR'}</span>${s.vb?' <span class="badge new">✔ Verificat</span>':''}<h3>${esc(s.name)}</h3></div></div><p class="rate-line">${ratingLine({avg:s.rating_avg,count:s.rating_n},s.id,'seller')}</p><p>${s.n} ${s.n===1?'anunț':'anunțuri'}${s.county?' · '+esc(s.county):''}</p><button class="btn ghost small" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`).join('');
     $('#storesEmpty').classList.toggle('hidden', list.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -2580,7 +2580,40 @@ async function loadSettings(){
   renderPhones();
   loadSessions().catch(()=>{}); loadBlocks().catch(()=>{});
   initPushState().catch(()=>{});
+  loadBizStatus().catch(()=>{});
 }
+/* ---------- Verificare firmă (CUI + acte) ---------- */
+const BIZ_FILES=[['bizDocCui','cui'],['bizDocAut','autorizatie'],['bizDocAlt','alt']];
+async function loadBizStatus(){
+  const f=$('#bizForm'); if(!f) return;
+  let d; try{ d=await api('/api/account/business-verification'); }catch{ return; }
+  const st=$('#bizStatus'), fields=$('#bizFields'), wd=$('#bizWithdraw'), r=d.request;
+  wd.classList.add('hidden'); fields.classList.remove('hidden'); st.textContent='';
+  if(d.verified){ st.innerHTML='<span class="badge new">✔ Firmă verificată</span>'; fields.classList.add('hidden'); return; }
+  if(r&&r.status==='pending'){ st.textContent='Cererea a fost trimisă pe '+fmtDate(r.created_at)+' și este în analiză ('+r.docs.length+' document'+(r.docs.length===1?'':'e')+').'; fields.classList.add('hidden'); wd.classList.remove('hidden'); return; }
+  if(r&&r.status==='rejected') st.textContent='Ultima cerere a fost respinsă'+(r.reject_reason?': '+r.reject_reason:'.')+' Poți trimite din nou.';
+  if(!$('#bizCui').value) $('#bizCui').value=($('#billCui')||{}).value||'';
+  if(!$('#bizCompany').value) $('#bizCompany').value=($('#billCompany')||{}).value||'';
+}
+async function submitBiz(e){
+  e.preventDefault(); const msg=$('#bizMsg'); setMsg(msg,'');
+  const btn=e.target.querySelector('button.btn.primary'); if(btn) btn.disabled=true;
+  try{
+    const docs=[];
+    for(const [id,kind] of BIZ_FILES){ const file=$('#'+id).files[0]; if(file) docs.push({kind,image:await fileToDataUrl(file)}); }
+    if(!docs.length) throw new Error('Adaugă cel puțin o poză cu certificatul de înregistrare (CUI).');
+    const r=await api('/api/account/business-verification',{method:'POST',body:JSON.stringify({cui:$('#bizCui').value.trim(),company:$('#bizCompany').value.trim(),docs})});
+    BIZ_FILES.forEach(([id])=>{ $('#'+id).value=''; });
+    setMsg(msg,r.message||'Cererea a fost trimisă.','ok'); await loadBizStatus();
+  }catch(err){ setMsg(msg,err.message||'Nu s-a putut trimite cererea.','error'); }
+  if(btn) btn.disabled=false;
+}
+async function withdrawBiz(){
+  if(!confirm('Retragi cererea de verificare? Documentele trimise se șterg.')) return;
+  try{ await api('/api/account/business-verification',{method:'DELETE'}); setMsg($('#bizMsg'),'Cererea a fost retrasă.','ok'); await loadBizStatus(); }
+  catch(err){ setMsg($('#bizMsg'),err.message||'Nu s-a putut retrage.','error'); }
+}
+
 /* ---------- Web Push ---------- */
 function b64ToU8(b64){ const pad='='.repeat((4-b64.length%4)%4); const raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(raw,c=>c.charCodeAt(0)); }
 const pushSupported = ()=> 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -2929,7 +2962,7 @@ function adminUsersRows(){
 }
 function renderAdmin(){
   const d = adminData, s = d.s;
-  const tabs = [['dashboard','Dashboard'],['listings',`Anunțuri${s.pending?` (${s.pending})`:''}`],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['messages','Mesaje'],['credits','Credite'],['reports',`Raportări${s.reports?` (${s.reports})`:''}`],['events','Evenimente'],['features','Funcții noi'],['activity','Activitate'],['vehicles','Mașini']].filter(t=>currentUser.role==='admin'||['dashboard','listings','users','requests','reports','offers','orders','events'].includes(t[0]));
+  const tabs = [['dashboard','Dashboard'],['listings',`Anunțuri${s.pending?` (${s.pending})`:''}`],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['messages','Mesaje'],['credits','Credite'],['reports',`Raportări${s.reports?` (${s.reports})`:''}`],['events','Evenimente'],['features','Funcții noi'],['activity','Activitate'],['vehicles','Mașini'],['bizver','Verificări firme']].filter(t=>currentUser.role==='admin'||['dashboard','listings','users','requests','reports','offers','orders','events','bizver'].includes(t[0]));
   if(!tabs.some(t=>t[0]===adminTab)) adminTab='dashboard';
   let body = '';
   if(adminTab==='dashboard') body = `<div class="stat-grid"><div class="stat"><b>Utilizatori</b><h3>${s.users}</h3><small>${s.activeUsers} activi</small></div><div class="stat"><b>Anunțuri</b><h3>${s.listings}</h3><small>${s.approved} aprobate · ${s.pending} în așteptare · ${s.rejected} respinse</small></div><div class="stat"><b>Raportări deschise</b><h3>${s.reports}</h3></div><div class="stat"><b>Cereri deschise</b><h3>${s.requests}</h3></div></div>`;
@@ -2946,8 +2979,27 @@ function renderAdmin(){
   if(adminTab==='events') body = adminEventsHtml();
   if(adminTab==='features') body = adminFeaturesHtml();
   if(adminTab==='vehicles') body = '<div id="vehAdmin"><p>Se încarcă baza de vehicule…</p></div>';
+  if(adminTab==='bizver') body = '<div id="bizAdmin"><p>Se încarcă cererile…</p></div>';
   $('#adminContent').innerHTML = `<div class="admin-tabs">${tabs.map(([k,l])=>`<button class="btn ghost ${k===adminTab?'active':''}" data-admin-tab="${k}">${l}</button>`).join('')}</div>${body}`;
   if(adminTab==='vehicles') safe(loadAdminVehicles)();
+  if(adminTab==='bizver') safe(loadAdminBiz)();
+}
+async function loadAdminBiz(){
+  const box=$('#bizAdmin'); if(!box) return;
+  const d=await api('/api/admin/business-verifications');
+  const KL={cui:'Certificat / CUI',autorizatie:'Autorizație',alt:'Alt document'}, ST={pending:'în așteptare',approved:'aprobată',rejected:'respinsă'};
+  box.innerHTML=(d.items.map(x=>{
+    const docs=(x.docs||[]).map(g=>`<a href="/api/admin/business-docs/${g.id}" target="_blank" rel="noopener"><img src="/api/admin/business-docs/${g.id}" alt="${esc(KL[g.kind]||g.kind)}" loading="lazy" style="max-width:150px;max-height:150px;border-radius:8px;border:1px solid var(--line)"><small style="display:block">${esc(KL[g.kind]||g.kind)}</small></a>`).join('');
+    const acts=x.status==='pending'?`<button class="btn primary small" data-biz="approve" data-id="${x.id}">Aprobă</button><button class="btn danger small" data-biz="reject" data-id="${x.id}">Respinge</button>`:(x.status==='approved'&&x.biz_verified?`<button class="btn danger small" data-biz="reject" data-id="${x.id}">Retrage verificarea</button>`:'');
+    return `<article class="info-card"><b>#${x.id} · ${esc(x.company||'—')}</b> <span class="badge">${esc(ST[x.status]||x.status)}</span><p>${esc(x.name||'')} · ${esc(x.email||'')} · CUI ${esc(x.cui||'—')}</p><small>Trimisă ${fmtDate(x.created_at)}${x.reject_reason?' · Motiv: '+esc(x.reject_reason):''}</small><div class="admin-actions" style="flex-wrap:wrap;gap:10px;margin:8px 0">${docs||'<small>Documentele au fost șterse după decizie.</small>'}</div><div class="admin-actions">${acts}</div></article>`;
+  }).join('')||'<p>Nu există cereri de verificare.</p>');
+}
+async function bizAction(el){
+  const approve=el.dataset.biz==='approve'; let reason='';
+  if(approve){ if(!confirm('Aprobi această firmă? Primește insigna „Firmă verificată”, iar documentele se șterg.')) return; }
+  else{ reason=(prompt('Motivul respingerii / retragerii (îl vede și utilizatorul):')||'').trim(); if(reason.length<3) return; }
+  await api('/api/admin/business-verifications/'+el.dataset.id+'/decision',{method:'POST',body:JSON.stringify({approve,reason})});
+  toast(approve?'Firmă verificată.':'Cererea a fost respinsă.'); await loadAdminBiz();
 }
 let vehQuery = '';
 const KIND_LABEL = {car:'Autoturism',van:'Utilitară',motorcycle:'Motocicletă',moped:'Moped',truck:'Camion',bus:'Autobuz'};
@@ -3288,7 +3340,7 @@ async function openSellerProfile(id){
     const own=currentUser&&currentUser.id===s.id;
     const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
     const phones=contactHtml(s.phones||[],'Vânzătorul',s.id,own,null), canMsg=!own, hasPh=(s.phones||[]).length>0;
-    box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small><div class="rate-line">Ca vânzător: ${ratingLine(s.rating,s.id,'seller')}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating,s.id,'buyer')}</div></div></div>
+    box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small>${s.verified_business?'<span class="badge new" title="Documentele firmei au fost verificate">✔ Firmă verificată</span>':''}<div class="rate-line">Ca vânzător: ${ratingLine(s.rating,s.id,'seller')}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating,s.id,'buyer')}</div></div></div>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
     ${s.vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${s.vacation.until?' până la '+esc(fmtDate(s.vacation.until+'T00:00:00')):''}.</div>`:''}
     ${(hasPh||canMsg)?contactFoldHtml(phones+(canMsg?`<button type="button" class="btn ghost contact-msg" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`:'')):''}
@@ -3412,6 +3464,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-del-phone]'))){ const id=el.dataset.delPhone; if(confirm('Ștergi acest număr?')) safe(async()=>{ await api('/api/account/phones/'+id,{method:'DELETE'}); await loadSettings(); })(); return; }
   if((el=t.closest('[data-admin-tab]'))){ adminTab=el.dataset.adminTab; if(adminTab==='listings') adminUserFilter=null; renderAdmin(); return; }
   if((el=t.closest('[data-veh]'))){ safe(vehAction)(el); return; }
+  if((el=t.closest('[data-biz]'))){ safe(bizAction)(el); return; }
   if((el=t.closest('[data-admin]'))){ safe(adminAction)(el); return; }
   if((el=t.closest('[data-ev-filter]'))){ adminEvKind=el.dataset.evFilter; renderAdmin(); return; }
   if((el=t.closest('[data-adm-filter]'))){ adminFilter=el.dataset.admFilter; renderAdmin(); return; }
@@ -3611,6 +3664,8 @@ function wire(){
   setupAvatarHold();
   $('#avatarFile').addEventListener('change', onAvatarPick);
   $('#storeForm').addEventListener('submit', saveStore);
+  $('#bizForm').addEventListener('submit', submitBiz);
+  $('#bizWithdraw').addEventListener('click', withdrawBiz);
   $('#notifForm').addEventListener('submit', saveNotifPrefs);
   $('#vacationForm').addEventListener('submit', saveVacation);
   $('#blockForm').addEventListener('submit', addBlock);
