@@ -346,7 +346,7 @@ async function dbReady(){
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS steering TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS registered TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS city TEXT',
-  "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='listings'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%avariata%') THEN ALTER TABLE listings DROP CONSTRAINT IF EXISTS listings_type_check; ALTER TABLE listings ADD CONSTRAINT listings_type_check CHECK(type IN ('piesa','masina','dezmembrari','avariata')); END IF; END $$",
+  "DO $$ DECLARE c RECORD; BEGIN FOR c IN SELECT conname FROM pg_constraint WHERE conrelid='listings'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%dezmembrari%' AND pg_get_constraintdef(oid) NOT LIKE '%avariata%' LOOP EXECUTE format('ALTER TABLE listings DROP CONSTRAINT %I',c.conname); END LOOP; IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='listings'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%avariata%') THEN ALTER TABLE listings ADD CONSTRAINT listings_type_check CHECK(type IN ('piesa','masina','dezmembrari','avariata')); END IF; END $$",
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS generation TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS engine TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS fuel TEXT',
