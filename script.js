@@ -60,7 +60,7 @@ const CATEGORIES = CATEGORY_TREE.map(c=>[c[0],c[1]]);
 const COUNTIES = ['Alba','Arad','Argeș','Bacău','Bihor','Bistrița-Năsăud','Botoșani','Brăila','Brașov','București','Buzău','Caraș-Severin','Călărași','Cluj','Constanța','Covasna','Dâmbovița','Dolj','Galați','Giurgiu','Gorj','Harghita','Hunedoara','Ialomița','Iași','Ilfov','Maramureș','Mehedinți','Mureș','Neamț','Olt','Prahova','Satu Mare','Sălaj','Sibiu','Suceava','Teleorman','Timiș','Tulcea','Vaslui','Vâlcea','Vrancea'];
 const STATUS_LABEL = {pending:['În așteptare','pending'],approved:['Publicat','new'],sold:['Vândut','pending'],rejected:['Respins','bad'],blocked:['Blocat','bad'],deleted:['Șters','bad']};
 const REPORT_REASONS = ['Preț înșelător','Piesa nu există / escrocherie','Conținut necorespunzător','Anunț duplicat','Altceva'];
-const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',mesagerie:'page-messages',privacy:'page-privacy',rules:'page-rules',contact:'page-contact',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change','verify-email':'page-verify-email'};
+const ROUTES = {home:'page-home',rezultate:'page-results',menu:'page-menu',cont:'page-account',cerere:'page-request-pick','cerere-noua':'page-request',vinde:'page-sell',dezmembrari:'page-dism',avariate:'page-avariate',servicii:'page-services',admin:'page-admin',match:'page-match',requests:'page-requests',stores:'page-stores',saved:'page-saved','anunturile-mele':'page-mine','account-tool':'page-account-tool',mesagerie:'page-messages',privacy:'page-privacy',rules:'page-rules',contact:'page-contact',cookies:'page-cookies',terms:'page-terms','reset-password':'page-reset-password',settings:'page-settings','verify-email-change':'page-verify-email-change','verify-email':'page-verify-email'};
 const AUTH_ROUTES = new Set(['cont','cerere','cerere-noua','vinde','settings','admin','anunturile-mele','mesagerie']);
 const FILTER_FIELDS = {filterType:'type',filterCategory:'category',filterMake:'make',filterModel:'model',filterCondition:'condition',filterCounty:'county',minPrice:'minPrice',maxPrice:'maxPrice',yearFrom:'yearFrom',yearTo:'yearTo',filterFuel:'fuel',filterSeller:'seller_type',sortListings:'sort'};
 
@@ -262,6 +262,7 @@ function route(){
   else if(name==='cerere-noua') safe(enterRequestForm)(params.get('from'),params.get('edit'));
   else if(name==='vinde') safe(enterSell)(params.get('edit'),params.get('t'));
   else if(name==='dezmembrari') loadDism();
+  else if(name==='avariate') loadAvar();
   else if(name==='requests') loadRequests(params.get('t')==='mine');
   else if(name==='stores') loadStores(params.get('t')==='parks');
   else if(name==='saved') renderSaved();
@@ -1165,7 +1166,7 @@ function cardMine(x){
 /* Iconițe pentru anunțuri fără poză (desenate în cod, culorile site-ului) */
 const PH_ICONS={"car": "<svg viewBox=\"0 0 64 40\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M4 29v-7c0-2 1.2-3 3-3.5l9-2.5 6-7.5h20l8 7.5 8 2.5c2 .5 3 1.5 3 3.5v7\"/><path d=\"M4 29h8M22 29h20M52 29h8M25 11.5l-4.5 7h12v-7zM36 11.5v7h10.5l-6-7z\"/><circle cx=\"17\" cy=\"29.5\" r=\"5\"/><circle cx=\"47\" cy=\"29.5\" r=\"5\"/></svg>", "engine": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 20h22l4 4v11H12z\"/><path d=\"M18 20v-6h12v6M7 27h5M38 28h4M18 27h14M18 31h14\"/></svg>", "brake": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"24\" cy=\"24\" r=\"16\"/><circle cx=\"24\" cy=\"24\" r=\"5\"/><circle cx=\"34.0\" cy=\"24.0\" r=\"1.4\"/><circle cx=\"29.0\" cy=\"32.7\" r=\"1.4\"/><circle cx=\"19.0\" cy=\"32.7\" r=\"1.4\"/><circle cx=\"14.0\" cy=\"24.0\" r=\"1.4\"/><circle cx=\"19.0\" cy=\"15.3\" r=\"1.4\"/><circle cx=\"29.0\" cy=\"15.3\" r=\"1.4\"/><path d=\"M36 10a18 18 0 0 1 6 9\"/></svg>", "light": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M8 15c8-5 20-5 28 0v18c-8 5-20 5-28 0z\"/><circle cx=\"22\" cy=\"24\" r=\"5.5\"/><path d=\"M40 19h5M40 24h5M40 29h5\"/></svg>", "body": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M8 37V19c0-3 2-5 5-5h15c3 0 5 1 7 4l5 7v12z\"/><path d=\"M14 19h12l6 7H14zM30 32h6\"/></svg>", "susp": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M24 5v8M20 13h8v6h-8z\"/><path d=\"M16 22h16l-16 4.5h16l-16 4.5h16l-16 4.5h16\"/><path d=\"M24 36v3\"/><circle cx=\"24\" cy=\"42\" r=\"3\"/></svg>", "wheel": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"24\" cy=\"24\" r=\"17\"/><circle cx=\"24\" cy=\"24\" r=\"12\"/><circle cx=\"24\" cy=\"24\" r=\"3.5\"/><path d=\"M24.0 20.5L24.0 12.0M27.3 22.9L35.4 20.3M26.1 26.8L31.1 33.7M21.9 26.8L16.9 33.7M20.7 22.9L12.6 20.3\"/></svg>", "elec": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M7 19h34v20H7z\"/><path d=\"M13 19v-4h7v4M28 19v-4h7v4M12 29h8M16 25v8M29 29h8\"/></svg>", "interior": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"24\" cy=\"24\" r=\"17\"/><circle cx=\"24\" cy=\"24\" r=\"4\"/><path d=\"M7.5 22c5 1 11 1.5 12.5 2M40.5 22c-5 1-11 1.5-12.5 2M24 28v13\"/></svg>", "gear": "<svg viewBox=\"0 0 48 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"19\" cy=\"28\" r=\"10\"/><circle cx=\"19\" cy=\"28\" r=\"3.5\"/><path d=\"M29.0 28.0L32.0 28.0M26.1 35.1L28.2 37.2M19.0 38.0L19.0 41.0M11.9 35.1L9.8 37.2M9.0 28.0L6.0 28.0M11.9 20.9L9.8 18.8M19.0 18.0L19.0 15.0M26.1 20.9L28.2 18.8\"/><circle cx=\"36\" cy=\"14\" r=\"5.5\"/><circle cx=\"36\" cy=\"14\" r=\"1.8\"/><path d=\"M41.5 14.0L44.0 14.0M38.8 18.8L40.0 20.9M33.2 18.8L32.0 20.9M30.5 14.0L28.0 14.0M33.2 9.2L32.0 7.1M38.8 9.2L40.0 7.1\"/></svg>"};
 function phKind(x){
-  if(x && x.type==='dezmembrari') return 'car';
+  if(x && (x.type==='dezmembrari'||x.type==='avariata')) return 'car';
   const t=(((x&&x.category)||'')+' '+((x&&x.subcategory)||'')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(/moto|chiulas|piston|turbo|distribu|evacuar|racire|pompe|injector|aprindere|filtre|ulei/.test(t)) return 'engine';
   if(/fran|disc|placut/.test(t)) return 'brake';
@@ -1182,7 +1183,7 @@ function phIcon(x){ return PH_ICONS[phKind(x)]||PH_ICONS.car; }
 function phHtml(x){ return `<span class="ar-ph">${phIcon(x)}<small>Fără poză</small></span>`; }
 function adRowHtml(x, eager){
   const fav = favorites.includes(x.id);
-  const isDism = x.type==='dezmembrari';
+  const isDism = x.type==='dezmembrari' || x.type==='avariata';
   const im = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
   const nImg = Number(x.image_count)||0;
   const thumb = im ? `<img src="${esc(im)}" alt="" ${eager?'fetchpriority="high"':'loading="lazy"'} decoding="async">` : phHtml(x);
@@ -1389,6 +1390,7 @@ function renderList(){
   else if(state.filters.q) title = `Rezultate pentru „${state.filters.q}”`;
   else if(state.filters.category) title = state.filters.category;
   else if(state.filters.type==='dezmembrari') title = 'Dezmembrări auto';
+  else if(state.filters.type==='avariata') title = 'Mașini avariate / defecte';
   $('#resultsTitle').textContent = title;
   renderSellerBanner();
   $('#crumbCurrent').textContent = title;
@@ -1508,7 +1510,7 @@ function contactFoldHtml(inner){
 let detailPhones = [];
 function detailHtml(x, phones, canContact){
   const fav = favorites.includes(x.id);
-  const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Coduri alternative',x.oem_alt],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
+  const rows = [['Stare',x.condition],['Categorie',[x.category,x.subcategory].filter(Boolean).join(' › ')],['Cod OEM',x.oem],['Coduri alternative',x.oem_alt],['Motor',x.engine],['Kilometri',x.km!=null?Number(x.km).toLocaleString('ro-RO')+' km':''],['Combustibil',x.fuel],['Generație',x.generation],['Livrare',x.delivery?'Da':'Nu'],['Tip vânzător',x.seller_type],['Publicat',fmtDate(x.created_at)],['ID anunț','#'+x.id]].filter(r=>r[1]);
   const spec = [['Marcă',x.make],['Model',x.model],['An',x.year]].filter(r=>r[1]);
   const phone1 = (phones||[]).slice(0,1);
   detailPhones = (phones||[]).slice(0,4);
@@ -1553,7 +1555,7 @@ function detailHtml(x, phones, canContact){
   </div>
   <aside class="ad-side">
     <div class="ad-card">
-      <div class="detail-top">${x.promoted?'<span class="badge promo">⭐ Promovat</span>':''}<span class="badge">${x.type==='dezmembrari'?'Dezmembrări':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
+      <div class="detail-top">${x.promoted?'<span class="badge promo">⭐ Promovat</span>':''}<span class="badge">${x.type==='dezmembrari'?'Dezmembrări':x.type==='avariata'?'Mașină avariată / defectă':'Piesă auto'}</span>${x.condition?`<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>`:''}</div>
       <div class="detail-price">${priceHtml(x)}${x.negotiable&&Number(x.price)>0?' <small class="muted">· negociabil</small>':''}</div>
       <p class="ad-ship">${x.delivery?'🚚 Livrare disponibilă':'📍 Ridicare personală'}</p>
     </div>
@@ -1624,6 +1626,25 @@ async function loadDism(){
     $('#dismEmpty').classList.toggle('hidden', r.listings.length>0);
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
+async function loadAvar(){
+  const grid = $('#avarGrid'), empty = $('#avarEmpty'), cs = $('#avarCounty');
+  if(cs && cs.options.length<2) cs.insertAdjacentHTML('beforeend', COUNTIES.map(c=>`<option>${esc(c)}</option>`).join(''));
+  const q = ($('#avarQ').value||'').trim(), county = cs ? cs.value : '';
+  empty.classList.add('hidden');
+  const qs = new URLSearchParams({type:'avariata',limit:'60'}); if(q) qs.set('q',q); if(county) qs.set('county',county);
+  const seq = (loadAvar.seq = (loadAvar.seq||0)+1);
+  try{
+    const r = await api('/api/listings?'+qs.toString());
+    if(seq!==loadAvar.seq) return;
+    grid.innerHTML = r.listings.map(x=>card(x)).join('');
+    empty.textContent = (q||county) ? 'Nicio mașină nu corespunde căutării.' : 'Încă nu există mașini avariate sau defecte. Adaugă prima mașină.';
+    empty.classList.toggle('hidden', r.listings.length>0);
+  }catch(e){ if(seq===loadAvar.seq) grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+let avarTimer=null;
+document.addEventListener('input',e=>{ if(e.target&&e.target.id==='avarQ'){ clearTimeout(avarTimer); avarTimer=setTimeout(loadAvar,350); } });
+document.addEventListener('change',e=>{ if(e.target&&e.target.id==='avarCounty') loadAvar(); });
+document.addEventListener('submit',e=>{ if(e.target&&e.target.id==='avarFilters'){ e.preventDefault(); clearTimeout(avarTimer); loadAvar(); } });
 const SVC_TYPES={reparatii:'Reparări generale',paint:'Vopsitorie și tinichigerie',mecanic:'Mecanică',istoric:'Istoric vehicul'};
 const svcState={all:[],loaded:false,loading:false,county:'',type:'',q:''};
 function svcFiltered(){
@@ -2363,7 +2384,7 @@ async function loadSavedCars(){
 }
 /* Compatibilitate cu mașina activă din garaj (după marcă și model) */
 function garageFitHtml(x){
-  const g = garageActive(); if(!g || !x || !x.make || x.type==='dezmembrari') return '';
+  const g = garageActive(); if(!g || !x || !x.make || x.type==='dezmembrari' || x.type==='avariata') return '';
   const nm = esc(garageName(g)), noModel = !x.model || /^alt model$/i.test(x.model);
   if(x.make!==g.make || (!noModel && x.model!==g.model)) return `<div class="ad-fit bad">⚠ Piesa este pentru ${esc([x.make,noModel?'':x.model].filter(Boolean).join(' '))}, nu pentru mașina ta activă (${nm}).</div>`;
   if(noModel) return '';
@@ -2451,14 +2472,18 @@ const SELL_TEXT = {
   piesa:{title:'Piesa care o vinzi', titleInfo:'Scrie ce piesă vinzi și pentru ce mașină. Ex: Far dreapta BMW Seria 3 E90.', titlePh:'ex. Far dreapta BMW Seria 3 2008',
     desc:'Descrie piesa', descInfo:'Descrie starea piesei, codul OEM și orice detaliu important. Marca, modelul și anul se completează automat din text.', descPh:'Descrie piesa, starea și detaliile importante...'},
   dezmembrari:{title:'Mașina de dezmembrat', titleInfo:'Scrie marca, modelul, anul și motorizarea mașinii. Ex: BMW Seria 3 E90 2008, 2.0 diesel.', titlePh:'ex. BMW Seria 3 E90 2008',
-    desc:'Descrie piesele', descInfo:'Scrie ce piese sunt disponibile, în ce stare se află și orice detaliu important. Marca, modelul și anul se completează automat din text.', descPh:'Descrie piesele disponibile, starea lor și detaliile importante...'}
+    desc:'Descrie piesele', descInfo:'Scrie ce piese sunt disponibile, în ce stare se află și orice detaliu important. Marca, modelul și anul se completează automat din text.', descPh:'Descrie piesele disponibile, starea lor și detaliile importante...'},
+  avariata:{title:'Mașina care o vinzi', titleInfo:'Scrie marca, modelul, anul și problema principală. Ex: BMW Seria 3 2008, motor defect.', titlePh:'ex. BMW Seria 3 2008, motor defect',
+    desc:'Descrie avariile sau defectele', descInfo:'Scrie ce are mașina: lovită, nu pornește, cutie defectă, airbag-uri declanșate etc. Menționează dacă pornește, dacă se poate rula și dacă are acte. Marca, modelul și anul se completează automat din text.', descPh:'Ce are mașina? Ex: lovită în față, nu pornește, cutie defectă. Se poate rula? Are acte?'}
 };
 function syncSellType(){
-  const d = $('#sellType').value==='dezmembrari';
-  $('#sellConditionWrap').classList.toggle('hidden', d);
-  $('#sellDismBlock').classList.toggle('hidden', !d);
-  $('#sellCategoryField').classList.toggle('hidden', d);
-  const T = SELL_TEXT[d?'dezmembrari':'piesa'];
+  const ty = $('#sellType').value, d = ty==='dezmembrari', av = ty==='avariata', car = d||av;
+  $('#sellConditionWrap').classList.toggle('hidden', car);
+  $('#sellDismBlock').classList.toggle('hidden', !car);
+  $('#sellCategoryField').classList.toggle('hidden', car);
+  $('#sellPartsWrap').classList.toggle('hidden', av);
+  $('#sellFuelWrap').classList.toggle('hidden', !av);
+  const T = SELL_TEXT[av?'avariata':d?'dezmembrari':'piesa'];
   $('#sellTitleLabel').textContent = T.title; $('#sellTitleInfo').dataset.info = T.titleInfo; $('#sellTitle').placeholder = T.titlePh;
   $('#sellDescLabel').textContent = T.desc;   $('#sellDescInfo').dataset.info = T.descInfo;   $('#sellDescription').placeholder = T.descPh;
 }
@@ -2486,15 +2511,19 @@ async function enterSell(editParam,mode){
   loadSellPhone();
   if(!id){
     if(state.editId){ resetSellForm(); } state.sellFilled=null; setSellMode(null);
-    const dism = mode==='dism';
+    const dism = mode==='dism', avar = mode==='avar', special = dism||avar;
     if(dism){
       $('#sellType').value='dezmembrari'; syncSellType();
       $('#sellHeading').textContent='Adaugă o mașină la dezmembrat';
       $('#sellSub').textContent='Spune ce mașină dezmembrezi și ce piese sunt disponibile.';
+    } else if(avar){
+      $('#sellType').value='avariata'; syncSellType();
+      $('#sellHeading').textContent='Vinde o mașină avariată / defectă';
+      $('#sellSub').textContent='Spune ce mașină vinzi și ce are: lovită, nu pornește, cutie defectă etc.';
     } else if(state.sellDism){
       $('#sellType').value='piesa'; syncSellType();
     }
-    state.sellDism = dism; return;
+    state.sellDism = special; return;
   }
   const wasEditing = state.editId===id;
   setSellMode(id); setMsg($('#sellMessage'),'');
@@ -2510,7 +2539,7 @@ async function enterSell(editParam,mode){
   if(x.model && $('#sellModel').value!==x.model){ const o=document.createElement('option'); o.value=o.textContent=x.model; $('#sellModel').appendChild(o); $('#sellModel').value=x.model; }
   if(x.make && $('#sellMake').value!==x.make){ const o=document.createElement('option'); o.value=o.textContent=x.make; $('#sellMake').appendChild(o); $('#sellMake').value=x.make; }
   $('#sellYear').value = x.year||''; $('#sellOem').value = x.oem||''; $('#sellOemAlt').value = x.oem_alt||'';
-  $('#sellEngine').value = x.engine||''; $('#sellKm').value = x.km!=null ? String(x.km) : ''; $('#sellVin').value = x.vin||''; $('#sellParts').value = x.parts_avail||'';
+  $('#sellEngine').value = x.engine||''; $('#sellKm').value = x.km!=null ? String(x.km) : ''; $('#sellVin').value = x.vin||''; $('#sellParts').value = x.parts_avail||''; $('#sellFuel').value = x.fuel||'';
   $('#sellPrice').value = Number(x.price)>0 ? String(Number(x.price)) : '';
   $('#sellDiscount').value = Number(x.discount_percent)>0 ? String(Math.round(Number(x.discount_percent))) : ''; updateDiscountPreview();
   $('#sellCondition').value = x.condition || 'Second-hand'; $('#sellCounty').value = x.county||'';
@@ -2527,15 +2556,15 @@ async function submitSell(e){
   if(year && (Number(year)<1950 || Number(year)>new Date().getFullYear()+1)){ setMsg(msg,ERR.AN_INVALID,'error'); return; }
   const focusBad = (el, text)=>{ setMsg(msg,text,'error'); if(el){ el.classList.add('field-error'); el.scrollIntoView({block:'center',behavior:'smooth'}); if(el.focus) el.focus({preventScroll:true}); } };
   ['sellTitle','sellMake','sellModel','sellCounty'].forEach(i=>$('#'+i).classList.remove('field-error')); $('#sellCategoryBtn').classList.remove('field-error');
-  if($('#sellTitle').value.trim().length<3){ focusBad($('#sellTitle'), type==='dezmembrari' ? 'Scrie mașina de dezmembrat (minimum 3 caractere).' : 'Scrie piesa pe care o vinzi (minimum 3 caractere).'); return; }
-  if(type!=='dezmembrari' && !$('#sellCategory').value){ focusBad($('#sellCategoryBtn'),'Alege categoria piesei.'); return; }
+  if($('#sellTitle').value.trim().length<3){ focusBad($('#sellTitle'), type==='avariata' ? 'Scrie mașina pe care o vinzi (minimum 3 caractere).' : type==='dezmembrari' ? 'Scrie mașina de dezmembrat (minimum 3 caractere).' : 'Scrie piesa pe care o vinzi (minimum 3 caractere).'); return; }
+  if(type==='piesa' && !$('#sellCategory').value){ focusBad($('#sellCategoryBtn'),'Alege categoria piesei.'); return; }
   if(!$('#sellMake').value){ focusBad($('#sellMake'),'Alege marca mașinii. Se completează automat dacă o scrii în titlu sau descriere.'); return; }
   if(!$('#sellModel').value){ focusBad($('#sellModel'),'Alege modelul mașinii (sau „Alt model”).'); return; }
   if(!$('#sellCounty').value){ focusBad($('#sellCounty'),'Alege județul.'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Se trimite…'; }
   try{
     await applySellPhone();
-    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type==='dezmembrari'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:$('#sellParts').value.trim(),discount_percent:Math.max(0,Math.min(50,Math.round(Number($('#sellDiscount').value)||0)))});
+    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type!=='piesa'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:$('#sellOem').value.trim(),oem_alt:$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:type==='avariata'?'':$('#sellParts').value.trim(),fuel:type==='avariata'?$('#sellFuel').value:'',discount_percent:Math.max(0,Math.min(50,Math.round(Number($('#sellDiscount').value)||0)))});
     const editing = state.editId;
     let r;
     if(editing) r = await api('/api/listings/'+editing,{method:'PATCH',body:payload});
@@ -3297,10 +3326,12 @@ function doAction(a){
   else if(a==='request') navigate('cerere');
   else if(a==='sell') navigate('vinde');
   else if(a==='sell-dism') navigate('vinde?t=dism');
+  else if(a==='sell-avar') navigate('vinde?t=avar');
   else if(a==='requests') navigate('requests');
   else if(a==='parks') navigate('stores?t=parks');
   else if(a==='stores') navigate('stores');
   else if(a==='dism') navigate('dezmembrari');
+  else if(a==='avar') navigate('avariate');
   else if(a==='services') navigate('servicii');
   else if(a==='match') navigate('match');
   else if(a==='admin') navigate('admin');
@@ -4534,6 +4565,10 @@ function addSwipe(el, onSwipe){
     'page-dism':{title:'Mașini pentru piese',intro:'Vehicule aflate la dezmembrare, cu piesele lor disponibile.',items:[
       L('Cardul mașinii','Arată mașina, anul, motorul și ce piese sunt disponibile. Apasă pe el ca să întrebi vânzătorul.'),
       L('＋ Adaugă o mașină la dezmembrat','Pentru parcuri și dezmembrări: publici mașina, iar cumpărătorii te contactează pentru piese.')]},
+    'page-avariate':{title:'Mașini avariate / defecte',intro:'Autoturisme avariate, accidentate sau cu defecte, de vânzare.',items:[
+      L('Căutare și județ','Caută după marcă, model, an sau combustibil și alege județul.'),
+      L('Cardul mașinii','Arată mașina, anul, motorul, kilometrii și prețul. Apasă pe el ca să vezi ce defecte are și să contactezi vânzătorul.'),
+      L('＋ Vinde o mașină avariată / defectă','Publici mașina cu o descriere a avariilor sau a defectelor.')]},
     'page-services':{title:'Ateliere și montaj',intro:'Zona pentru service-uri și reparații.',items:[
       L('În curând','Vom putea căuta service-uri după județ, localitate și tip de lucrare. Deocamdată pagina nu are funcții.')]},
     'page-match':{title:'Se potrivește mașinii mele?',intro:'Verifici ce piese sunt compatibile cu mașina ta.',items:[

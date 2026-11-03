@@ -284,7 +284,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE TABLE IF NOT EXISTS listings (
  id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
- type TEXT NOT NULL CHECK(type IN ('piesa','masina','dezmembrari')), title TEXT NOT NULL,
+ type TEXT NOT NULL CHECK(type IN ('piesa','masina','dezmembrari','avariata')), title TEXT NOT NULL,
  price NUMERIC(12,2) DEFAULT 0, condition TEXT, make TEXT, model TEXT, generation TEXT, year TEXT,
  engine TEXT, fuel TEXT, vehicle_id TEXT, seller_type TEXT, quantity INTEGER DEFAULT 1, negotiable BOOLEAN DEFAULT FALSE,
  county TEXT, category TEXT, oem TEXT, oem_alt TEXT, delivery BOOLEAN DEFAULT FALSE, description TEXT DEFAULT '',
@@ -337,6 +337,7 @@ async function dbReady(){
  if(!pool)return false;
  await pool.query(schema);
  const migrations=[
+  "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='listings'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%avariata%') THEN ALTER TABLE listings DROP CONSTRAINT IF EXISTS listings_type_check; ALTER TABLE listings ADD CONSTRAINT listings_type_check CHECK(type IN ('piesa','masina','dezmembrari','avariata')); END IF; END $$",
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS generation TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS engine TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS fuel TEXT',
@@ -1189,6 +1190,7 @@ app.delete('/api/favorites/:id',auth,requireDb,async(req,res)=>{
 });
 function buildListingFilter(query){
  const {q,delivery}=query; const where=["l.status='approved'","l.type <> 'masina'",NOT_VAC_LISTING],vals=[];let i=1;
+ if(query.type!=='avariata')where.push("l.type <> 'avariata'");
  if(q){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
   for(const term of terms){
@@ -1820,8 +1822,8 @@ app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 function parseListing(x){
  const bad=(error,status=400)=>({error,status});
- if(!['piesa','dezmembrari'].includes(x.type)||typeof x.title!=='string'||x.title.trim().length<3||x.title.length>150)return bad('DATE_INVALIDE');
- if(x.type==='dezmembrari'&&!String(x.category||'').trim())x.category='Diverse';
+ if(!['piesa','dezmembrari','avariata'].includes(x.type)||typeof x.title!=='string'||x.title.trim().length<3||x.title.length>150)return bad('DATE_INVALIDE');
+ if((x.type==='dezmembrari'||x.type==='avariata')&&!String(x.category||'').trim())x.category='Diverse';
  if(!String(x.category||'').trim()||!CATEGORIES.includes(x.category)||!String(x.make||'').trim()||!String(x.model||'').trim()||!String(x.county||'').trim())return bad('DATE_INVALIDE');
  if(x.type==='piesa'&&!['Nouă','Second-hand'].includes(x.condition))return bad('STARE_INVALIDA');
  const price=Number(x.price)||0; if(price<0||price>10000000)return bad('DATE_INVALIDE');
@@ -1835,7 +1837,7 @@ function parseListing(x){
  const images=Array.isArray(x.images)?x.images.slice(0,8):[];
  for(const img of images){if(typeof img!=='string'||!(isDataImg(img)||isStoredUrl(img)))return bad('POZA_INVALIDA');if(img.length>700000)return bad('POZE_PREA_MARI');}
  if(images.reduce((n,v)=>n+v.length,0)>4500000)return bad('POZE_PREA_MARI');
- return {v:{type:x.type,title:x.title.trim(),price,condition:x.type==='dezmembrari'?(clip(x.condition,30)||'Second-hand'):clip(x.condition,30),make:clip(x.make,60),model:clip(x.model,80),
+ return {v:{type:x.type,title:x.title.trim(),price,condition:(x.type==='dezmembrari'||x.type==='avariata')?(clip(x.condition,30)||'Second-hand'):clip(x.condition,30),make:clip(x.make,60),model:clip(x.model,80),
   year:clip(x.year,10),seller_type:clip(x.seller_type,30),quantity:x.quantity==null?null:Math.min(9999,Math.max(1,Number(x.quantity)||1)),negotiable:!!x.negotiable,county:clip(x.county,60),
    category:clip(x.category,60),subcategory:clip(x.subcategory,80),oem:clip(x.oem,60),oem_alt:cleanOemAlt(x.oem_alt),delivery:!!x.delivery,description:String(x.description||'').slice(0,5000),images,
    generation:clip(x.generation,80),engine:clip(x.engine,80),fuel:clip(x.fuel,30),vehicle_id:clip(x.vehicle_id,120),
@@ -1928,8 +1930,8 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
    status='pending';
   }
  }
-  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24,oem_alt=$25,discount_percent=$26 WHERE id=$18 AND user_id=$19 RETURNING id,status',
-   [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine,v.oem_alt,v.discount_percent]);
+  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24,oem_alt=$25,discount_percent=$26,fuel=$27 WHERE id=$18 AND user_id=$19 RETURNING id,status',
+   [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine,v.oem_alt,v.discount_percent,v.fuel]);
  logEvent(req.user.id,'listing_edit','listing',cur.id,v.title+(status==='pending'&&cur.status!=='pending'?' (retrimis la moderare)':''));
  res.json({listing:r.rows[0],resubmitted:status==='pending'&&cur.status!=='pending'});
 });
@@ -2905,7 +2907,7 @@ function seoPlural(n,one,many){return n===1?`1 ${one}`:`${new Intl.NumberFormat(
 // Index în memorie: categorii, mărci și modele care au cel puțin un anunț aprobat (se reface la 5 minute sau după modificări).
 async function getSeoIndex(){
  if(SEO_IDX&&Date.now()-SEO_IDX.at<SEO_IDX_TTL)return SEO_IDX;
- const r=await pool.query(`SELECT l.category,l.make,l.model,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} GROUP BY l.category,l.make,l.model`);
+ const r=await pool.query(`SELECT l.category,l.make,l.model,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type NOT IN ('masina','avariata') AND ${NOT_VAC_LISTING} GROUP BY l.category,l.make,l.model`);
  const cats=new Map(),makes=new Map();
  const bump=(map,key,name,n)=>{let e=map.get(key);if(!e){e={key,n:0,names:new Map()};map.set(key,e);}e.n+=n;e.names.set(name,(e.names.get(name)||0)+n);return e;};
  for(const row of r.rows){
@@ -2979,7 +2981,7 @@ app.get('/piese-auto/:slug',ah(async(req,res,next)=>{
  const cat=ix.catBySlug.get(slug);
  if(cat){
   const byMake=new Map();
-  const r=await pool.query(`SELECT l.make,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${flat('l.category')}=$1 AND COALESCE(l.make,'')<>'' GROUP BY l.make`,[cat.key]);
+  const r=await pool.query(`SELECT l.make,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type NOT IN ('masina','avariata') AND ${NOT_VAC_LISTING} AND ${flat('l.category')}=$1 AND COALESCE(l.make,'')<>'' GROUP BY l.make`,[cat.key]);
   const mkByKey=new Map([...ix.makeBySlug.values()].map(m=>[m.key,m]));
   for(const row of r.rows){const m=mkByKey.get(seoKey(row.make));if(m)byMake.set(m.slug,{name:m.name,slug:m.slug,n:(byMake.get(m.slug)?.n||0)+row.n});}
   const makes=topN(byMake,24);
@@ -3000,7 +3002,7 @@ app.get('/piese-auto/:make/:model',ah(async(req,res,next)=>{
  if(!/^[a-z0-9-]{1,120}$/.test(ms)||!/^[a-z0-9-]{1,120}$/.test(ds))return seoNotFound(req,res);
  const ix=await getSeoIndex(),mk=ix.makeBySlug.get(ms),md=mk&&mk.models.get(ds);
  if(!md)return seoNotFound(req,res);
- const r=await pool.query(`SELECT l.category,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${flat('l.make')}=$1 AND ${flat('l.model')}=$2 AND COALESCE(l.category,'')<>'' GROUP BY l.category ORDER BY n DESC`,[mk.key,md.key]);
+ const r=await pool.query(`SELECT l.category,COUNT(*)::int n FROM listings l WHERE l.status='approved' AND l.type NOT IN ('masina','avariata') AND ${NOT_VAC_LISTING} AND ${flat('l.make')}=$1 AND ${flat('l.model')}=$2 AND COALESCE(l.category,'')<>'' GROUP BY l.category ORDER BY n DESC`,[mk.key,md.key]);
  const full=`${mk.name} ${md.name}`;
  const crumbs=[['AutoParts','/'],['Piese auto','/piese-auto'],[mk.name,`/piese-auto/${mk.slug}`],[md.name,`/piese-auto/${mk.slug}/${md.slug}`]];
  const extra=r.rows.length?`<h2>Categorii de piese pentru ${escapeHtml(full)}</h2>${seoChips(r.rows.map(x=>{const cs=slugify(x.category),ce=md.cats.get(cs);return [x.category,ce&&ce.n>=SEO_MIN_COMBO?`/piese-auto/${mk.slug}/${md.slug}/${cs}`:`/#/rezultate?make=${encodeURIComponent(mk.name)}&model=${encodeURIComponent(md.name)}&category=${encodeURIComponent(x.category)}`,x.n];}))}`:'';

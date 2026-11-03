@@ -4107,3 +4107,8 @@ html.dark{color-scheme:dark}
 
 /* Butonul „Admin” din bara de jos: ascuns pentru oricine nu e administrator/moderator, indiferent de ordinea regulilor sau de un CSS vechi din cache */
 .bottom-nav .bn-admin[hidden]{display:none!important}
+
+/* Pagina Mașini avariate / defecte */
+.avar-filters{display:grid;grid-template-columns:1fr 200px;gap:10px;margin:0 0 16px}
+.avar-filters input,.avar-filters select{width:100%;min-width:0}
+@media(max-width:600px){.avar-filters{grid-template-columns:1fr}}
