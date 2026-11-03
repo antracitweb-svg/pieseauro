@@ -57,7 +57,22 @@ function deleteStoredImages(userId){
   fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET,{method:'DELETE',headers:{Authorization:'Bearer '+SUPA_KEY,apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({prefixes:['u'+userId+'/']})}).catch(e=>console.error('Supabase Storage delete:',e.message));
 }
 console.log(STORAGE_ON?'Poze: Supabase Storage (bucket '+SUPA_BUCKET+')':'Poze: salvate în baza de date (SUPABASE_URL / SUPABASE_SERVICE_KEY lipsesc)');
-const { CURATED_VEHICLES } = require('./vehicles-catalog');
+const { CURATED_VEHICLES: BASE_VEHICLES } = require('./vehicles-catalog');
+// Modele noi (ex. Audi Q6 e-tron) din vehicles-extra.js, adăugate peste catalog fără a suprascrie ce există deja.
+function mergeVehicles(base,extra){
+ const nk=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+ const out=[...base],makes=new Map(),have=new Set();
+ for(const v of base){const mk=nk(v.make);if(!makes.has(mk))makes.set(mk,v.make);have.add(mk+'|'+nk(v.model));}
+ const findMake=mk=>{if(makes.has(mk))return makes.get(mk);for(const [k,name] of makes)if(Math.min(k.length,mk.length)>=4&&(k.startsWith(mk)||mk.startsWith(k)))return name;return null;};
+ for(const [make,model,from,kind] of extra){
+  const name=findMake(nk(make))||make,key=nk(name)+'|'+nk(model);
+  if(have.has(key))continue; have.add(key);
+  out.push({make:name,model,year_from:from||null,year_to:null,kind:kind||'car',_extra:true});
+ }
+ return out;
+}
+let EXTRA_VEHICLES=[]; try{EXTRA_VEHICLES=require('./vehicles-extra').EXTRA_VEHICLES||[];}catch(e){console.error('vehicles-extra.js lipsește sau e invalid:',e.message);}
+const CURATED_VEHICLES = mergeVehicles(BASE_VEHICLES,EXTRA_VEHICLES);
 // Anunțurile noi se publică automat. Pentru moderare manuală setează AUTO_APPROVE=false în Render.
 const AUTO_APPROVE = String(process.env.AUTO_APPROVE||'true').toLowerCase()!=='false';
 const ACTIVE_LISTINGS_LIMIT = Number(process.env.ACTIVE_LISTINGS_LIMIT)||100;
@@ -647,7 +662,7 @@ function getCatalog(){
   catalogCache=CURATED_VEHICLES.map(v=>({
    id:`curated/${slugify(v.make)}/${slugify(v.model)}`,
    name:v.model, make:v.make, model:v.model, generation:'', years:[],
-   year_from:v.year_from, year_to:v.year_to, kind:v.kind||'car', engine:'', fuel:'', raw:{}
+   year_from:v.year_from, year_to:v.year_to, kind:v.kind||'car', engine:'', fuel:'', raw:{}, extra:!!v._extra
   }));
   catalogLoadedAt=Date.now();
  }
@@ -726,6 +741,14 @@ async function ensureVehicleDb(){
   const r=(await pool.query("SELECT COUNT(*) FILTER (WHERE source='curated')::int AS nc, COUNT(*) FILTER (WHERE source NOT IN ('curated','manual'))::int AS nold FROM vehicles")).rows[0];
   // Listele vechi (VehiclesDB / rezervă) sunt înlocuite o singură dată cu lista standard.
   if(r.nold>0||r.nc<cat.length*0.9){const out=await syncVehicleDb({reset:true});console.log('Vehicle DB sync:',JSON.stringify(out));}
+  else{
+   // Modelele noi din vehicles-extra.js se adaugă în baza existentă, fără să se șteargă nimic.
+   const ex=cat.filter(v=>v.extra);
+   if(ex.length){
+    const have=new Set((await pool.query("SELECT make_norm||'|'||model_norm AS k FROM vehicles")).rows.map(x=>x.k));
+    if(ex.some(v=>!have.has(vkey(v.make)+'|'+vkey(v.model)))){const out=await syncVehicleDb({reset:false});console.log('Vehicle DB sync (modele noi):',JSON.stringify(out));}
+   }
+  }
  }catch(e){console.error('Vehicle DB sync failed:',e.message);}
 }
 
@@ -1227,7 +1250,7 @@ function buildListingFilter(query){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
   const termClauses=[];
   for(const term of terms){
-    const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel','l.parts_avail'].map(c=>`${fold(c)} LIKE $${i}`);
+    const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel','l.parts_avail','l.city'].map(c=>`${fold(c)} LIKE $${i}`);
     // Coduri OEM scrise cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsesc și când sunt căutate lipite.
     // Codul de piesă scris în titlu / descriere / piese disponibile (cu spații sau liniuțe) se găsește la fel ca în câmpul OEM.
     if(/\d/.test(term)&&term.length>=4)for(const c of ['l.oem','l.title','l.description','l.parts_avail'])cols.push(`${flat(c)} LIKE $${i}`);
@@ -1264,6 +1287,15 @@ function buildListingFilter(query){
   const yt=Number(query.yearTo);
   if(query.yearTo!==undefined&&query.yearTo!==''&&Number.isFinite(yt)){where.push(`l.year <= $${i}`);vals.push(yt);i++;}
   if(query.fuel){where.push(`${flat('l.fuel')}=$${i}`);vals.push(norm(String(query.fuel).slice(0,40)).replace(/\s+/g,''));i++;}
+  // Filtre pentru mașini: kilometri maximi, putere minimă și câmpurile alese din liste (caroserie, cutie, culoare, uși, volan, înmatriculare).
+  const kmx=Number(query.kmMax);
+  if(query.kmMax!==undefined&&query.kmMax!==''&&Number.isFinite(kmx)){where.push(`l.km <= $${i}`);vals.push(kmx);i++;}
+  const pmn=Number(query.powerMin);
+  if(query.powerMin!==undefined&&query.powerMin!==''&&Number.isFinite(pmn)){where.push(`l.power_hp >= $${i}`);vals.push(pmn);i++;}
+  for(const [key,col] of [['body','l.body_type'],['gearbox','l.gearbox'],['color','l.color'],['doors','l.doors'],['steering','l.steering'],['registered','l.registered']]){
+   const v=norm(String(query[key]||'').slice(0,40)).replace(/\s+/g,'');
+   if(v){where.push(`${flat(col)}=$${i}`);vals.push(v);i++;}
+  }
  if(delivery==='true')where.push('l.delivery=true');
  return {where,vals,condClause};
 }

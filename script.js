@@ -1120,7 +1120,7 @@ async function loadCatalog(attempt=0){
   try{ makes = ((await api('/api/catalog/makes')).makes||[]).map(x=>x.name); }catch{}
   if(makes.length) catalogMakes = makes;
   if(!makes.length){ if(attempt<3) setTimeout(()=>loadCatalog(attempt+1), 4000*(attempt+1)); else toast('Nu am putut încărca lista de mărci. Reîncarcă pagina.'); return; }
-  for(const [id,first] of [['filterMake','Toate mărcile'],['homeMake','Alege marca'],['matchMake','Alege marca'],['sellMake','Alege marca'],['reqMake','Alege marca'],['garageMake','Alege marca']]){
+  for(const [id,first] of [['filterMake','Toate mărcile'],['homeMake','Alege marca'],['matchMake','Alege marca'],['sellMake','Alege marca'],['reqMake','Alege marca'],['garageMake','Alege marca'],['avarMake','Marcă'],['dismMake','Marcă']]){
     const el = $('#'+id); if(el) setOptions(el, first, makes);
   }
 }
@@ -1623,14 +1623,49 @@ async function copyLink(id){
 }
 
 /* ---------- dezmembrări, cereri, magazine ---------- */
+const DISM_TYPED=['dismQ','dismPriceMin','dismPriceMax','dismYearMin','dismYearMax','dismKmMax'], DISM_PICK=['dismMake','dismModel','dismCounty','dismFuel'];
 async function loadDism(){
-  const grid = $('#dismGrid'); $('#dismEmpty').classList.add('hidden');
+  const grid=$('#dismGrid'), empty=$('#dismEmpty'), cs=$('#dismCounty');
+  if(cs && cs.options.length<2) cs.insertAdjacentHTML('beforeend', COUNTIES.map(c=>`<option>${esc(c)}</option>`).join(''));
+  const v=id=>{ const e=$('#'+id); return e ? String(e.value||'').trim() : ''; };
+  const qs=new URLSearchParams({type:'dezmembrari',limit:'40'});
+  let filtered=false;
+  for(const [k,id] of Object.entries({q:'dismQ',make:'dismMake',model:'dismModel',county:'dismCounty',fuel:'dismFuel',minPrice:'dismPriceMin',maxPrice:'dismPriceMax',yearFrom:'dismYearMin',yearTo:'dismYearMax',kmMax:'dismKmMax'})){
+    const val=v(id); if(val){ qs.set(k,val); filtered=true; }
+  }
+  const nF=[...DISM_PICK,'dismPriceMin','dismPriceMax','dismYearMin','dismYearMax','dismKmMax'].filter(id=>v(id)).length;
+  const cnt=$('#dismFilterCount'); if(cnt){ cnt.textContent=String(nF); cnt.classList.toggle('hidden',!nF); }
+  empty.classList.add('hidden');
+  const seq=(loadDism.seq=(loadDism.seq||0)+1);
   try{
-    const r = await api('/api/listings?type=dezmembrari&limit=40');
+    const r = await api('/api/listings?'+qs.toString());
+    if(seq!==loadDism.seq) return;
     grid.innerHTML = r.listings.map(x=>card(x)).join('');
-    $('#dismEmpty').classList.toggle('hidden', r.listings.length>0);
-  }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+    empty.textContent = filtered ? 'Nicio mașină nu corespunde filtrelor.' : 'Încă nu există mașini la dezmembrat. Adaugă prima mașină.';
+    empty.classList.toggle('hidden', r.listings.length>0);
+  }catch(e){ if(seq===loadDism.seq) grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
+let dismTimer=null;
+document.addEventListener('input',e=>{ if(e.target&&DISM_TYPED.includes(e.target.id)){ clearTimeout(dismTimer); dismTimer=setTimeout(loadDism,400); } });
+document.addEventListener('change',e=>{
+  if(!e.target||!DISM_PICK.includes(e.target.id)) return;
+  if(e.target.id==='dismMake') loadModels(e.target.value,'dismModel','Model').then(loadDism); else loadDism();
+});
+document.addEventListener('submit',e=>{ if(e.target&&e.target.id==='dismFilters'){ e.preventDefault(); clearTimeout(dismTimer); loadDism(); } });
+function dismSheet(open){
+  const sh=$('#dismSheet'), b=$('#dismOpenFilters'); if(!sh) return;
+  sh.classList.toggle('hidden',!open); if(b) b.setAttribute('aria-expanded',open?'true':'false');
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const sh=$('#dismSheet'); if(sh&&!sh.classList.contains('hidden')) dismSheet(false); } });
+document.addEventListener('click',e=>{
+  if(!e.target.closest) return;
+  if(e.target.closest('#dismOpenFilters')){ dismSheet(true); return; }
+  if(e.target.closest('[data-dism-close]')){ dismSheet(false); return; }
+  if(e.target.closest('#dismReset')){
+    [...DISM_TYPED,...DISM_PICK].forEach(id=>{ const el=$('#'+id); if(!el) return; if(el.tagName==='SELECT') el.selectedIndex=0; else el.value=''; });
+    loadModels('','dismModel','Model'); loadDism();
+  }
+});
 async function getRates(){
   if(state.rates) return state.rates;
   try{ state.rates = await api('/api/rates'); }catch{ state.rates = {eur_ron:0}; }
@@ -1655,12 +1690,12 @@ async function loadAvar(){
   const v=id=>{ const e=$('#'+id); return e ? String(e.value||'').trim() : ''; };
   const qs=new URLSearchParams({type:state.avarType||'masini',limit:'60'});
   let filtered = (state.avarType||'masini')!=='masini';
-  for(const [k,id] of Object.entries({q:'avarQ',county:'avarCounty',fuel:'avarFuel',minPrice:'avarPriceMin',maxPrice:'avarPriceMax',yearFrom:'avarYearMin',yearTo:'avarYearMax'})){
+  for(const [k,id] of Object.entries({q:'avarQ',make:'avarMake',model:'avarModel',county:'avarCounty',fuel:'avarFuel',minPrice:'avarPriceMin',maxPrice:'avarPriceMax',yearFrom:'avarYearMin',yearTo:'avarYearMax',kmMax:'avarKmMax',powerMin:'avarPowerMin',body:'avarBody',gearbox:'avarGearbox'})){
     const val=v(id); if(val){ qs.set(k,val); filtered=true; }
   }
   if(qs.has('minPrice')||qs.has('maxPrice')) qs.set('priceCur', v('avarCur')==='RON'?'RON':'EUR');
   empty.classList.add('hidden');
-  const nF=['avarCounty','avarFuel','avarPriceMin','avarPriceMax','avarYearMin','avarYearMax'].filter(id=>v(id)).length + ((state.avarType||'masini')!=='masini'?1:0);
+  const nF=['avarMake','avarModel','avarCounty','avarFuel','avarPriceMin','avarPriceMax','avarYearMin','avarYearMax','avarKmMax','avarPowerMin','avarBody','avarGearbox'].filter(id=>v(id)).length + ((state.avarType||'masini')!=='masini'?1:0);
   const cnt=$('#avarFilterCount'); if(cnt){ cnt.textContent=String(nF); cnt.classList.toggle('hidden',!nF); }
   const seq=(loadAvar.seq=(loadAvar.seq||0)+1);
   try{
@@ -1672,7 +1707,8 @@ async function loadAvar(){
   }catch(e){ if(seq===loadAvar.seq) grid.innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
 }
 let avarTimer=null;
-const AVAR_TYPED=['avarQ','avarPriceMin','avarPriceMax','avarYearMin','avarYearMax'], AVAR_PICK=['avarCounty','avarFuel','avarCur'];
+const AVAR_TYPED=['avarQ','avarPriceMin','avarPriceMax','avarYearMin','avarYearMax','avarKmMax','avarPowerMin'], AVAR_PICK=['avarModel','avarCounty','avarFuel','avarCur','avarBody','avarGearbox'];
+document.addEventListener('change',e=>{ if(e.target&&e.target.id==='avarMake') loadModels(e.target.value,'avarModel','Model').then(loadAvar); });
 document.addEventListener('input',e=>{ if(e.target&&AVAR_TYPED.includes(e.target.id)){ clearTimeout(avarTimer); avarTimer=setTimeout(loadAvar,400); } });
 document.addEventListener('change',e=>{ if(e.target&&AVAR_PICK.includes(e.target.id)) loadAvar(); });
 document.addEventListener('submit',e=>{ if(e.target&&e.target.id==='avarFilters'){ e.preventDefault(); clearTimeout(avarTimer); loadAvar(); } });
@@ -1687,7 +1723,8 @@ document.addEventListener('click',e=>{
   const chip=e.target.closest&&e.target.closest('[data-avar-type]');
   if(chip){ state.avarType=chip.dataset.avarType; $$('#avarChips button').forEach(b=>b.classList.toggle('on',b===chip)); loadAvar(); return; }
   if(e.target.closest&&e.target.closest('#avarReset')){
-    [...AVAR_TYPED,...AVAR_PICK].forEach(id=>{ const el=$('#'+id); if(el) el.selectedIndex!==undefined&&el.tagName==='SELECT' ? el.selectedIndex=0 : (el.value=''); });
+    [...AVAR_TYPED,...AVAR_PICK,'avarMake'].forEach(id=>{ const el=$('#'+id); if(el) el.selectedIndex!==undefined&&el.tagName==='SELECT' ? el.selectedIndex=0 : (el.value=''); });
+    loadModels('','avarModel','Model');
     state.avarType='masini'; $$('#avarChips button').forEach(b=>b.classList.toggle('on',b.dataset.avarType==='masini')); loadAvar();
   }
 });
@@ -2534,7 +2571,7 @@ function syncSellType(){
   updateCurrencyHint();
   ['sellOemWrap','sellOemAltWrap','sellDeliveryWrap'].forEach(i=>$('#'+i).classList.toggle('hidden', av));
   if(!state.editId) $('#sellHeading').textContent = av ? (ty==='defecta'?'Vinde o mașină defectă':'Vinde o mașină avariată') : d ? 'Adaugă o mașină la dezmembrat' : 'Adaugă o piesă';
-  $('#sellFuelWrap').classList.toggle('hidden', !av);
+  $('#sellFuelWrap').classList.toggle('hidden', !car);
   const T = SELL_TEXT[av?ty:d?'dezmembrari':'piesa'];
   $('#sellTitleLabel').textContent = T.title; $('#sellTitleInfo').dataset.info = T.titleInfo; $('#sellTitle').placeholder = T.titlePh;
   $('#sellDescLabel').textContent = T.desc;   $('#sellDescInfo').dataset.info = T.descInfo;   $('#sellDescription').placeholder = T.descPh;
@@ -2626,7 +2663,7 @@ async function submitSell(e){
   if(btn){ btn.disabled=true; btn.textContent='Se trimite…'; }
   try{
     await applySellPhone();
-    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type!=='piesa'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:isCarT(type)?'':$('#sellOem').value.trim(),oem_alt:isCarT(type)?'':$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:isCarT(type)?false:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:isCarT(type)?'':$('#sellParts').value.trim(),fuel:isCarT(type)?$('#sellFuel').value:'',discount_percent:Math.max(0,Math.min(50,Math.round(Number($('#sellDiscount').value)||0))),power_hp:isCarT(type)?$('#sellPower').value:'',engine_cc:isCarT(type)?$('#sellCc').value:'',body_type:isCarT(type)?$('#sellBody').value:'',color:isCarT(type)?$('#sellColor').value:'',doors:isCarT(type)?$('#sellDoors').value:'',gearbox:isCarT(type)?$('#sellGearbox').value:'',steering:isCarT(type)?$('#sellSteering').value:'',registered:isCarT(type)?$('#sellRegistered').value:'',city:isCarT(type)?$('#sellCity').value.trim():'',currency:isCarT(type)?$('#sellCurrency').value:'RON'});
+    const payload = JSON.stringify({type,title:$('#sellTitle').value.trim(),price:$('#sellPrice').value||0,condition:type!=='piesa'?'Second-hand':$('#sellCondition').value,category:$('#sellCategory').value,subcategory:$('#sellSubcategory').value,seller_type:$('#sellSellerType').value,make:$('#sellMake').value,model:$('#sellModel').value,year,oem:isCarT(type)?'':$('#sellOem').value.trim(),oem_alt:isCarT(type)?'':$('#sellOemAlt').value.trim(),county:$('#sellCounty').value,description:$('#sellDescription').value,delivery:isCarT(type)?false:$('#sellDelivery').checked,negotiable:$('#sellNegotiable').checked,images:state.sellImages,engine:$('#sellEngine').value.trim(),km:$('#sellKm').value,vin:$('#sellVin').value.trim(),parts_avail:isCarT(type)?'':$('#sellParts').value.trim(),fuel:(isCarT(type)||type==='dezmembrari')?$('#sellFuel').value:'',discount_percent:Math.max(0,Math.min(50,Math.round(Number($('#sellDiscount').value)||0))),power_hp:isCarT(type)?$('#sellPower').value:'',engine_cc:isCarT(type)?$('#sellCc').value:'',body_type:isCarT(type)?$('#sellBody').value:'',color:isCarT(type)?$('#sellColor').value:'',doors:isCarT(type)?$('#sellDoors').value:'',gearbox:isCarT(type)?$('#sellGearbox').value:'',steering:isCarT(type)?$('#sellSteering').value:'',registered:isCarT(type)?$('#sellRegistered').value:'',city:(isCarT(type)||type==='dezmembrari')?$('#sellCity').value.trim():'',currency:isCarT(type)?$('#sellCurrency').value:'RON'});
     const editing = state.editId;
     let r;
     if(editing) r = await api('/api/listings/'+editing,{method:'PATCH',body:payload});

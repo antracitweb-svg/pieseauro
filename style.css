@@ -4161,3 +4161,7 @@ html.dark .avar-sheet-card{background:#141a24;color:#e9e7e2}
 .avar-sheet .avar-chips{margin-bottom:12px}
 .avar-sheet-go{width:100%;margin-top:6px}
 @media(min-width:700px){.avar-sheet{align-items:center}.avar-sheet-card{border-radius:20px}}
+
+/* Filtre pe pagina Dezmembrări (același aspect ca la avariate) */
+.avar-fgrid #dismReset{min-height:44px;border-radius:12px}
+#page-dism .page-head{margin-bottom:10px}
