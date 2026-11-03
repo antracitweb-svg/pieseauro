@@ -156,7 +156,7 @@ const uaHash=req=>crypto.createHash('sha256').update(String(req.headers['user-ag
 const safeEq=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
 function zeroBits(buf){let n=0;for(const b of buf){if(b===0){n+=8;continue;}n+=Math.clz32(b)-24;break;}return n;}
 function newChallenge(req){const p=Buffer.from(JSON.stringify({t:Date.now(),n:crypto.randomBytes(9).toString('base64url'),u:uaHash(req),b:BOT_BITS})).toString('base64url');return p+'.'+botHmac(p);}
-function hasPass(req){const [exp,u,sig]=String((req.cookies&&req.cookies.bv)||'').split('.');return !!(exp&&u&&sig&&Number(exp)>Date.now()&&safeEq(u,uaHash(req))&&safeEq(sig,botHmac(exp+'.'+u)));}
+function hasPass(req){const [exp,u,sig]=String((req.cookies&&req.cookies.bv)||'').split('.');return !!(exp&&u&&sig&&Number(exp)>Date.now()&&safeEq(sig,botHmac(exp+'.'+u)));}   /* fără legare de User-Agent: „Site desktop” din Chrome și service worker-ul trimit User-Agent-uri diferite */
 const GOOD_BOT_RE=/Googlebot|bingbot|Applebot|YandexBot/i;
 const GOOD_HOST_RE=/\.(googlebot\.com|google\.com|search\.msn\.com|applebot\.apple\.com|yandex\.(ru|net|com))$/i;
 const SOCIAL_RE=/facebookexternalhit|Facebot|WhatsApp|TelegramBot|Twitterbot|LinkedInBot|Slackbot|Discordbot/i;
@@ -238,7 +238,7 @@ app.post('/api/botcheck',(req,res)=>{
  if(!p||!sig||!safeEq(sig,botHmac(p)))return res.status(400).json({error:'BOT_CHECK'});
  let d;try{d=JSON.parse(Buffer.from(p,'base64url').toString());}catch{return res.status(400).json({error:'BOT_CHECK'});}
  const age=Date.now()-Number(d.t);
- if(!(age>=0&&age<5*60*1000)||d.u!==uaHash(req)||usedChal.has(d.n))return res.status(400).json({error:'BOT_CHECK'});
+ if(!(age>=0&&age<5*60*1000)||usedChal.has(d.n))return res.status(400).json({error:'BOT_CHECK'});
  if(zeroBits(crypto.createHash('sha256').update(chal+':'+counter).digest())<Number(d.b))return res.status(400).json({error:'BOT_CHECK'});
  usedChal.set(d.n,Date.now()+10*60*1000);markDirty(usedChal,d.n);
  const exp=Date.now()+12*3600*1000,u=uaHash(req);

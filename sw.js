@@ -4,7 +4,7 @@
    - Navigarea: network-first, cu fallback la index.html din cache când e offline.
    - Shell static (css/js/iconițe): stale-while-revalidate.
 */
-const VERSION = 'autoparts-v15';
+const VERSION = 'autoparts-v16';
 const SHELL = [
   '/',
   '/index.html',
@@ -48,8 +48,8 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(VERSION).then((c) => c.put('/index.html', copy)).catch(() => {});
+          // în shell se păstrează doar pagina reală (nu pagina de verificare 403 / erorile)
+          if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put('/index.html', copy)).catch(() => {}); }
           return res;
         })
         .catch(() => caches.match('/index.html').then((r) => r || caches.match('/')))
