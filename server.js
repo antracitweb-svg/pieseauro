@@ -500,6 +500,12 @@ async function dbReady(){
   "UPDATE part_requests SET expires_at=GREATEST(created_at+INTERVAL '7 days',NOW()+INTERVAL '3 days') WHERE expires_at IS NULL",
   "ALTER TABLE part_requests ALTER COLUMN expires_at SET DEFAULT (NOW()+INTERVAL '7 days')",
   'CREATE INDEX IF NOT EXISTS part_requests_expires_idx ON part_requests(status,expires_at)',
+  'CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id,is_read)',
+  'CREATE INDEX IF NOT EXISTS orders_seller_idx ON orders(seller_id,status)',
+  'CREATE INDEX IF NOT EXISTS orders_buyer_idx ON orders(buyer_id,status)',
+  'CREATE INDEX IF NOT EXISTS part_requests_user_idx ON part_requests(user_id,status)',
+  'CREATE INDEX IF NOT EXISTS favorites_listing_idx ON favorites(listing_id)',
+  'CREATE INDEX IF NOT EXISTS listings_category_idx ON listings(status,category)',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS req_posted INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS req_resolved INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS req_cancelled INTEGER NOT NULL DEFAULT 0',
@@ -598,13 +604,6 @@ function bumpStat(listingId,col){
  pool.query(`INSERT INTO listing_stats(listing_id,day,${col}) VALUES($1,${TODAY_SQL},1) ON CONFLICT(listing_id,day) DO UPDATE SET ${col}=listing_stats.${col}+1`,[listingId]).catch(e=>console.error('stats',e.message));
 }
 function purgeStats(){return pool?pool.query(`DELETE FROM listing_stats WHERE day<=${TODAY_SQL}-$1::int`,[STATS_KEEP_DAYS]).catch(e=>console.error('stats purge',e.message)):null;}
-async function optUserId(req){
- try{
-  const t=req.cookies&&req.cookies.session; if(!t)return null;
-  const r=await pool.query('SELECT s.user_id FROM sessions s WHERE s.token_hash=$1 AND s.expires_at>NOW()',[hashToken(t)]);
-  return r.rowCount?r.rows[0].user_id:null;
- }catch{return null;}
-}
 function norm(s=''){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 function slugify(s=''){return norm(s).replace(/\s+/g,'-').slice(0,120);}
 function escapeHtml(s=''){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
