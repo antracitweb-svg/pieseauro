@@ -4129,3 +4129,7 @@ html.dark{color-scheme:dark}
 .avar-links button{white-space:nowrap;flex:0 1 auto;min-width:0;font-size:clamp(12px,3.4vw,14px)!important;padding:9px clamp(10px,3vw,18px)!important}
 .avar-links select{flex:0 1 auto;width:auto!important;min-width:0;max-width:48%;min-height:40px;padding:9px 12px!important;border:1px solid var(--gold-line,#d8c9aa)!important;border-radius:999px!important;background-color:rgba(255,255,255,.55)!important;color:#4a3a1c!important;font-weight:650;font-size:clamp(12px,3.4vw,14px)!important;cursor:pointer;text-overflow:ellipsis}
 html.dark .avar-links select{background-color:#161c26!important;color:#e9e7e2!important;border-color:#3a4250!important}
+
+.req{color:#c62828;font-weight:800}
+.sell-car-block{display:flex;flex-direction:column;gap:10px}
+.sell-car-block.hidden{display:none}

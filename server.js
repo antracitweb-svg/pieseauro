@@ -337,6 +337,15 @@ async function dbReady(){
  if(!pool)return false;
  await pool.query(schema);
  const migrations=[
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS power_hp INTEGER',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS engine_cc INTEGER',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS body_type TEXT',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS color TEXT',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS doors TEXT',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS gearbox TEXT',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS steering TEXT',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS registered TEXT',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS city TEXT',
   "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='listings'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%avariata%') THEN ALTER TABLE listings DROP CONSTRAINT IF EXISTS listings_type_check; ALTER TABLE listings ADD CONSTRAINT listings_type_check CHECK(type IN ('piesa','masina','dezmembrari','avariata')); END IF; END $$",
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS generation TEXT',
   'ALTER TABLE listings ADD COLUMN IF NOT EXISTS engine TEXT',
@@ -1155,7 +1164,7 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,ah(async(req,res)=>{
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.discount_percent,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.oem_alt,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
+const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.discount_percent,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.oem_alt,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.power_hp,l.city,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
 // Media calificativelor: ca vânzător (de la cumpărători) și ca cumpărător (de la vânzători).
 const RATE_SQL=(tbl,col,uid,al)=>`(SELECT ROUND(AVG(stars),1)::float FROM ${tbl} WHERE ${col}=${uid}) ${al}_avg,(SELECT COUNT(*)::int FROM ${tbl} WHERE ${col}=${uid}) ${al}_n`;
 const SELLER_RATE=(uid,al)=>RATE_SQL('seller_ratings','seller_id',uid,al);
@@ -1820,6 +1829,7 @@ app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified}});
 }));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
+const ni=(v,lo,hi)=>{if(v==null||String(v).trim()==='')return null;const n=Math.round(Number(v));return Number.isFinite(n)&&n>=lo&&n<=hi?n:null;};
 function parseListing(x){
  const bad=(error,status=400)=>({error,status});
  if(!['piesa','dezmembrari','avariata'].includes(x.type)||typeof x.title!=='string'||x.title.trim().length<3||x.title.length>150)return bad('DATE_INVALIDE');
@@ -1827,6 +1837,7 @@ function parseListing(x){
  if(!String(x.category||'').trim()||!CATEGORIES.includes(x.category)||!String(x.make||'').trim()||!String(x.model||'').trim()||!String(x.county||'').trim())return bad('DATE_INVALIDE');
  if(x.type==='piesa'&&!['Nouă','Second-hand'].includes(x.condition))return bad('STARE_INVALIDA');
  const price=Number(x.price)||0; if(price<0||price>10000000)return bad('DATE_INVALIDE');
+ if(!(price>0))return bad('PRET_OBLIGATORIU');
  // Moderare automată (ca pe site-urile de profil): fără linkuri/emailuri în text și fără prețuri neserioase.
   if(price>0&&price<5)return bad('PRET_NEREALIST');
   const disc=Math.round(Number(x.discount_percent)||0); if(disc<0||disc>50)return bad('DATE_INVALIDE');
@@ -1843,7 +1854,8 @@ function parseListing(x){
    generation:clip(x.generation,80),engine:clip(x.engine,80),fuel:clip(x.fuel,30),vehicle_id:clip(x.vehicle_id,120),
    discount_percent:Math.max(0,Math.min(50,disc)),
   km:(x.km==null||String(x.km).trim()==='')?null:Math.round(Number(x.km)),vin:clip(String(x.vin||'').toUpperCase().replace(/[^A-Z0-9]/g,''),30),
-  parts_avail:clip(String(x.parts_avail||'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,30).join(', '),600)}};
+  parts_avail:clip(String(x.parts_avail||'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,30).join(', '),600),
+  power_hp:ni(x.power_hp,1,2000),engine_cc:ni(x.engine_cc,1,20000),body_type:clip(x.body_type,30),color:clip(x.color,30),doors:clip(x.doors,10),gearbox:clip(x.gearbox,20),steering:clip(x.steering,20),registered:clip(x.registered,30),city:clip(x.city,80)}};
 }
 // Coduri OEM alternative (cross-reference): listă separată prin virgulă, normalizată și fără duplicate.
 // Acceptă și array din JSON; păstrează maximum 12 coduri de 40 caractere.
@@ -1895,8 +1907,8 @@ app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
    let r,cl=null;
   try{
   if(charge){cl=await pool.connect();await cl.query('BEGIN');if(await creditMove(cl,req.user.id,-LISTING_COST,'listing',null,'Anunț peste limita gratuită: '+String(v.title).slice(0,80))===null){await cl.query('ROLLBACK');return res.status(402).json({error:'CREDITE_INSUFICIENTE'});}}
-  r=await (cl||pool).query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,oem_alt,delivery,description,images,status,subcategory,km,vin,parts_avail,discount_percent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
-   [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.oem_alt,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail,v.discount_percent]);
+  r=await (cl||pool).query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,oem_alt,delivery,description,images,status,subcategory,km,vin,parts_avail,discount_percent,power_hp,engine_cc,body_type,color,doors,gearbox,steering,registered,city) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37) RETURNING *`,
+   [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.oem_alt,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail,v.discount_percent,v.power_hp,v.engine_cc,v.body_type,v.color,v.doors,v.gearbox,v.steering,v.registered,v.city]);
   if(cl){await cl.query("UPDATE listings SET paid_until=NOW()+INTERVAL '30 days',expires_at=NOW()+INTERVAL '30 days' WHERE id=$1",[r.rows[0].id]);await cl.query('COMMIT');}
   }catch(e){if(cl){try{await cl.query('ROLLBACK');}catch{}}throw e;}finally{if(cl)cl.release();}
   if(NEW_LISTING_STATUS==='approved')alertForListings([r.rows[0].id]);
@@ -1930,8 +1942,8 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
    status='pending';
   }
  }
-  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24,oem_alt=$25,discount_percent=$26,fuel=$27 WHERE id=$18 AND user_id=$19 RETURNING id,status',
-   [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine,v.oem_alt,v.discount_percent,v.fuel]);
+  const r=await pool.query('UPDATE listings SET type=$1,title=$2,price=$3,condition=$4,make=$5,model=$6,year=$7,seller_type=$8,quantity=$9,negotiable=$10,county=$11,category=$12,oem=$13,delivery=$14,description=$15,images=$16,status=$17,subcategory=$20,km=$21,vin=$22,parts_avail=$23,engine=$24,oem_alt=$25,discount_percent=$26,fuel=$27,power_hp=$28,engine_cc=$29,body_type=$30,color=$31,doors=$32,gearbox=$33,steering=$34,registered=$35,city=$36 WHERE id=$18 AND user_id=$19 RETURNING id,status',
+   [v.type,v.title,v.price,v.condition,v.make,v.model,v.year,v.seller_type,v.quantity||cur.quantity||1,v.negotiable,v.county,v.category,v.oem,v.delivery,v.description,v.images,status,cur.id,req.user.id,v.subcategory,v.km,v.vin,v.parts_avail,v.engine,v.oem_alt,v.discount_percent,v.fuel,v.power_hp,v.engine_cc,v.body_type,v.color,v.doors,v.gearbox,v.steering,v.registered,v.city]);
  logEvent(req.user.id,'listing_edit','listing',cur.id,v.title+(status==='pending'&&cur.status!=='pending'?' (retrimis la moderare)':''));
  res.json({listing:r.rows[0],resubmitted:status==='pending'&&cur.status!=='pending'});
 });
@@ -2697,7 +2709,7 @@ const impKey=v=>String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g
 const IMP_CAT=new Map(CATEGORIES.map(c=>[impKey(c),c])), IMP_COUNTY=new Map(IMPORT_COUNTIES.map(c=>[impKey(c),c]));
 const impYes=v=>/^(1|da|yes|true|y|x|adevarat)$/.test(impKey(v));
 const impNum=v=>{let t=String(v==null?'':v).toLowerCase().replace(/lei|ron|eur|€|\s/g,'');if(t==='')return 0;if(t.includes('.')&&t.includes(','))t=t.replace(/\./g,'').replace(',','.');else if(t.includes(','))t=t.replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');const n=Number(t);return Number.isFinite(n)?n:NaN;};
-const IMP_ERR={DATE_INVALIDE:'Date invalide (titlu, marcă, model sau județ)',PRET_NEREALIST:'Preț prea mic (pune 0 pentru „La cerere”)',LINK_INTERZIS:'Linkurile și adresele de email nu sunt permise în text',AN_INVALID:'An invalid (4 cifre, între 1950 și anul viitor)',STARE_INVALIDA:'Stare invalidă (Nouă sau Second-hand)'};
+const IMP_ERR={DATE_INVALIDE:'Date invalide (titlu, marcă, model sau județ)',PRET_NEREALIST:'Preț prea mic',PRET_OBLIGATORIU:'Prețul este obligatoriu',LINK_INTERZIS:'Linkurile și adresele de email nu sunt permise în text',AN_INVALID:'An invalid (4 cifre, între 1950 și anul viitor)',STARE_INVALIDA:'Stare invalidă (Nouă sau Second-hand)'};
 function normImportRow(r){
  const g=k=>r&&r[k]!=null?String(r[k]).trim():'';
  const t=impKey(g('type'));
