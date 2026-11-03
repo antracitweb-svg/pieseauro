@@ -1197,7 +1197,7 @@ const CATEGORIES=['Accesorii auto','Accesorii roți','Aprindere','Cabluri auto',
  // nume vechi, păstrate doar ca anunțurile existente să rămână editabile (se migrează la pornire)
  'Alimentare combustibil','Interior','Motor','Iluminare','Roți','Electrică','Filtre','Altele'];
 const SELLER_TYPES=['Persoană fizică','Firmă','Parc dezmembrări'];
-const fold=c=>`translate(LOWER(COALESCE(${c},'')),'ăâîșşțţéèêëáàäãåíìïóòôöõúùûüçñšžčřěýÿ','aaisstteeeeaaaaaiiiooooouuuucnszcreyy')`;
+const fold=c=>`translate(LOWER(translate(COALESCE(${c},''),'ĂÂÎȘŞȚŢ','aaisstt')),'ăâîșşțţéèêëáàäãåíìïóòôöõúùûüçñšžčřěýÿ','aaisstteeeeaaaaaiiiooooouuuucnszcreyy')`;
 const flat=c=>`regexp_replace(${fold(c)},'[^a-z0-9]+','','g')`;
 app.get('/api/listings/mine',auth,requireDb,async(req,res)=>{
  const r=await pool.query(`SELECT ${LIST_COLS},l.added_at,l.expires_at,l.paid_until FROM listings l WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 500`,[req.user.id]);
@@ -1222,17 +1222,28 @@ app.delete('/api/favorites/:id',auth,requireDb,async(req,res)=>{
 function buildListingFilter(query){
  const {q,delivery}=query; const where=["l.status='approved'","l.type <> 'masina'",NOT_VAC_LISTING],vals=[];let i=1;
  if(query.type==='masini')where.push("l.type IN ('avariata','defecta')");
- else if(query.type!=='avariata'&&query.type!=='defecta')where.push("l.type NOT IN ('avariata','defecta')");
+ else if(query.type!=='avariata'&&query.type!=='defecta'&&!/^\d{1,10}$/.test(String(query.seller_id||'')))where.push("l.type NOT IN ('avariata','defecta')"); // pe profilul unui vânzător (seller_id) se văd TOATE anunțurile lui, inclusiv mașinile avariate/defecte
  if(q){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
+  const termClauses=[];
   for(const term of terms){
     const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel','l.parts_avail'].map(c=>`${fold(c)} LIKE $${i}`);
     // Coduri OEM scrise cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsesc și când sunt căutate lipite.
-    if(/\d/.test(term)&&term.length>=4)cols.push(`${flat('l.oem')} LIKE $${i}`);
+    // Codul de piesă scris în titlu / descriere / piese disponibile (cu spații sau liniuțe) se găsește la fel ca în câmpul OEM.
+    if(/\d/.test(term)&&term.length>=4)for(const c of ['l.oem','l.title','l.description','l.parts_avail'])cols.push(`${flat(c)} LIKE $${i}`);
     // Coduri alternative / cross-reference (ex. căutarea "1K0615301" găsește piesa cu echivalentul "1K0615301A").
     cols.push(`${flat('COALESCE(l.oem_alt,\'\')')} LIKE $${i}`);
-   where.push('('+cols.join(' OR ')+')');vals.push('%'+term+'%');i++;
+   // Ignoră terminațiile românești uzuale (capota/capote/capotei/capotele → "capot"), ca piesele din descriere să se găsească indiferent de formă.
+   const stem=(!/\d/.test(term)&&term.replace(/(ele|ei|a|e|i)$/,'').length>=4)?term.replace(/(ele|ei|a|e|i)$/,''):term;
+   termClauses.push('('+cols.join(' OR ')+')');vals.push('%'+stem+'%');i++;
   }
+  // Cod scris cu spații în căutare (ex. \"1K0 615 301\") și lipit în anunț (\"1K0615301\"), sau invers: se compară și toată căutarea fără spații.
+  const flatQ=terms.join('');
+  if(terms.length>1&&/\d/.test(flatQ)&&flatQ.length>=5){
+   const fc=['l.oem','l.title','l.description','l.parts_avail'].map(c=>`${flat(c)} LIKE $${i}`);
+   fc.push(`${flat('COALESCE(l.oem_alt,\'\')')} LIKE $${i}`);
+   where.push('(('+termClauses.join(' AND ')+') OR '+fc.join(' OR ')+')');vals.push('%'+flatQ+'%');i++;
+  }else if(termClauses.length)where.push(termClauses.join(' AND '));
  }
  let condClause=null;
  for(const [key,col] of [['type','l.type'],['condition','l.condition'],['year','l.year'],['seller_type','l.seller_type']]){
@@ -1501,7 +1512,7 @@ app.get('/api/services',requireDb,ah(async(req,res)=>{
   const where=["status='approved'"],params=[];
   if(county){params.push(county);where.push(`county=$${params.length}`);}
   if(type){params.push(type);where.push(`type=$${params.length}`);}
-  if(q){params.push('%'+q.toLowerCase()+'%');where.push(`(lower(title) LIKE $${params.length} OR lower(COALESCE(city,'')) LIKE $${params.length} OR lower(COALESCE(address,'')) LIKE $${params.length})`);}
+  if(q){params.push('%'+q.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()+'%');where.push(`(${fold('title')} LIKE $${params.length} OR ${fold('city')} LIKE $${params.length} OR ${fold('address')} LIKE $${params.length})`);}
   const r=await pool.query(
     `SELECT id,title,address,city,county,phone,type,hours,lat,lng,rating,offers_count,created_at
        FROM services WHERE ${where.join(' AND ')} ORDER BY rating DESC NULLS LAST, created_at DESC LIMIT 200`,params);

@@ -1805,8 +1805,8 @@ function renderMineRequests(){
   const grid=$('#requestGrid'); if(!grid) return;
   const cnt=st=>rqAll.filter(x=>x.status===st).length;
   $$('#rqTabs [data-rq-tab]').forEach(b=>{ const on=b.dataset.rqTab===rqTab; b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); const sm=b.querySelector('small'); if(sm) sm.textContent=cnt(b.dataset.rqTab); });
-  const q=rqQ.trim().toLowerCase();
-  const list=rqAll.filter(x=>x.status===rqTab && (!q || String(x.title||'').toLowerCase().includes(q)));
+  const q=carNorm(rqQ.trim());
+  const list=rqAll.filter(x=>x.status===rqTab && (!q || carNorm(x.title).includes(q)));
   grid.innerHTML=list.map(x=>reqRowHtml(x,true)).join('');
   $('#rqCount').textContent=`Cereri (${list.length?'1 - '+list.length:'0'} din ${list.length})`;
   const em=$('#requestsEmpty'); em.textContent=q?'Nu am găsit cereri cu acest titlu.':'Nu ai cereri în această secțiune.'; em.classList.toggle('hidden',list.length>0);
@@ -1878,7 +1878,7 @@ document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rqSearch'){ r
 /* Piese căutate de cumpărători (pentru vânzători): stare personală, filtre, „Ofertez mai târziu” / „Ignoră” */
 const rqPub={all:[],state:'new',f:{make:'',model:'',kind:'',county:'',offers:'',sort:'new',q:''}};
 function rqPubFiltered(){
-  const f=rqPub.f, q=f.q.trim().toLowerCase(), st=currentUser?rqPub.state:'all';
+  const f=rqPub.f, q=carNorm(f.q.trim()), st=currentUser?rqPub.state:'all';
   const list=rqPub.all.filter(x=>{
     if(st==='offered'&&!x.my_offer) return false;
     if(st==='later'&&x.my_mark!=='later') return false;
@@ -1891,7 +1891,7 @@ function rqPubFiltered(){
     if(f.county&&x.county!==f.county) return false;
     if(f.offers==='none'&&Number(x.offers_count)>0) return false;
     if(f.offers==='some'&&!(Number(x.offers_count)>0)) return false;
-    if(q&&![x.title,x.description,x.make,x.model,x.variant,x.engine].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+    if(q&&![x.title,x.description,x.make,x.model,x.variant,x.engine].some(v=>carNorm(v).includes(q))) return false;
     return true;
   });
   const t=x=>new Date(x.created_at).getTime(), cn=x=>Number(x.offers_count)||0;
