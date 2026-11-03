@@ -4133,3 +4133,17 @@ html.dark .avar-links select{background-color:#161c26!important;color:#e9e7e2!im
 .req{color:#c62828;font-weight:800}
 .sell-car-block{display:flex;flex-direction:column;gap:10px}
 .sell-car-block.hidden{display:none}
+
+/* Filtre ca pe OLX pe pagina Mașini avariate / defecte */
+.avar-links{margin-bottom:10px!important}
+.avar-chips{display:flex;justify-content:center;gap:8px;margin:0 0 12px}
+.avar-chips button{min-height:38px;padding:7px 16px;border:1px solid var(--gold-line,#d8c9aa);border-radius:999px;background:rgba(255,255,255,.55);color:#4a3a1c;font-weight:700;font-size:14px;cursor:pointer}
+.avar-chips button.on{background:linear-gradient(180deg,#d9b36a,#b98a3e);border-color:transparent;color:#1c1608}
+html.dark .avar-chips button{background:#161c26;color:#e9e7e2;border-color:#3a4250}
+html.dark .avar-chips button.on{background:linear-gradient(180deg,#d9b36a,#b98a3e);color:#1c1608;border-color:transparent}
+.avar-fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 16px}
+.avar-fgrid input,.avar-fgrid select{width:100%;min-width:0;min-height:44px;padding:9px 12px;border:1px solid var(--gold-line,#d8c9aa);border-radius:12px;font-size:14px}
+.avar-fgrid #avarReset{min-height:44px;border-radius:12px}
+
+/* „Defectă” = bandă albastră, „Avariată” = bandă roșie */
+.avar-badge.defecta{background:rgba(25,118,210,.95)}
