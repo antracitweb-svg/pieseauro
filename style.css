@@ -4222,3 +4222,16 @@ html.dark .admin-tabs .btn.ghost.active,html.dark #adminContent .btn.primary,htm
 html.dark #adminContent .btn.ghost,html.dark #adminListingBody .btn.ghost{background:transparent!important;color:#e9d3a8;border-color:#3a4250}
 html.dark #adminContent .btn.ghost:hover,html.dark #adminListingBody .btn.ghost:hover{background:#1c2430!important}
 html.dark #adminContent .btn.danger,html.dark #adminListingBody .btn.danger{background:#2a1a1d!important;color:#f0a3ab;border-color:#5a2c33}
+
+/* ---- Scris și culori ca în pagina de rezultate (filtrele-pastilă): zi și dark; rămân plate ---- */
+#page-home .home-links button,#page-home #homeRequestBtn,#page-home .home-feed-head button{
+  font-size:14px;font-weight:650;color:#3b3224;background:var(--paper,#fffefb)!important;border:1px solid #ddd3bf}
+#page-home .home-links button:hover,#page-home #homeRequestBtn:hover,#page-home .home-feed-head button:hover{background:#f6edd9!important;border-color:var(--gold,#b8935a)}
+html.dark #page-home .home-links button,html.dark #page-home #homeRequestBtn,html.dark #page-home .home-feed-head button{
+  background:#1c232e!important;border:1px solid #3a4250!important;color:#e9e7e2!important}
+html.dark #page-home .home-links button:hover,html.dark #page-home #homeRequestBtn:hover,html.dark #page-home .home-feed-head button:hover{
+  background:#243040!important;border-color:#8f6d38!important}
+/* admin: butoanele cu contur au același text ca „Filtrare” (auriu-închis în zi, alb-cald în dark) */
+html.dark #adminContent .btn.ghost,html.dark #adminListingBody .btn.ghost,html.dark .admin-tabs .btn.ghost{color:#e9e7e2;background:#161c26!important;border-color:#3a4250}
+html.dark #adminContent .btn.ghost:hover,html.dark #adminListingBody .btn.ghost:hover{background:#243040!important;border-color:#8f6d38}
+html.dark .adm-chip{color:#e9e7e2}
