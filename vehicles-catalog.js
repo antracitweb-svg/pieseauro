@@ -5,7 +5,7 @@
  * (an sfârșit gol = încă în producție). Pentru a adăuga o marcă/un model, adaugă-l aici
  * sau din Admin → Mașini. Fiecare marcă primește automat și „Alt model”.
  */
-const CATALOG_VERSION = 1;
+const CATALOG_VERSION = 2;
 
 const RAW = `
 Alfa Romeo: 33 1983-1995; 145 1994-2001; 146 1994-2001; 147 2000-2010; 156 1997-2007; 159 2005-2012; 164 1987-1998; 166 1998-2007; 4C 2013-2020; Brera 2005-2010; Giulia 2015-; Giulietta 2010-2020; GT 2003-2010; GTV 1995-2006; Junior 2024-; Mito 2008-2018; Spider 1995-2010; Stelvio 2016-; Tonale 2022-
@@ -98,6 +98,82 @@ function parse() {
   return rows;
 }
 
-const CURATED_VEHICLES = parse();
+
+/*
+ * Modele adăugate ulterior (versiunea 2). Aceleași reguli ca mai sus.
+ * Un model care există deja în lista de sus (aceeași marcă + același nume, fără diferențe de
+ * majuscule, spații sau diacritice) este ignorat. Pentru o marcă nouă se adaugă automat „Alt model".
+ * Serverul adaugă aceste modele și în baza de date existentă la pornire, fără să șteargă nimic.
+ */
+const ADDED_RAW = `
+Audi: A6 e-tron 2024-; Q6 e-tron 2024-; SQ6 e-tron 2024-; Q8 e-tron 2023-; Q3 Sportback 2019-; Q5 Sportback 2020-; S3 1999-; S4 1997-; S5 2007-; S6 1994-; S8 1996-; RS3 2011-; RS4 1999-; RS5 2010-; RS6 2002-; RS7 2013-; RS e-tron GT 2021-; SQ5 2013-; SQ7 2016-; SQ8 2019-; RS Q3 2013-; RS Q8 2019-
+BMW: iX2 2024-; i8 2014-2020; M2 2016-; M3 1986-; M4 2014-; M5 1985-; M6 2005-2018; M8 2019-
+Mercedes-Benz: CLE 2023-; Clasa T 2022-; EQE SUV 2022-; EQS SUV 2022-
+Volkswagen: Tayron 2025-; e-Golf 2014-2020; Tiguan Allspace 2017-; Passat Alltrack 2012-
+Renault: Symbioz 2024-; Scenic E-Tech 2024-; 5 E-Tech 2024-; 4 E-Tech 2025-; Avantime 2001-2003; 12 1969-1980
+Opel: Ascona 1970-1988; Manta 1970-1988; Senator 1978-1993; Combo Life 2018-
+Ford: E-Transit 2022-; E-Transit Custom 2023-; Streetka 2003-2005
+Peugeot: 1007 2005-2009; 309 1985-1993; 605 1989-1999
+Citroen: Ami 2020-; C-Zero 2010-2020; C4 Aircross 2012-2017; C3 Pluriel 2003-2010
+Fiat: Grande Panda 2025-; 500e 2020-; Fullback 2016-2019; Barchetta 1995-2005; Coupe 1993-2000; 124 Spider 2016-2019
+Toyota: iQ 2008-2014; Hiace 1967-; Proace Max 2021-; Crown 2023-; Corolla Cross 2021-; GR Yaris 2020-; GR86 2021-; Mirai 2015-
+Hyundai: Ioniq 9 2025-; Inster 2025-; Nexo 2018-; Staria 2021-; H350 2015-
+Kia: EV3 2024-; EV4 2025-
+Honda: e:Ny1 2023-
+Mazda: CX-80 2024-; 6e 2025-; BT-50 2006-2020; RX-7 1978-2002
+Nissan: NV300 2016-2021
+Suzuki: e Vitara 2025-
+Mini: Aceman 2024-
+Smart: #1 2022-; #3 2024-; #5 2025-
+MG: Cyberster 2024-
+BYD: Atto 2 2025-; Dolphin Surf 2025-; Seal 6 2025-; Sealion 6 2025-
+Volvo: EX40 2024-; EC40 2024-; EX90 2024-; ES90 2025-; 740 1984-1992; 440 1988-1996
+Lexus: LBX 2023-; LM 2023-
+Subaru: WRX 2014-
+Polestar: Polestar 1 2019-2021; Polestar 2 2020-; Polestar 3 2024-; Polestar 4 2024-
+Leapmotor: T03 2020-; C10 2024-; B10 2025-
+Xpeng: G6 2024-; G9 2024-
+Omoda: Omoda 5 2023-
+Jaecoo: Jaecoo 7 2024-
+Genesis: G70 2017-; G80 2020-; G90 2018-; GV60 2021-; GV70 2020-; GV80 2020-
+Abarth: 500 2008-; 595 2008-; 695 2008-; 124 Spider 2016-2019; 500e 2023-
+Alpine: A110 2017-; A290 2024-; A390 2025-
+`;
+
+const VAN_RE = /^(Daily|Massif|Ducato|Jumper|Boxer|Master|Movano|Sprinter|Crafter|Transit|Transporter|Vito|Trafic|Vivaro|Expert|Jumpy|Scudo|Interstar|Primastar|NV400|E-Transit|Hiace|Proace Max|H350|NV300)/;
+const normKey = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function parseAdded(base) {
+  const have = new Set(base.map(r => normKey(r.make) + '|' + normKey(r.model)));
+  const makes = new Map();
+  for (const r of base) if (!makes.has(normKey(r.make))) makes.set(normKey(r.make), r.make);
+  const rows = [];
+  for (const line of ADDED_RAW.split('\n')) {
+    const t = line.trim();
+    if (!t) continue;
+    const i = t.indexOf(':');
+    const rawMake = t.slice(0, i).trim();
+    const known = makes.get(normKey(rawMake));
+    const make = known || rawMake;
+    for (const part of t.slice(i + 1).split(';')) {
+      const p = part.trim();
+      if (!p) continue;
+      const m = MODEL_RE.exec(p);
+      const model = m ? m[1].trim() : p;
+      const key = normKey(make) + '|' + normKey(model);
+      if (have.has(key)) continue;
+      have.add(key);
+      rows.push({ make, model, year_from: m ? Number(m[2]) : null, year_to: m && m[3] ? Number(m[3]) : null, kind: VAN_RE.test(model) ? 'van' : 'car', added: true });
+    }
+    if (!known) {
+      makes.set(normKey(rawMake), rawMake);
+      rows.push({ make: rawMake, model: 'Alt model', year_from: null, year_to: null, kind: 'car', added: true });
+    }
+  }
+  return rows;
+}
+
+const BASE_ROWS = parse();
+const CURATED_VEHICLES = BASE_ROWS.concat(parseAdded(BASE_ROWS));
 
 module.exports = { CATALOG_VERSION, CURATED_VEHICLES };

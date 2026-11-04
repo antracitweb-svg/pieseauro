@@ -57,22 +57,7 @@ function deleteStoredImages(userId){
   fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET,{method:'DELETE',headers:{Authorization:'Bearer '+SUPA_KEY,apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({prefixes:['u'+userId+'/']})}).catch(e=>console.error('Supabase Storage delete:',e.message));
 }
 console.log(STORAGE_ON?'Poze: Supabase Storage (bucket '+SUPA_BUCKET+')':'Poze: salvate în baza de date (SUPABASE_URL / SUPABASE_SERVICE_KEY lipsesc)');
-const { CURATED_VEHICLES: BASE_VEHICLES } = require('./vehicles-catalog');
-// Modele noi (ex. Audi Q6 e-tron) din vehicles-extra.js, adăugate peste catalog fără a suprascrie ce există deja.
-function mergeVehicles(base,extra){
- const nk=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
- const out=[...base],makes=new Map(),have=new Set();
- for(const v of base){const mk=nk(v.make);if(!makes.has(mk))makes.set(mk,v.make);have.add(mk+'|'+nk(v.model));}
- const findMake=mk=>{if(makes.has(mk))return makes.get(mk);for(const [k,name] of makes)if(Math.min(k.length,mk.length)>=4&&(k.startsWith(mk)||mk.startsWith(k)))return name;return null;};
- for(const [make,model,from,kind] of extra){
-  const name=findMake(nk(make))||make,key=nk(name)+'|'+nk(model);
-  if(have.has(key))continue; have.add(key);
-  out.push({make:name,model,year_from:from||null,year_to:null,kind:kind||'car',_extra:true});
- }
- return out;
-}
-let EXTRA_VEHICLES=[]; try{EXTRA_VEHICLES=require('./vehicles-extra').EXTRA_VEHICLES||[];}catch(e){console.error('vehicles-extra.js lipsește sau e invalid:',e.message);}
-const CURATED_VEHICLES = mergeVehicles(BASE_VEHICLES,EXTRA_VEHICLES);
+const { CURATED_VEHICLES } = require('./vehicles-catalog');
 // Anunțurile noi se publică automat. Pentru moderare manuală setează AUTO_APPROVE=false în Render.
 const AUTO_APPROVE = String(process.env.AUTO_APPROVE||'true').toLowerCase()!=='false';
 const ACTIVE_LISTINGS_LIMIT = Number(process.env.ACTIVE_LISTINGS_LIMIT)||100;
@@ -662,7 +647,7 @@ function getCatalog(){
   catalogCache=CURATED_VEHICLES.map(v=>({
    id:`curated/${slugify(v.make)}/${slugify(v.model)}`,
    name:v.model, make:v.make, model:v.model, generation:'', years:[],
-   year_from:v.year_from, year_to:v.year_to, kind:v.kind||'car', engine:'', fuel:'', raw:{}, extra:!!v._extra
+   year_from:v.year_from, year_to:v.year_to, kind:v.kind||'car', engine:'', fuel:'', raw:{}, extra:!!v.added
   }));
   catalogLoadedAt=Date.now();
  }
@@ -742,7 +727,7 @@ async function ensureVehicleDb(){
   // Listele vechi (VehiclesDB / rezervă) sunt înlocuite o singură dată cu lista standard.
   if(r.nold>0||r.nc<cat.length*0.9){const out=await syncVehicleDb({reset:true});console.log('Vehicle DB sync:',JSON.stringify(out));}
   else{
-   // Modelele noi din vehicles-extra.js se adaugă în baza existentă, fără să se șteargă nimic.
+   // Modelele noi (ADDED_RAW din vehicles-catalog.js) se adaugă în baza existentă, fără să se șteargă nimic.
    const ex=cat.filter(v=>v.extra);
    if(ex.length){
     const have=new Set((await pool.query("SELECT make_norm||'|'||model_norm AS k FROM vehicles")).rows.map(x=>x.k));
