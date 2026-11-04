@@ -4165,3 +4165,24 @@ html.dark .avar-sheet-card{background:#141a24;color:#e9e7e2}
 /* Filtre pe pagina Dezmembrări (același aspect ca la avariate) */
 .avar-fgrid #dismReset{min-height:44px;border-radius:12px}
 #page-dism .page-head{margin-bottom:10px}
+
+/* ---- Admin: butoane și formular de editare, în același stil cu site-ul (negru/auriu) ---- */
+.admin-tabs .btn.ghost.active{background:linear-gradient(180deg,#24211b 0%,#0e0f12 100%);color:var(--gold-pale);border-color:#0e0f12;box-shadow:none}
+.admin-tabs .btn.ghost.active:hover{background:linear-gradient(180deg,#24211b 0%,#0e0f12 100%)}
+.adm-chip{min-height:36px;transition:background-color .12s ease,border-color .12s ease}
+.adm-chip:hover{border-color:var(--gold);background:#f6edd9}
+.adm-chip.on:hover{background:#14110c}
+.adm-chip:focus-visible,.adm-link:focus-visible,.adm-thumbs button:focus-visible,.adm-edit :is(input,select,textarea):focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.adm-edit label{color:var(--gold-ink);font-weight:750}
+.adm-edit input,.adm-edit select,.adm-edit textarea{min-height:var(--tap);padding:10px 12px;border:1px solid #d8c9aa;border-radius:var(--r);background:#fffefb;color:var(--ink);transition:border-color .12s ease,box-shadow .12s ease}
+.adm-edit textarea{min-height:120px;resize:vertical}
+.adm-edit input:focus,.adm-edit select:focus,.adm-edit textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,147,90,.22);outline:none}
+.adm-edit .admin-actions{margin-top:6px}
+.adm-edit .admin-actions .btn{flex:1 1 140px}
+.btn[disabled]{pointer-events:none}
+html.dark .admin-tabs .btn.ghost.active{background:var(--gold);color:#14110c;border-color:var(--gold)}
+html.dark .adm-chip{background:#1c2430;border-color:#2e3a4b;color:#e9d3a8}
+html.dark .adm-chip.on{background:var(--gold);color:#14110c;border-color:var(--gold)}
+html.dark .adm-edit label{color:#e9d3a8}
+html.dark .adm-edit input,html.dark .adm-edit select,html.dark .adm-edit textarea{background:#141b25;border-color:#2e3a4b;color:#e8e6e1}
+html.dark .adm-edit :is(input,select,textarea):focus{border-color:var(--gold)}

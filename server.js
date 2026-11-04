@@ -108,6 +108,7 @@ function throttle(map,key,limit,windowMs){
 }
 setInterval(()=>{const now=Date.now();for(const m of [authAttempts,recoveryAttempts])for(const [k,v] of m){if(!v.length||now-v[v.length-1]>15*60*1000)m.delete(k);}},10*60*1000).unref();
 function clientIp(req){return String(req.ip||req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();}
+const {expandTerm,wordsRegex}=require('./search-terms');
 function normalizeIdentifier(value){return String(value||'').trim();}
 const COMMON_PW=new Set(['12345678','123456789','1234567890','11111111','00000000','87654321','password','password1','password123','parola123','parola1234','parola','parola1','parolamea','qwertyui','qwertyuiop','qwerty123','asdfghjk','asdfghjkl','abcd1234','abcdefgh','iloveyou','admin123','administrator','autopiese','autopiese1','autopiese123','test1234','testtest','welcome1','romania1','romania123','bucuresti','dacialogan','master123','letmein1','changeme','abc12345','1q2w3e4r','1qaz2wsx','zaq12wsx']);
 function weakPassword(pw,ctx={}){
@@ -1235,15 +1236,28 @@ function buildListingFilter(query){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
   const termClauses=[];
   for(const term of terms){
-    const cols=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel','l.parts_avail','l.city'].map(c=>`${fold(c)} LIKE $${i}`);
-    // Coduri OEM scrise cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsesc și când sunt căutate lipite.
-    // Codul de piesă scris în titlu / descriere / piese disponibile (cu spații sau liniuțe) se găsește la fel ca în câmpul OEM.
-    if(/\d/.test(term)&&term.length>=4)for(const c of ['l.oem','l.title','l.description','l.parts_avail'])cols.push(`${flat(c)} LIKE $${i}`);
+    const ex=expandTerm(term,terms);
+    const P=v=>{vals.push(v);return '$'+(i++);};
+    const TXT=['l.title','l.oem','l.description','l.make','l.model','l.generation','l.engine','l.category','l.year','l.fuel','l.parts_avail','l.city'];
+    const cols=[];
+    // Rădăcini și forme de plural/singular (capota/capote, radiator/radiatoare, geam/geamuri) ca LIKE pe bucăți de cuvânt.
+    for(const lk of ex.like){const p=P(lk);for(const c of TXT)cols.push(`${fold(c)} LIKE ${p}`);}
+    // Cod OEM scris cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsește și când e căutat lipit; la fel și codul din titlu/descriere/piese disponibile.
+    if(/\d/.test(term)&&term.length>=4){const p=P('%'+term+'%');for(const c of ['l.oem','l.title','l.description','l.parts_avail'])cols.push(`${flat(c)} LIKE ${p}`);}
     // Coduri alternative / cross-reference (ex. căutarea "1K0615301" găsește piesa cu echivalentul "1K0615301A").
-    cols.push(`${flat('COALESCE(l.oem_alt,\'\')')} LIKE $${i}`);
-   // Ignoră terminațiile românești uzuale (capota/capote/capotei/capotele → "capot"), ca piesele din descriere să se găsească indiferent de formă.
-   const stem=(!/\d/.test(term)&&term.replace(/(ele|ei|a|e|i)$/,'').length>=4)?term.replace(/(ele|ei|a|e|i)$/,''):term;
-   termClauses.push('('+cols.join(' OR ')+')');vals.push('%'+stem+'%');i++;
+    cols.push(`${flat('COALESCE(l.oem_alt,\'\')')} LIKE ${P('%'+term+'%')}`);
+    // Forme neregulate și sinonime ca cuvânt întreg (ușă/uși, radiator/radiatoare, capotă față = capotă motor).
+    const wr=wordsRegex(ex.words);
+    if(wr){const p=P(wr);for(const c of ['l.title','l.description','l.parts_avail','l.category','l.make','l.model'])cols.push(`${fold(c)} ~ ${p}`);}
+    // Greșeli de scriere la marcă/model: "karq" găsește "Karoq", "octvia" găsește "Octavia".
+    if(ex.fuzzy){const p=P(ex.fuzzy);cols.push(`${fold('l.model')} LIKE ${p}`,`${fold('l.make')} LIKE ${p}`);}
+    let clause='('+cols.join(' OR ')+')';
+    // Calificative (față/spate, stânga/dreapta, apă/clima): lipsa lor în anunț nu exclude anunțul, doar menționarea opusului.
+    if(ex.opposite){
+      const orx=wordsRegex(ex.opposite);
+      if(orx)clause=`(${clause} OR NOT (${fold("(COALESCE(l.title,'')||' '||COALESCE(l.description,'')||' '||COALESCE(l.parts_avail,''))")} ~ ${P(orx)}))`;
+    }
+    termClauses.push(clause);
   }
   // Cod scris cu spații în căutare (ex. \"1K0 615 301\") și lipit în anunț (\"1K0615301\"), sau invers: se compară și toată căutarea fără spații.
   const flatQ=terms.join('');
@@ -2095,7 +2109,8 @@ app.patch('/api/admin/listings/:id',auth,staff,requireDb,ah(async(req,res)=>{
  for(const [k,fn] of Object.entries(EDIT)){
   if(!(k in body))continue;
   const val=fn(body[k]);
-  if(val===null)return res.status(400).json({error:'DATE_INVALIDE',field:k});
+  // oem_alt gol → cleanOemAlt întoarce null (valid: șterge codurile). Pentru restul, null = valoare invalidă (ex. preț negativ).
+  if(val===null&&k!=='oem_alt')return res.status(400).json({error:'DATE_INVALIDE',field:k});
   if(String(before[k]??'')===String(val??''))continue;
   vals.push(val);sets.push(`${k}=$${vals.length}`);
   changes.push(`${k}: „${String(before[k]??'').slice(0,40)}” → „${String(val??'').slice(0,40)}”`);

@@ -3052,7 +3052,7 @@ async function loadAdmin(){
     renderAdmin();
   }catch(e){ $('#adminContent').innerHTML = `<p>${esc(e.message)}</p>`; }
 }
-function adminBtns(kind, id, items){ return items.map(([label,status])=>`<button class="btn ghost small" data-admin="${kind}" data-id="${id}" data-status="${status}">${label}</button>`).join(''); }
+function adminBtns(kind, id, items){ const cls={approved:'primary',active:'primary',rejected:'danger',blocked:'danger'}; return items.map(([label,status])=>`<button type="button" class="btn ${cls[status]||'ghost'} small" data-admin="${kind}" data-id="${id}" data-status="${status}">${label}</button>`).join(''); }
 const EV_LABEL = {listing_create:['📝','Anunț nou'],listing_edit:['✏️','Anunț editat'],listing_sold:['✅','Marcat vândut'],listing_resale:['♻️','Repus la vânzare'],import:['📥','Import CSV'],price_bulk:['💰','Prețuri actualizate'],vacation_on:['🌴','Vacanță pornită'],vacation_off:['🏠','Vacanță oprită'],block:['🚫','Utilizator blocat'],unblock:['↩️','Blocare ridicată'],rating:['⭐','Calificativ nou'],rating_edit:['⭐','Calificativ modificat'],account_delete:['🗑️','Cont șters']};
 const evWhen = d => new Date(d).toLocaleString('ro-RO');
 function adminEventsHtml(){
@@ -3289,9 +3289,18 @@ async function saveListingEdit(id){
   if(!v('aeTitle')){ toast('Titlul nu poate fi gol.'); return; }
   if(!v('aeCat')){ toast('Alege o categorie.'); return; }
   if(price!=='' && (!Number.isFinite(Number(price)) || Number(price)<0)){ toast('Preț invalid.'); return; }
-  const r = await api(`/api/admin/listings/${id}`,{method:'PATCH',body:JSON.stringify({title:v('aeTitle'),price:price===''?0:Number(price),category:v('aeCat'),subcategory:v('aeSub'),make:v('aeMake'),model:v('aeModel'),oem:v('aeOem'),oem_alt:v('aeOemAlt'),county:v('aeCounty'),description:$('#aeDesc').value,note:v('aeNote')})});
-  toast(r.changed===false ? 'Nu ai schimbat nimic.' : 'Anunțul a fost actualizat.');
-  await loadAdmin(); await openAdminListing(id);
+  const btn = document.querySelector('[data-adm-edit-save]'), label = btn ? btn.textContent : '';
+  if(btn){ if(btn.disabled) return; btn.disabled = true; btn.textContent = 'Se salvează…'; }
+  try{
+    const r = await api(`/api/admin/listings/${id}`,{method:'PATCH',body:JSON.stringify({title:v('aeTitle'),price:price===''?0:Number(price),category:v('aeCat'),subcategory:v('aeSub'),make:v('aeMake'),model:v('aeModel'),oem:v('aeOem'),oem_alt:v('aeOemAlt'),county:v('aeCounty'),description:$('#aeDesc').value,note:v('aeNote')})});
+    toast(r.changed===false ? 'Nu ai schimbat nimic.' : 'Anunțul a fost actualizat.');
+  }catch(e){
+    // Rămânem în formular, ca să nu se piardă ce ai scris.
+    if(btn){ btn.disabled = false; btn.textContent = label; }
+    throw e;
+  }
+  try{ await loadAdmin(); }catch{}
+  await openAdminListing(id);
 }
 async function adminAction(el){
   const {admin:kind,id,status} = el.dataset;
