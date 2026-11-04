@@ -109,6 +109,7 @@ function throttle(map,key,limit,windowMs){
 setInterval(()=>{const now=Date.now();for(const m of [authAttempts,recoveryAttempts])for(const [k,v] of m){if(!v.length||now-v[v.length-1]>15*60*1000)m.delete(k);}},10*60*1000).unref();
 function clientIp(req){return String(req.ip||req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();}
 const {expandTerm,wordsRegex}=require('./search-terms');
+const {buildSuggestions}=require('./search-suggest');
 function normalizeIdentifier(value){return String(value||'').trim();}
 const COMMON_PW=new Set(['12345678','123456789','1234567890','11111111','00000000','87654321','password','password1','password123','parola123','parola1234','parola','parola1','parolamea','qwertyui','qwertyuiop','qwerty123','asdfghjk','asdfghjkl','abcd1234','abcdefgh','iloveyou','admin123','administrator','autopiese','autopiese1','autopiese123','test1234','testtest','welcome1','romania1','romania123','bucuresti','dacialogan','master123','letmein1','changeme','abc12345','1q2w3e4r','1qaz2wsx','zaq12wsx']);
 function weakPassword(pw,ctx={}){
@@ -1231,7 +1232,7 @@ app.delete('/api/favorites/:id',auth,requireDb,async(req,res)=>{
 function buildListingFilter(query){
  const {q,delivery}=query; const where=["l.status='approved'","l.type <> 'masina'",NOT_VAC_LISTING],vals=[];let i=1;
  if(query.type==='masini')where.push("l.type IN ('avariata','defecta')");
- else if(query.type!=='avariata'&&query.type!=='defecta'&&!/^\d{1,10}$/.test(String(query.seller_id||'')))where.push("l.type NOT IN ('avariata','defecta')"); // pe profilul unui vânzător (seller_id) se văd TOATE anunțurile lui, inclusiv mașinile avariate/defecte
+ else if(query.type!=='toate'&&query.type!=='avariata'&&query.type!=='defecta'&&!/^\d{1,10}$/.test(String(query.seller_id||'')))where.push("l.type NOT IN ('avariata','defecta')"); // pe profilul unui vânzător (seller_id) se văd TOATE anunțurile lui, inclusiv mașinile avariate/defecte
  if(q){
   const terms=norm(String(q).slice(0,100)).split(/\s+/).filter(Boolean).slice(0,8);
   const termClauses=[];
@@ -1269,7 +1270,7 @@ function buildListingFilter(query){
  }
  let condClause=null;
  for(const [key,col] of [['type','l.type'],['condition','l.condition'],['year','l.year'],['seller_type','l.seller_type']]){
-  if(query[key]&&!(key==='type'&&query.type==='masini')){where.push(`${col}=$${i}`);if(key==='condition')condClause={at:where.length-1,param:i};vals.push(String(query[key]).slice(0,100));i++;}
+  if(query[key]&&!(key==='type'&&(query.type==='masini'||query.type==='toate'))){where.push(`${col}=$${i}`);if(key==='condition')condClause={at:where.length-1,param:i};vals.push(String(query[key]).slice(0,100));i++;}
  }
  // Marcă/model/județ/categorie: fără diferențe de majuscule, diacritice, spații sau cratime ("Land Rover" = "LandRover").
  for(const [key,col] of [['make','l.make'],['model','l.model'],['county','l.county'],['category','l.category']]){
@@ -1299,6 +1300,26 @@ function buildListingFilter(query){
  return {where,vals,condClause};
 }
 app.get('/api/rates',(req,res)=>res.json({eur_ron:EUR_RON,date:EUR_RON_DATE,live:EUR_RON_LIVE}));
+// Sugestii la scris (pagina de căutare): expresii frecvente din titluri + categoria lor (piese / mașini). Fără DB întoarce doar lista fixă.
+const SUGGEST_CACHE=new Map();
+app.get('/api/search/suggest',ah(async(req,res)=>{
+ const q=norm(String(req.query.q||'')).slice(0,40),cat=req.query.cat==='piese'||req.query.cat==='masini'?req.query.cat:'';
+ if(q.length<2)return res.json({suggestions:[]});
+ const ckey=q+'|'+cat,hit=SUGGEST_CACHE.get(ckey);
+ if(hit&&Date.now()-hit.at<60000)return res.json(hit.body);
+ let rows=[];
+ if(pool){
+  try{
+   const vals=[],like=q.split(' ').slice(0,4).map(t=>{vals.push('%'+t+'%');return `${fold('l.title')} LIKE $${vals.length}`;});
+   const r=await pool.query(`SELECT l.title,l.type FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${like.join(' AND ')} ORDER BY l.created_at DESC LIMIT 400`,vals);
+   rows=r.rows;
+  }catch(e){console.error('suggest',e.message);}
+ }
+ const body={suggestions:buildSuggestions(q,rows,{cat,limit:8})};
+ if(SUGGEST_CACHE.size>=500)SUGGEST_CACHE.clear();
+ SUGGEST_CACHE.set(ckey,{at:Date.now(),body});
+ res.json(body);
+}));
 app.get('/api/listings',requireDb,ah(async(req,res)=>{
  const ckey=req.originalUrl,hit=LIST_CACHE.get(ckey);
  if(hit&&Date.now()-hit.at<LIST_CACHE_TTL)return res.json(hit.body);

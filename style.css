@@ -4241,3 +4241,45 @@ html body :is(.back,.text-btn,.adm-link,.filter-head button):not(#bt):hover{colo
 html body .btn:not(#bt)::after{display:none}
 /* Pastilele din prima pagină păstrează forma lor */
 html body :is(.home-links button,.home-feed-head button):not(#bt){border-radius:999px;font-size:14px}
+
+/* =====================================================================
+   Pagina de căutare (se deschide din bara de pe prima pagină și din lupa din header).
+   Telefon: ecran întreg. Laptop: panou centrat peste pagină. Culorile vin din variabilele site-ului
+   (zi + dark), iar pastilele și butonul „Caută” folosesc sistemul de butoane de mai sus.
+   ===================================================================== */
+html body .sov{position:fixed;inset:0;z-index:120;display:flex;justify-content:center;align-items:flex-start;padding:6vh 16px 24px;background:rgba(14,15,18,.55);overflow-y:auto;-webkit-overflow-scrolling:touch}
+html body .sov.hidden{display:none}
+.sov-panel{width:100%;max-width:640px;max-height:88vh;display:flex;flex-direction:column;gap:12px;padding:12px 14px 14px;background:var(--ivory);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-3);color:var(--ink)}
+.sov-panel .page-head{flex:none}
+.sov-cats{flex:none;display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.sov-cats::-webkit-scrollbar{display:none}
+.sov-cats .facet{flex:none;min-height:40px;padding:0 13px;white-space:nowrap}
+html body .sov-box{flex:none;display:flex;align-items:center;gap:6px;min-height:54px;padding:0 6px 0 14px;background:var(--paper);border:2px solid var(--gold);border-radius:14px}
+html body .sov-box:focus-within{box-shadow:0 0 0 3px rgba(184,147,90,.28)}
+.sov-lens{font-size:24px;line-height:1;color:var(--bt-link)}
+html body .sov-box input{flex:1;min-width:0;height:48px;padding:0 4px;margin:0;border:0;outline:0;box-shadow:none;background:transparent;color:var(--ink);font:inherit;font-size:17px;-webkit-appearance:none;appearance:none}
+html body .sov-box input::placeholder{color:var(--muted);opacity:1}
+html body .sov-box input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+.sov-clear{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
+.sov-clear:hover{color:var(--ink)}
+.sov-clear.hidden{display:none}
+.sov-box .btn{flex:none;margin:0}
+.sov-list{flex:1 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain}
+.sov-recent-head{display:flex;align-items:center;justify-content:space-between;padding:2px 2px 8px;font-size:15px}
+.sov-recent-head.hidden,.sov-items.hidden{display:none}
+.sov-recent-head button{border:0;background:transparent;font:inherit;font-weight:700;color:var(--bt-link);cursor:pointer;padding:6px 2px}
+.sov-items{display:flex;flex-direction:column}
+html body .sov-item{display:grid;grid-template-columns:32px minmax(0,1fr) 28px;align-items:center;gap:8px;width:100%;min-height:60px;margin:0;padding:8px 2px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+html body .sov-item:hover,html body .sov-item:focus-visible{background:rgba(184,147,90,.12);outline:0}
+.sov-ico{font-size:22px;line-height:1;text-align:center;color:var(--muted)}
+.sov-txt{display:block;min-width:0;font-size:18px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sov-txt b{font-weight:800}
+.sov-txt small{display:block;margin-top:2px;font-size:13.5px;color:var(--muted)}
+.sov-item i{font-style:normal;font-size:20px;text-align:center;color:var(--muted)}
+.sov-empty{margin:0;padding:18px 2px;color:var(--muted)}
+#searchOverlay .page-head>div::before{content:"🔍"}
+@media(max-width:700px){
+  html body .sov{padding:0;background:var(--ivory)}
+  .sov-panel{max-width:none;height:100%;max-height:none;border:0;border-radius:0;box-shadow:none;padding:10px 12px 14px}
+  .sov-txt{font-size:17px}
+}

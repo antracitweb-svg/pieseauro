@@ -3650,39 +3650,83 @@ function saveRecentSearch(q){
   const arr=getRecentSearches().filter(x=>x.toLowerCase()!==q.toLowerCase());
   arr.unshift(q); writeJSON('autopiese_recent_searches',arr.slice(0,10));
 }
+const SEARCH_CAT_LABEL={piese:'Piese auto',masini:'Mașini avariate/defecte'};
+let searchCat='toate', sugSeq=0, sugTimer=null;
 function renderRecentSearches(){
   const box=$('#recentSearchList'); if(!box) return;
   const arr=getRecentSearches();
-  box.innerHTML=arr.length ? arr.map(q=>`<button type="button" class="recent-search-item" data-recent-search="${esc(q)}"><span>⌕</span><b>${esc(q)}</b><i>↖</i></button>`).join('') : '<p class="recent-empty">Nu ai căutări recente.</p>';
+  const head=$('#searchOverlayContent .sov-recent-head'); if(head) head.classList.toggle('hidden',!arr.length);
+  box.innerHTML=arr.length ? arr.map(q=>`<button type="button" class="sov-item" data-recent-search="${esc(q)}"><span class="sov-ico" aria-hidden="true">↺</span><span class="sov-txt">${esc(q)}</span><i aria-hidden="true">↖</i></button>`).join('') : '<p class="sov-empty">Nu ai căutări recente.</p>';
+}
+function setSearchCat(cat){
+  searchCat=cat;
+  $$('#searchCats [data-scat]').forEach(b=>{ const on=b.dataset.scat===cat; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+  refreshSearchList();
+}
+// Sugestii: termenul tastat e îngroșat, categoria apare dedesubt (ca la OLX).
+function sugRow(s,q){
+  const fq=foldTxt(q).trim(), t=String(s.text||'');
+  const txt = fq && t.startsWith(fq) ? `<b>${esc(t.slice(0,fq.length))}</b>${esc(t.slice(fq.length))}` : esc(t);
+  return `<button type="button" class="sov-item" data-sug="${esc(t)}" data-sug-cat="${esc(s.cat)}"><span class="sov-ico" aria-hidden="true">⌕</span><span class="sov-txt">${txt}<small>${esc(SEARCH_CAT_LABEL[s.cat]||'')}</small></span><i aria-hidden="true">↖</i></button>`;
+}
+function refreshSearchList(){
+  const input=$('#searchOverlayInput'); if(!input) return;
+  const q=input.value.trim(), recent=$('#recentSearchList'), head=$('#searchOverlayContent .sov-recent-head'), box=$('#suggestList');
+  $('#searchOverlayClear').classList.toggle('hidden',!input.value);
+  clearTimeout(sugTimer);
+  if(q.length<2){ sugSeq++; box.classList.add('hidden'); box.innerHTML=''; recent.classList.remove('hidden'); renderRecentSearches(); return; }
+  recent.classList.add('hidden'); head.classList.add('hidden'); box.classList.remove('hidden');
+  const seq=++sugSeq, cat=searchCat;
+  sugTimer=setTimeout(async()=>{
+    let list=[];
+    try{ list=(await api('/api/search/suggest?q='+encodeURIComponent(q)+(cat!=='toate'?'&cat='+cat:''))).suggestions||[]; }catch{}
+    if(seq!==sugSeq) return;
+    box.innerHTML = list.length ? list.map(s=>sugRow(s,q)).join('') : `<button type="button" class="sov-item" data-sug="${esc(q)}" data-sug-cat="${cat==='toate'?'':esc(cat)}"><span class="sov-ico" aria-hidden="true">⌕</span><span class="sov-txt">Caută „${esc(q)}”</span><i aria-hidden="true">↖</i></button>`;
+  }, 160);
 }
 function openSearchOverlay(value=''){
   const ov=$('#searchOverlay'), input=$('#searchOverlayInput'); if(!ov||!input) return;
   input.value=value||$('#topSearchInput').value.trim()||state.filters.q||'';
+  const t=state.filters.type;
+  searchCat = t==='masini'||t==='avariata'||t==='defecta' ? 'masini' : (t==='piesa' ? 'piese' : 'toate');
+  $$('#searchCats [data-scat]').forEach(b=>{ const on=b.dataset.scat===searchCat; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); });
   ov.classList.remove('hidden'); ov.setAttribute('aria-hidden','false'); document.body.classList.add('search-open');
-  renderRecentSearches(); setTimeout(()=>input.focus(),20);
+  refreshSearchList(); input.focus(); setTimeout(()=>input.focus(),30);
 }
 function closeSearchOverlay(){
   const ov=$('#searchOverlay'); if(!ov) return;
   ov.classList.add('hidden'); ov.setAttribute('aria-hidden','true'); document.body.classList.remove('search-open');
+  sugSeq++; clearTimeout(sugTimer);
+  if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();
 }
-function submitSearchQuery(q){
+// cat: 'toate' | 'piese' | 'masini'. Din pagina de căutare vine categoria aleasă; din alte formulare (acasă) rămâne căutarea de piese.
+function submitSearchQuery(q, cat){
   q=String(q||'').trim();
   if(!q){ toast('Scrie ce piesă cauți.'); return; }
+  const ov=$('#searchOverlay'); if(cat===undefined||cat==='') cat = ov&&!ov.classList.contains('hidden') ? searchCat : 'piese';
+  const type = cat==='masini' ? 'masini' : (cat==='toate' ? 'toate' : '');
   saveRecentSearch(q); $('#topSearchInput').value=q; closeSearchOverlay();
-  smartSearch(q).then(r=>{ if(r.make){ toast('Am recunoscut mașina: '+[r.make,r.model].filter(Boolean).join(' ')); openSearch({q:r.rest, make:r.make, model:r.model}); } else openSearch({q}); }).catch(()=>openSearch({q}));
+  smartSearch(q).then(r=>{ if(r.make){ toast('Am recunoscut mașina: '+[r.make,r.model].filter(Boolean).join(' ')); openSearch({q:r.rest, make:r.make, model:r.model, type}); } else openSearch({q, type}); }).catch(()=>openSearch({q, type}));
 }
 
 function wire(){
-  $('#topSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#topSearchInput').value); });
-  $('#topSearchBtn').addEventListener('click', ()=>{
-    const hp=$('#page-home'), hi=$('#homeSearchInput');
-    if(hp && hp.classList.contains('active') && hi){ if(hi.value.trim()) submitSearchQuery(hi.value); else { hi.scrollIntoView({block:'center',behavior:'smooth'}); hi.focus({preventScroll:true}); } return; }
-    openSearchOverlay();
-  });
+  $('#topSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#topSearchInput').value,'piese'); });
+  $('#topSearchBtn').addEventListener('click', ()=>openSearchOverlay());
   $('#searchOverlayBack').addEventListener('click', closeSearchOverlay);
-  $('#searchOverlayForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#searchOverlayInput').value); });
+  $('#searchOverlay').addEventListener('click', e=>{ if(e.target.id==='searchOverlay') closeSearchOverlay(); });
+  $('#searchOverlay').addEventListener('keydown', e=>{ if(e.key==='Escape'){ e.stopPropagation(); closeSearchOverlay(); } });
+  $('#searchOverlayForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#searchOverlayInput').value, searchCat); });
+  $('#searchOverlayInput').addEventListener('input', refreshSearchList);
+  $('#searchOverlayClear').addEventListener('click', ()=>{ const i=$('#searchOverlayInput'); i.value=''; refreshSearchList(); i.focus(); });
+  $('#searchCats').addEventListener('click', e=>{ const b=e.target.closest('[data-scat]'); if(b) setSearchCat(b.dataset.scat); });
   $('#clearRecentSearches').addEventListener('click', ()=>{ localStorage.removeItem('autopiese_recent_searches'); renderRecentSearches(); });
-  $('#recentSearchList').addEventListener('click', e=>{ const b=e.target.closest('[data-recent-search]'); if(b) submitSearchQuery(b.dataset.recentSearch); });
+  $('#searchOverlayContent').addEventListener('click', e=>{
+    const r=e.target.closest('[data-recent-search]'); if(r){ submitSearchQuery(r.dataset.recentSearch, searchCat); return; }
+    const g=e.target.closest('[data-sug]'); if(g) submitSearchQuery(g.dataset.sug, g.dataset.sugCat||searchCat);
+  });
+  // Bara din prima pagină deschide pagina de căutare (ca la OLX).
+  const hi=$('#homeSearchInput');
+  hi.addEventListener('focus', ()=>{ if($('#searchOverlay').classList.contains('hidden')){ hi.blur(); openSearchOverlay(hi.value.trim()); } });
   $('#homeRequestBtn').addEventListener('click', ()=>doAction('request'));
   $('#garageBtn').addEventListener('click', openGarage);
   $('#garageForm').addEventListener('submit', garageSave);
@@ -3701,7 +3745,7 @@ function wire(){
   $('#garageBanner').addEventListener('click', async e=>{ if(e.target.closest('[data-garage-all]')){ $('#filterMake').value=''; await loadModels('','filterModel','Toate modelele'); state.extra.g='0'; onFilterChange(); } });
   updateGarageUI();
   $('#cartBtn').addEventListener('click', ()=>doAction('cart'));
-  $('#homeSearchForm').addEventListener('submit', e=>{ e.preventDefault(); submitSearchQuery($('#homeSearchInput').value); });
+  $('#homeSearchForm').addEventListener('submit', e=>{ e.preventDefault(); const v=$('#homeSearchInput').value.trim(); if(v) submitSearchQuery(v,'piese'); else openSearchOverlay(); });
   $('#resultsSearchForm').addEventListener('submit', e=>{ e.preventDefault(); if(state.mode!=='search') return; onFilterChange(); });
   $('#homeMake').addEventListener('change', e=>loadModels(e.target.value,'homeModel'));
   $('#homeVehicleBtn').addEventListener('click', ()=>{ const make=$('#homeMake').value; if(!make){ toast('Alege marca mașinii.'); return; } openSearch({make, model:$('#homeModel').value}); });
