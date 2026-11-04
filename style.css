@@ -4196,3 +4196,29 @@ html.dark .adm-edit :is(input,select,textarea):focus{border-color:var(--gold)}
 @media(pointer:coarse){.ar-btn{min-height:36px;min-width:36px}}
 html.dark .home-feed-head button{background:#161c26;border-color:#3a4250;color:#e9d3a8}
 html.dark .home-feed-head button:hover{border-color:var(--gold,#b8935a)}
+
+/* ---- Prima pagină, dark mode: cele trei pastile (oferte, avariate, vezi toate) au exact aceeași culoare ---- */
+html.dark #page-home .home-links button,
+html.dark #page-home #homeRequestBtn,
+html.dark #page-home .home-feed-head button{background:#161c26!important;border:1px solid #3a4250!important;color:#e9d3a8!important}
+html.dark #page-home .home-links button:hover,
+html.dark #page-home #homeRequestBtn:hover,
+html.dark #page-home .home-feed-head button:hover{border-color:var(--gold,#b8935a)!important;background:#1c2430!important}
+
+/* ---- Butoane PLATE (fără gradient, umbre sau reflexii) în prima pagină și în admin ---- */
+#page-home .home-links button,#page-home #homeRequestBtn,#page-home .home-feed-head button,#page-home .home-search-go,
+#adminContent .btn,#adminListingBody .btn,.admin-tabs .btn,.admin-actions .btn,.adm-edit .btn,.adm-chip{
+  background-image:none!important;box-shadow:none!important;text-shadow:none!important;filter:none}
+#adminContent .btn::after,#adminListingBody .btn::after{display:none}
+#adminContent .btn.primary,#adminListingBody .btn.primary,.admin-tabs .btn.ghost.active{background:#14110c!important;color:#e9d3a8;border:1px solid #14110c}
+#adminContent .btn.primary:hover,#adminListingBody .btn.primary:hover{background:var(--gold)!important;border-color:var(--gold);color:#14110c;filter:none}
+#adminContent .btn.ghost,#adminListingBody .btn.ghost{background:transparent!important;color:#7a5a28;border:1px solid #d8c9aa}
+#adminContent .btn.ghost:hover,#adminListingBody .btn.ghost:hover{background:#f6edd9!important}
+#adminContent .btn.danger,#adminListingBody .btn.danger{background:#fff5f5!important;color:#a62a36;border:1px solid #f0cfd2}
+#adminContent .btn.danger:hover,#adminListingBody .btn.danger:hover{background:#fde8ea!important}
+#page-home .home-search-go{background:#14110c!important}
+#page-home .home-search-go:hover{background:var(--gold)!important}
+html.dark .admin-tabs .btn.ghost.active,html.dark #adminContent .btn.primary,html.dark #adminListingBody .btn.primary{background:var(--gold)!important;color:#14110c;border-color:var(--gold)}
+html.dark #adminContent .btn.ghost,html.dark #adminListingBody .btn.ghost{background:transparent!important;color:#e9d3a8;border-color:#3a4250}
+html.dark #adminContent .btn.ghost:hover,html.dark #adminListingBody .btn.ghost:hover{background:#1c2430!important}
+html.dark #adminContent .btn.danger,html.dark #adminListingBody .btn.danger{background:#2a1a1d!important;color:#f0a3ab;border-color:#5a2c33}
