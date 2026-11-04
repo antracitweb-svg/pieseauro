@@ -3682,7 +3682,7 @@ function refreshSearchList(){
     let list=[];
     try{ list=(await api('/api/search/suggest?q='+encodeURIComponent(q)+(cat!=='toate'?'&cat='+cat:''))).suggestions||[]; }catch{}
     if(seq!==sugSeq) return;
-    box.innerHTML = list.length ? list.map(s=>sugRow(s,q)).join('') : `<button type="button" class="sov-item" data-sug="${esc(q)}" data-sug-cat="${cat==='toate'?'':esc(cat)}"><span class="sov-ico" aria-hidden="true">⌕</span><span class="sov-txt">Caută „${esc(q)}”</span><i aria-hidden="true">↖</i></button>`;
+    box.innerHTML = list.length ? list.map(s=>sugRow(s,q)).join('') : `<button type="button" class="sov-item" data-sug="${esc(q)}" data-sug-cat="${cat==='toate'?'':esc(cat)}"><span class="sov-ico" aria-hidden="true">⌕</span><span class="sov-txt">Caută „${esc(q)}”<small>${esc(SEARCH_CAT_LABEL[cat]||'Toate categoriile')}</small></span><i aria-hidden="true">↖</i></button>`;
   }, 160);
 }
 function openSearchOverlay(value=''){

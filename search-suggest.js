@@ -98,6 +98,14 @@ function buildSuggestions(rawQ, rows = [], opt = {}) {
   const out = [], seen = new Set();
   const push = s => { const k = s.text + '|' + s.cat; if (seen.has(k) || out.length >= limit) return; if (want && s.cat !== want) return; seen.add(k); out.push({ text: s.text, cat: s.cat }); };
 
+  // 1b) fraze ca „capota avariata” / „masina lovita de gheata”: pot fi o piesă sau o mașină → pe „Toate” se arată ambele categorii.
+  const CAR_WORDS = new Set(['masina', 'masini', 'auto', 'autoturism', 'autoturisme']);
+  const both = !want && tokens.length > 1 && tokens.some(isMasiniWord);
+  if (both) {
+    const order = tokens.some(t => CAR_WORDS.has(t)) ? ['masini', 'piese'] : ['piese', 'masini'];
+    for (const c of order) push({ text: q, cat: c });
+  }
+
   // 2) cuvintele „avariat / defect…” duc direct spre mașini, chiar dacă nu există încă anunțuri
   const first = tokens[0];
   const masiniTyped = tokens.length === 1 && isMasiniWord(first);
@@ -110,7 +118,10 @@ function buildSuggestions(rawQ, rows = [], opt = {}) {
   }
 
   // 3) restul expresiilor reale (ambele categorii dacă un cuvânt are rezultate în ambele)
-  for (const s of real) push(s);
+  for (const s of real) {
+    push(s);
+    if (both) push({ text: s.text, cat: s.cat === 'piese' ? 'masini' : 'piese' });
+  }
 
   // 4) lista fixă (rezervă când sunt puține anunțuri)
   if (out.length < limit && !masiniTyped) {
