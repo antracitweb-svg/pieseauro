@@ -4197,41 +4197,47 @@ html.dark .adm-edit :is(input,select,textarea):focus{border-color:var(--gold)}
 html.dark .home-feed-head button{background:#161c26;border-color:#3a4250;color:#e9d3a8}
 html.dark .home-feed-head button:hover{border-color:var(--gold,#b8935a)}
 
-/* ---- Prima pagină, dark mode: cele trei pastile (oferte, avariate, vezi toate) au exact aceeași culoare ---- */
-html.dark #page-home .home-links button,
-html.dark #page-home #homeRequestBtn,
-html.dark #page-home .home-feed-head button{background:#161c26!important;border:1px solid #3a4250!important;color:#e9d3a8!important}
-html.dark #page-home .home-links button:hover,
-html.dark #page-home #homeRequestBtn:hover,
-html.dark #page-home .home-feed-head button:hover{border-color:var(--gold,#b8935a)!important;background:#1c2430!important}
-
-/* ---- Butoane PLATE (fără gradient, umbre sau reflexii) în prima pagină și în admin ---- */
-#page-home .home-links button,#page-home #homeRequestBtn,#page-home .home-feed-head button,#page-home .home-search-go,
-#adminContent .btn,#adminListingBody .btn,.admin-tabs .btn,.admin-actions .btn,.adm-edit .btn,.adm-chip{
-  background-image:none!important;box-shadow:none!important;text-shadow:none!important;filter:none}
-#adminContent .btn::after,#adminListingBody .btn::after{display:none}
-#adminContent .btn.primary,#adminListingBody .btn.primary,.admin-tabs .btn.ghost.active{background:#14110c!important;color:#e9d3a8;border:1px solid #14110c}
-#adminContent .btn.primary:hover,#adminListingBody .btn.primary:hover{background:var(--gold)!important;border-color:var(--gold);color:#14110c;filter:none}
-#adminContent .btn.ghost,#adminListingBody .btn.ghost{background:transparent!important;color:#7a5a28;border:1px solid #d8c9aa}
-#adminContent .btn.ghost:hover,#adminListingBody .btn.ghost:hover{background:#f6edd9!important}
-#adminContent .btn.danger,#adminListingBody .btn.danger{background:#fff5f5!important;color:#a62a36;border:1px solid #f0cfd2}
-#adminContent .btn.danger:hover,#adminListingBody .btn.danger:hover{background:#fde8ea!important}
-#page-home .home-search-go{background:#14110c!important}
-#page-home .home-search-go:hover{background:var(--gold)!important}
-html.dark .admin-tabs .btn.ghost.active,html.dark #adminContent .btn.primary,html.dark #adminListingBody .btn.primary{background:var(--gold)!important;color:#14110c;border-color:var(--gold)}
-html.dark #adminContent .btn.ghost,html.dark #adminListingBody .btn.ghost{background:transparent!important;color:#e9d3a8;border-color:#3a4250}
-html.dark #adminContent .btn.ghost:hover,html.dark #adminListingBody .btn.ghost:hover{background:#1c2430!important}
-html.dark #adminContent .btn.danger,html.dark #adminListingBody .btn.danger{background:#2a1a1d!important;color:#f0a3ab;border-color:#5a2c33}
-
-/* ---- Scris și culori ca în pagina de rezultate (filtrele-pastilă): zi și dark; rămân plate ---- */
-#page-home .home-links button,#page-home #homeRequestBtn,#page-home .home-feed-head button{
-  font-size:14px;font-weight:650;color:#3b3224;background:var(--paper,#fffefb)!important;border:1px solid #ddd3bf}
-#page-home .home-links button:hover,#page-home #homeRequestBtn:hover,#page-home .home-feed-head button:hover{background:#f6edd9!important;border-color:var(--gold,#b8935a)}
-html.dark #page-home .home-links button,html.dark #page-home #homeRequestBtn,html.dark #page-home .home-feed-head button{
-  background:#1c232e!important;border:1px solid #3a4250!important;color:#e9e7e2!important}
-html.dark #page-home .home-links button:hover,html.dark #page-home #homeRequestBtn:hover,html.dark #page-home .home-feed-head button:hover{
-  background:#243040!important;border-color:#8f6d38!important}
-/* admin: butoanele cu contur au același text ca „Filtrare” (auriu-închis în zi, alb-cald în dark) */
-html.dark #adminContent .btn.ghost,html.dark #adminListingBody .btn.ghost,html.dark .admin-tabs .btn.ghost{color:#e9e7e2;background:#161c26!important;border-color:#3a4250}
-html.dark #adminContent .btn.ghost:hover,html.dark #adminListingBody .btn.ghost:hover{background:#243040!important;border-color:#8f6d38}
-html.dark .adm-chip{color:#e9e7e2}
+/* =====================================================================
+   SISTEM UNIC DE BUTOANE (zi + dark), PLAT: fără gradient, umbre sau reflexii.
+   Valorile sunt cele mai folosite în site, adunate într-un singur loc:
+   • Principal: zi = negru #14110c cu text auriu #e9d3a8 · dark = auriu #d8bd8d cu text negru
+   • Secundar (contur / pastile / filtre): zi = crem cu text #7a5a28 · dark = #1c232e cu text auriu #d8bd8d
+   • Pericol: zi = roz pal cu text #a62a36 · dark = #2a1518 cu text #e08a84
+   Pentru o schimbare de culoare se modifică DOAR variabilele de mai jos.
+   ===================================================================== */
+:root{
+  --bt-fw:650;
+  --bt-p-bg:#14110c;--bt-p-fg:#e9d3a8;--bt-p-hover-bg:#b8935a;--bt-p-hover-fg:#14110c;
+  --bt-s-bg:#fffefb;--bt-s-bd:#d8c9aa;--bt-s-fg:#7a5a28;--bt-s-hover-bg:#f6edd9;--bt-s-hover-bd:#b8935a;
+  --bt-d-bg:#fff5f5;--bt-d-bd:#f0cfd2;--bt-d-fg:#a62a36;--bt-d-hover-bg:#fde8ea;
+  --bt-link:#7a5a28;--bt-link-hover:#14110c;
+}
+html.dark{
+  --bt-p-bg:#d8bd8d;--bt-p-fg:#14110c;--bt-p-hover-bg:#e9d3a8;--bt-p-hover-fg:#14110c;
+  --bt-s-bg:#1c232e;--bt-s-bd:#3a4250;--bt-s-fg:#d8bd8d;--bt-s-hover-bg:#243040;--bt-s-hover-bd:#8f6d38;
+  --bt-d-bg:#2a1518;--bt-d-bd:#5a2c28;--bt-d-fg:#e08a84;--bt-d-hover-bg:#341a1e;
+  --bt-link:#d8bd8d;--bt-link-hover:#e9d3a8;
+}
+/* Principal */
+html body :is(.btn.primary,.result-search button,.home-search-go,.ar-btn.ar-primary,.facet.on,.adm-chip.on,.admin-tabs .btn.ghost.active):not(#bt){
+  background:var(--bt-p-bg)!important;background-image:none!important;color:var(--bt-p-fg)!important;border:1px solid var(--bt-p-bg)!important;box-shadow:none!important;text-shadow:none!important;font-weight:var(--bt-fw)}
+html body :is(.btn.primary,.result-search button,.home-search-go,.ar-btn.ar-primary,.facet.on,.adm-chip.on,.admin-tabs .btn.ghost.active):not(#bt):hover{
+  background:var(--bt-p-hover-bg)!important;border-color:var(--bt-p-hover-bg)!important;color:var(--bt-p-hover-fg)!important}
+html body :is(.facet.on,.adm-chip.on) :is(b,i):not(#bt){color:inherit!important}
+/* Secundar */
+html body :is(.btn.ghost:not(.active),.btn.secondary,.pick-btn,.set-btn,.filter-toggle,.save-search,.facet:not(.on),.adm-chip:not(.on),.home-links button,.home-feed-head button,.page-btn:not(.active),.rq-btn,.mr-btn,.mine-act,.mine-tool,.ar-btn:not(.ar-primary):not(.ar-del):not(.on)):not(#bt){
+  background:var(--bt-s-bg)!important;background-image:none!important;color:var(--bt-s-fg)!important;border:1px solid var(--bt-s-bd)!important;box-shadow:none!important;text-shadow:none!important;font-weight:var(--bt-fw)}
+html body :is(.btn.ghost:not(.active),.btn.secondary,.pick-btn,.set-btn,.filter-toggle,.save-search,.facet:not(.on),.adm-chip:not(.on),.home-links button,.home-feed-head button,.page-btn:not(.active),.rq-btn,.mr-btn,.mine-act,.mine-tool,.ar-btn:not(.ar-primary):not(.ar-del):not(.on)):not(#bt):hover{
+  background:var(--bt-s-hover-bg)!important;border-color:var(--bt-s-hover-bd)!important;transform:none}
+html body .facet:not(.on) b:not(#bt){color:var(--bt-s-fg)!important}
+/* Pericol */
+html body :is(.btn.danger,.danger-btn,.ar-btn.ar-del):not(#bt){
+  background:var(--bt-d-bg)!important;background-image:none!important;color:var(--bt-d-fg)!important;border:1px solid var(--bt-d-bd)!important;box-shadow:none!important;text-shadow:none!important;font-weight:var(--bt-fw)}
+html body :is(.btn.danger,.danger-btn,.ar-btn.ar-del):not(#bt):hover{background:var(--bt-d-hover-bg)!important}
+/* Linkuri-buton (← Înapoi, Resetează, linkuri din admin) */
+html body :is(.back,.text-btn,.adm-link,.filter-head button):not(#bt){color:var(--bt-link)!important;font-weight:var(--bt-fw)}
+html body :is(.back,.text-btn,.adm-link,.filter-head button):not(#bt):hover{color:var(--bt-link-hover)!important}
+/* Fără reflexii „3D” */
+html body .btn:not(#bt)::after{display:none}
+/* Pastilele din prima pagină păstrează forma lor */
+html body :is(.home-links button,.home-feed-head button):not(#bt){border-radius:999px;font-size:14px}
