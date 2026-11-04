@@ -3,6 +3,7 @@
 // Modul pur (fără DB): server.js îi dă titlurile potrivite, el întoarce [{text, cat}] unde cat = 'piese' | 'masini'.
 // Testat în test/searchSuggest.test.cjs.
 
+const { expandTerm } = require('./search-terms');
 const norm = (s = '') => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 // Cuvinte care duc spre „Mașini avariate / defecte” (prefix de minimum 4 litere: „avar”, „acci”, „defe”…).
@@ -29,21 +30,42 @@ const catOfType = t => (MASINI_TYPES.has(String(t || '')) ? 'masini' : 'piese');
 // Cuvintele de după cele tastate, până la 4 cuvinte în total; se oprește la cuvinte „de umplutură” și la prețuri.
 const STOP = new Set(['si', 'cu', 'de', 'pentru', 'la', 'din', 'in', 'pe', 'ptr', 'urgent', 'noua', 'nou', 'originala', 'original', 'second', 'hand']);
 
-function phraseFromTitle(words, tokens) {
-  const n = tokens.length;
+// Variante acceptate pentru fiecare cuvânt tastat: aceleași reguli ca la căutarea principală
+// (capota = capote = capot, usa = usi, radiator = radiatoare, avariate = avariat).
+function tokenVariants(tokens) {
+  return tokens.map(t => {
+    const ex = expandTerm(t, tokens);
+    const set = new Set([t, ...ex.like.map(l => l.replace(/%/g, '')), ...ex.words]);
+    return [...set].filter(Boolean).slice(0, 14);
+  });
+}
+
+function wordMatches(w, variants, isLast) {
+  for (const v of variants) {
+    if (w === v) return true;
+    if (v.length >= 3 && (isLast || v.length >= 4) && w.startsWith(v)) return true;
+  }
+  return false;
+}
+
+// Poziția din titlu unde încep cuvintele tastate (consecutive), sau -1.
+function findStart(words, tv) {
+  const n = tv.length;
   for (let i = 0; i + n <= words.length; i++) {
     let ok = true;
-    for (let k = 0; k < n; k++) {
-      const w = words[i + k];
-      if (k < n - 1 ? w !== tokens[k] : !w.startsWith(tokens[k])) { ok = false; break; }
-    }
-    if (!ok) continue;
-    // Ultimul cuvânt tastat se completează; apoi se adaugă până la 2 cuvinte utile.
-    let end = i + n;
-    while (end < words.length && end - i < Math.min(4, n + 2) && !STOP.has(words[end]) && words[end].length <= 12) end++;
-    return words.slice(i, end).join(' ');
+    for (let k = 0; k < n; k++) if (!wordMatches(words[i + k], tv[k], k === n - 1)) { ok = false; break; }
+    if (ok) return i;
   }
-  return '';
+  return -1;
+}
+
+function phraseFromTitle(words, tv) {
+  const i = findStart(words, tv);
+  if (i < 0) return '';
+  const n = tv.length;
+  let end = i + n;
+  while (end < words.length && end - i < Math.min(4, n + 2) && !STOP.has(words[end]) && words[end].length <= 12) end++;
+  return words.slice(i, end).join(' ');
 }
 
 /**
@@ -55,6 +77,7 @@ function buildSuggestions(rawQ, rows = [], opt = {}) {
   const q = norm(rawQ).slice(0, 40);
   if (q.length < 2) return [];
   const tokens = q.split(' ').slice(0, 4);
+  const tv = tokenVariants(tokens);
   const limit = Math.max(1, Math.min(12, opt.limit || 8));
   const want = opt.cat === 'piese' || opt.cat === 'masini' ? opt.cat : null;
 
@@ -64,7 +87,7 @@ function buildSuggestions(rawQ, rows = [], opt = {}) {
     const cat = catOfType(r.type);
     if (want && cat !== want) continue;
     const words = norm(r.title).split(' ').filter(Boolean);
-    const ph = phraseFromTitle(words, tokens);
+    const ph = phraseFromTitle(words, tv);
     if (!ph) continue;
     const key = ph + '|' + cat;
     counts.set(key, (counts.get(key) || 0) + 1);
@@ -89,14 +112,13 @@ function buildSuggestions(rawQ, rows = [], opt = {}) {
   // 3) restul expresiilor reale (ambele categorii dacă un cuvânt are rezultate în ambele)
   for (const s of real) push(s);
 
-  // 4) lista fixă (rezervă când sunt puține anunțuri): cuvinte care încep ca ce s-a tastat
+  // 4) lista fixă (rezervă când sunt puține anunțuri)
   if (out.length < limit && !masiniTyped) {
-    const lastTok = tokens[tokens.length - 1];
-    const partHit = tokens.length === 1 && PARTS.find(p => p.startsWith(first));
+    const partHit = tokens.length === 1 && PARTS.find(p => wordMatches(p.split(' ')[0], tv[0], true));
     if (partHit) for (const m of POP_MODELS) push({ text: `${partHit} ${m}`, cat: 'piese' });
-    for (const f of FIXED) if (f.text.startsWith(q) || (tokens.length === 1 && f.text.split(' ').some(w => w.startsWith(first) && first.length >= 3)) || (tokens.length > 1 && f.text.startsWith(tokens.slice(0, -1).join(' ') + ' ') && f.text.split(' ').pop().startsWith(lastTok))) push(f);
+    for (const f of FIXED) if (findStart(f.text.split(' '), tv) >= 0) push(f);
   }
   return out.slice(0, limit);
 }
 
-module.exports = { buildSuggestions, phraseFromTitle, isMasiniWord, catOfType, norm };
+module.exports = { buildSuggestions, tokenVariants, phraseFromTitle, isMasiniWord, catOfType, norm };

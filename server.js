@@ -109,7 +109,7 @@ function throttle(map,key,limit,windowMs){
 setInterval(()=>{const now=Date.now();for(const m of [authAttempts,recoveryAttempts])for(const [k,v] of m){if(!v.length||now-v[v.length-1]>15*60*1000)m.delete(k);}},10*60*1000).unref();
 function clientIp(req){return String(req.ip||req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();}
 const {expandTerm,wordsRegex}=require('./search-terms');
-const {buildSuggestions}=require('./search-suggest');
+const {buildSuggestions,tokenVariants}=require('./search-suggest');
 function normalizeIdentifier(value){return String(value||'').trim();}
 const COMMON_PW=new Set(['12345678','123456789','1234567890','11111111','00000000','87654321','password','password1','password123','parola123','parola1234','parola','parola1','parolamea','qwertyui','qwertyuiop','qwerty123','asdfghjk','asdfghjkl','abcd1234','abcdefgh','iloveyou','admin123','administrator','autopiese','autopiese1','autopiese123','test1234','testtest','welcome1','romania1','romania123','bucuresti','dacialogan','master123','letmein1','changeme','abc12345','1q2w3e4r','1qaz2wsx','zaq12wsx']);
 function weakPassword(pw,ctx={}){
@@ -1243,6 +1243,8 @@ function buildListingFilter(query){
     const cols=[];
     // Rădăcini și forme de plural/singular (capota/capote, radiator/radiatoare, geam/geamuri) ca LIKE pe bucăți de cuvânt.
     for(const lk of ex.like){const p=P(lk);for(const c of TXT)cols.push(`${fold(c)} LIKE ${p}`);}
+    // „avariat / accidentat / defect…”: o mașină publicată la Mașini avariate/defecte se găsește și când cuvântul nu e în titlu.
+    if(/^(avariat|accidentat|defect|epav|daunat|lovit)/.test(term))cols.push("l.type IN ('avariata','defecta')");
     // Cod OEM scris cu spații/liniuțe în anunț (ex. "1K0 615 301") se găsește și când e căutat lipit; la fel și codul din titlu/descriere/piese disponibile.
     if(/\d/.test(term)&&term.length>=4){const p=P('%'+term+'%');for(const c of ['l.oem','l.title','l.description','l.parts_avail'])cols.push(`${flat(c)} LIKE ${p}`);}
     // Coduri alternative / cross-reference (ex. căutarea "1K0615301" găsește piesa cu echivalentul "1K0615301A").
@@ -1310,7 +1312,7 @@ app.get('/api/search/suggest',ah(async(req,res)=>{
  let rows=[];
  if(pool){
   try{
-   const vals=[],like=q.split(' ').slice(0,4).map(t=>{vals.push('%'+t+'%');return `${fold('l.title')} LIKE $${vals.length}`;});
+   const vals=[],like=tokenVariants(q.split(' ').slice(0,4)).map(vs=>'('+vs.map(v=>{vals.push('%'+v+'%');return `${fold('l.title')} LIKE $${vals.length}`;}).join(' OR ')+')');
    const r=await pool.query(`SELECT l.title,l.type FROM listings l WHERE l.status='approved' AND l.type<>'masina' AND ${NOT_VAC_LISTING} AND ${like.join(' AND ')} ORDER BY l.created_at DESC LIMIT 400`,vals);
    rows=r.rows;
   }catch(e){console.error('suggest',e.message);}

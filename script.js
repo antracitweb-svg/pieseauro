@@ -3666,7 +3666,8 @@ function setSearchCat(cat){
 // Sugestii: termenul tastat e îngroșat, categoria apare dedesubt (ca la OLX).
 function sugRow(s,q){
   const fq=foldTxt(q).trim(), t=String(s.text||'');
-  const txt = fq && t.startsWith(fq) ? `<b>${esc(t.slice(0,fq.length))}</b>${esc(t.slice(fq.length))}` : esc(t);
+  let k=0; while(k<fq.length && k<t.length && t[k]===fq[k]) k++;
+  const txt = k>=2 ? `<b>${esc(t.slice(0,k))}</b>${esc(t.slice(k))}` : esc(t);
   return `<button type="button" class="sov-item" data-sug="${esc(t)}" data-sug-cat="${esc(s.cat)}"><span class="sov-ico" aria-hidden="true">⌕</span><span class="sov-txt">${txt}<small>${esc(SEARCH_CAT_LABEL[s.cat]||'')}</small></span><i aria-hidden="true">↖</i></button>`;
 }
 function refreshSearchList(){
