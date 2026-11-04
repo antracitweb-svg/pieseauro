@@ -4186,3 +4186,13 @@ html.dark .adm-chip.on{background:var(--gold);color:#14110c;border-color:var(--g
 html.dark .adm-edit label{color:#e9d3a8}
 html.dark .adm-edit input,html.dark .adm-edit select,html.dark .adm-edit textarea{background:#141b25;border-color:#2e3a4b;color:#e8e6e1}
 html.dark .adm-edit :is(input,select,textarea):focus{border-color:var(--gold)}
+
+/* ---- Prima pagină: „Vezi toate →” în același stil cu butoanele-pastilă, plus focus vizibil pe butoane ---- */
+.home-feed-head{align-items:center}
+.home-feed-head button{min-height:38px;padding:8px 16px;border:1px solid var(--gold-line,#d8c9aa);border-radius:999px;background:rgba(255,255,255,.55);color:var(--gold-ink,#7a5a28);font:inherit;font-size:14px;font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color .15s,border-color .15s,transform .12s}
+.home-feed-head button:hover{background:#fff;border-color:var(--gold,#b8935a)}
+.home-feed-head button:active{transform:scale(.97)}
+.home-links button:focus-visible,.home-feed-head button:focus-visible,.home-search-go:focus-visible,.ar-btn:focus-visible{outline:2px solid var(--gold,#b8935a);outline-offset:2px}
+@media(pointer:coarse){.ar-btn{min-height:36px;min-width:36px}}
+html.dark .home-feed-head button{background:#161c26;border-color:#3a4250;color:#e9d3a8}
+html.dark .home-feed-head button:hover{border-color:var(--gold,#b8935a)}
