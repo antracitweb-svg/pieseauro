@@ -44,3 +44,21 @@ test('filtrul de categorie', () => {
 });
 
 test('diacritice și majuscule', () => assert.ok(buildSuggestions('CAPOTĂ', rows).length > 0));
+
+const rows2 = [
+  { title: 'Capota Golf 6', type: 'piesa' },
+  { title: 'Usa fata stanga Passat B7', type: 'piesa' },
+  { title: 'Radiator apa Logan', type: 'piesa' },
+  { title: 'Golf 7 avariat frontal', type: 'avariata' },
+  { title: 'BMW avariat', type: 'avariata' }
+];
+test('capote găsește capota', () => assert.ok(buildSuggestions('capote', rows2).some(x => x.text === 'capota golf 6')));
+test('usi găsește usa', () => assert.ok(buildSuggestions('usi', rows2).some(x => x.text.startsWith('usa fata'))));
+test('radiatoare găsește radiator', () => assert.ok(buildSuggestions('radiatoare', rows2).some(x => x.text === 'radiator apa logan')));
+test('avariate găsește titlurile cu avariat, în mașini', () => {
+  const r = buildSuggestions('avariate', rows2);
+  assert.ok(r.some(x => x.text === 'avariat' && x.cat === 'masini'));
+  assert.ok(r.every(x => x.cat === 'masini'));
+  assert.ok(buildSuggestions('avariate', rows2, { cat: 'masini' }).length >= 3);
+});
+test('capote fără anunțuri: lista fixă', () => assert.ok(buildSuggestions('capote', []).some(x => x.text === 'capota golf 6')));
