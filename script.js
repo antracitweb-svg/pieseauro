@@ -1526,7 +1526,7 @@ function detailHtml(x, phones, canContact){
     callbar = `<div class="ad-callbar">${ph}${x.seller_vacation?'':cart}</div>`;
   }
   const galleryImages = Array.isArray(x.images) ? x.images.filter(Boolean) : [];
-  const gallery = galleryImages.length ? `<div class="ad-gal"><div class="detail-gallery ad-slider" data-slider>${galleryImages.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(x.title)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(x.title)} - poza ${i+1}" ${i===0?'fetchpriority="high"':'loading="lazy"'} decoding="async"></button>`).join('')}</div>${galleryImages.length>1?`<button type="button" class="ad-nav prev" data-ad-slide="-1" aria-label="Poza anterioară">‹</button><button type="button" class="ad-nav next" data-ad-slide="1" aria-label="Poza următoare">›</button><span class="ad-count">1 / ${galleryImages.length}</span><div class="ad-dots" aria-hidden="true">${galleryImages.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}</div>` : '<div class="ad-gal ad-gal-empty"><span>⚙️</span><small>Fără poze</small></div>';
+  const gallery = galleryImages.length ? `<div class="ad-gal"><div class="detail-gallery pic-slider" data-slider>${galleryImages.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(x.title)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(x.title)} - poza ${i+1}" ${i===0?'fetchpriority="high"':'loading="lazy"'} decoding="async"></button>`).join('')}</div>${galleryImages.length>1?`<button type="button" class="ad-nav prev" data-ad-slide="-1" aria-label="Poza anterioară">‹</button><button type="button" class="ad-nav next" data-ad-slide="1" aria-label="Poza următoare">›</button><span class="ad-count">1 / ${galleryImages.length}</span><div class="ad-dots" aria-hidden="true">${galleryImages.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}</div>` : '<div class="ad-gal ad-gal-empty"><span>⚙️</span><small>Fără poze</small></div>';
   const crumbs = ['Piese auto', x.category, x.make, x.model, x.county].filter(Boolean).map(t=>`<span>${esc(t)}</span>`).join('<i>›</i>');
   const seller = esc(x.seller_name || 'Vânzător');
   const isOwner = !!(currentUser && x.user_id && currentUser.id===x.user_id);
@@ -2448,7 +2448,7 @@ async function handleImgBox(e){
 function imgGalleryHtml(images, alt, big){
   const list=(Array.isArray(images)?images:[]).filter(Boolean); if(!list.length) return '';
   const n=list.length;
-  return `<div class="ad-gal${big?'':' req-gal'}"><div class="detail-gallery ad-slider${big?'':' req-slider'}" data-slider>${list.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(alt)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(alt)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>${n>1?`<button type="button" class="ad-nav prev" data-ad-slide="-1" aria-label="Poza anterioară">‹</button><button type="button" class="ad-nav next" data-ad-slide="1" aria-label="Poza următoare">›</button><span class="ad-count">1 / ${n}</span><div class="ad-dots" aria-hidden="true">${list.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}</div>`;
+  return `<div class="ad-gal${big?'':' req-gal'}"><div class="detail-gallery pic-slider${big?'':' req-slider'}" data-slider>${list.map((src,i)=>`<button type="button" class="detail-gallery-item" data-lightbox-src="${esc(src)}" data-lightbox-alt="${esc(alt)}" data-lightbox-index="${i}" aria-label="Vezi poza ${i+1} mai mare"><img src="${esc(src)}" alt="${esc(alt)} - poza ${i+1}" loading="lazy" decoding="async"></button>`).join('')}</div>${n>1?`<button type="button" class="ad-nav prev" data-ad-slide="-1" aria-label="Poza anterioară">‹</button><button type="button" class="ad-nav next" data-ad-slide="1" aria-label="Poza următoare">›</button><span class="ad-count">1 / ${n}</span><div class="ad-dots" aria-hidden="true">${list.map((_,i)=>`<i class="${i===0?'on':''}"></i>`).join('')}</div>`:''}</div>`;
 }
 
 /* ---------- preselecție mașină pentru cereri ---------- */
@@ -3586,7 +3586,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-saved-rm]'))){ safe(async()=>{ await api('/api/saved-searches/'+el.dataset.savedRm,{method:'DELETE'}); await renderSaved(); })(); return; }
   if((el=t.closest('[data-saved-open]'))){ const s=getSaved()[Number(el.dataset.savedOpen)]; if(s) navigate('rezultate?'+s.qs); return; }
   if((el=t.closest('[data-saved-del]'))){ const list=getSaved(); list.splice(Number(el.dataset.savedDel),1); writeJSON('autopiese_saved_searches',list); renderSaved(); return; }
-  if((el=t.closest('[data-ad-slide]'))){ const g=el.closest('.ad-gal'), sl=g&&g.querySelector('.ad-slider'); if(sl) sl.scrollBy({left:Number(el.dataset.adSlide)*sl.clientWidth,behavior:'smooth'}); return; }
+  if((el=t.closest('[data-ad-slide]'))){ const g=el.closest('.ad-gal'), sl=g&&g.querySelector('.pic-slider'); if(sl) sl.scrollBy({left:Number(el.dataset.adSlide)*sl.clientWidth,behavior:'smooth'}); return; }
   if((el=t.closest('[data-lightbox-src]'))){
     const src=el.dataset.lightboxSrc;
     let images=[src], index=0;
@@ -4437,7 +4437,7 @@ document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminSearch'
 /* carusel poze anunț: sincronizează punctele și contorul */
 document.addEventListener('scroll',e=>{
   const sl=e.target;
-  if(!sl||!sl.classList||!sl.classList.contains('ad-slider')) return;
+  if(!sl||!sl.classList||!sl.classList.contains('pic-slider')) return;
   const i=Math.max(0,Math.round(sl.scrollLeft/Math.max(1,sl.clientWidth)));
   const box=sl.closest('.ad-gal'); if(!box) return;
   $$('.ad-dots i',box).forEach((d,k)=>d.classList.toggle('on',k===i));
