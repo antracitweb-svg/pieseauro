@@ -4312,3 +4312,6 @@ html body .plus-item:hover,html body .plus-item:focus-visible{border-color:var(-
 .msg-link{display:inline-block;margin-top:6px;font-weight:700;color:var(--bt-link);text-decoration:underline}
 /* Pagina de cerere: nota cu cele 10 minute stă sub explicație, nu peste ea */
 html body .page-head>div:has(>h2)>p.req-lock-note{grid-column:1 / -1;grid-row:3;margin:8px 0 0}
+
+/* Fereastra de cont/înregistrare apare mereu în fața oricărei alte ferestre (detaliu piesă, comandă, telefoane) */
+#authModal.modal,#forgotModal.modal{z-index:400}
