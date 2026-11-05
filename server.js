@@ -1339,6 +1339,12 @@ app.get('/api/listings',requireDb,ah(async(req,res)=>{
  LIST_CACHE.set(ckey,{at:Date.now(),body});
  res.json(body);
 }));
+// Pozele vechi sunt base64 (sute de KB fiecare). Puse direct în <img src="data:...">, multe browsere mobile (Brave etc.) nu le afișează.
+// Le înlocuim cu URL-ul scurt /api/listings/:id/img/:n, la fel ca în listele de anunțuri (care se văd corect).
+function shortImgUrls(x){
+ if(x&&Array.isArray(x.images))x.images=x.images.map((im,i)=>(typeof im==='string'&&im.startsWith('data:'))?'/api/listings/'+x.id+'/img/'+i:im);
+ return x;
+}
 // Poza unui anunț ca fișier (cache în browser). Pozele vechi sunt base64 în DB; listele trimit doar acest URL scurt.
 app.get('/api/listings/:id/img/:n(\\d{1,2})',requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
@@ -1356,6 +1362,7 @@ app.get('/api/listings/:id',requireDb,async(req,res)=>{
  if(req.query.noview!=='1'){const me=await optUserId(req);if(!me||me!==x.user_id){pool.query('UPDATE listings SET views=views+1 WHERE id=$1',[x.id]).catch(()=>{});bumpStat(x.id,'views');x.views=(Number(x.views)||0)+1;}}
  if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id LIMIT 4',[x.user_id])).rows;
  delete x.seller_show_phone;
+ shortImgUrls(x);
  res.json({listing:x,phones});
 });
 app.post('/api/listings/:id/phone-click',requireDb,ah(async(req,res)=>{
@@ -2727,6 +2734,7 @@ app.get('/api/orders/:id(\\d+)/listing',auth,requireDb,ah(async(req,res)=>{
  const x=r.rows[0]; let phones=[];
  if(x.seller_show_phone&&x.user_id)phones=(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id LIMIT 4',[x.user_id])).rows;
  delete x.seller_show_phone;
+ shortImgUrls(x);
  res.json({listing:x,phones});
 }));
 app.patch('/api/orders/:id(\\d+)/details',auth,requireDb,ah(async(req,res)=>{
