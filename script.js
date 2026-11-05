@@ -3688,8 +3688,7 @@ function refreshSearchList(){
 function openSearchOverlay(value=''){
   const ov=$('#searchOverlay'), input=$('#searchOverlayInput'); if(!ov||!input) return;
   input.value=value||$('#topSearchInput').value.trim()||state.filters.q||'';
-  const t=state.filters.type;
-  searchCat = t==='masini'||t==='avariata'||t==='defecta' ? 'masini' : (t==='piesa' ? 'piese' : 'toate');
+  searchCat = 'toate'; // la fiecare deschidere pagina de căutare pornește pe „Toate”
   $$('#searchCats [data-scat]').forEach(b=>{ const on=b.dataset.scat===searchCat; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); });
   ov.classList.remove('hidden'); ov.setAttribute('aria-hidden','false'); document.body.classList.add('search-open');
   refreshSearchList(); input.focus(); setTimeout(()=>input.focus(),30);
