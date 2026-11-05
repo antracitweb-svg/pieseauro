@@ -1999,7 +1999,7 @@ async function loadRequests(mine){
   $('#requestsCrumb').textContent = $('#requestsTitle').textContent;
   { const pg=$('#page-requests'), pc=pg&&pg.querySelector('.container'); if(pg) pg.classList.toggle('req-mine',!!mine); if(pc) pc.classList.toggle('narrow',!!mine); }
   { const ph=$('#page-requests .page-head'); if(ph) ph.classList.add('hd-compact'); const mb=$('#rqMineBar'); if(mb) mb.classList.toggle('hidden',!mine); grid.classList.toggle('rq-list',!!mine); const pb=$('#rqPubBar'); if(pb) pb.classList.toggle('hidden',!!mine); const ab=$('#rqAddBtn'); if(ab) ab.classList.toggle('hidden',!!mine); grid.classList.toggle('rq-pub-list',!mine); }
-  $('#requestsSub').textContent = mine ? 'Cererile publicate de tine.' : 'Cereri publicate de cumpărători. Ai piesa? Contactează-l.';
+  $('#requestsSub').textContent = mine ? 'Cererile publicate de tine. Răspunsurile vânzătorilor le vezi în Ofertele primite.' : 'Cerere = ce caută un cumpărător. Ai piesa? Trimite-i o ofertă.';
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
     const r = await api(mine ? '/api/requests/mine' : '/api/requests');
@@ -2548,7 +2548,8 @@ async function submitRequest(e){
     await api(editId?'/api/requests/'+editId:'/api/requests',{method:editId?'PATCH':'POST',body:JSON.stringify({title:$('#reqTitle').value.trim(),make:$('#reqMake').value,model:$('#reqModel').value,year,description:$('#reqDescription').value,variant:$('#reqVariant').value.trim(),engine:$('#reqEngine').value.trim(),vin:$('#reqVin').value.trim(),kind:$('#reqKind').value,county:$('#reqCounty').value,city:$('#reqCity').value.trim(),ship_address:$('#reqAddress').value.trim(),extra_parts:extra,images:state.reqImages})});
     e.target.reset(); resetCarAutoFor('req'); $('#reqExtra').innerHTML=''; state.reqImages=[]; renderImgBox('reqImages'); await loadModels('','reqModel'); setReqMode('');
     if(editId){ toast('Cererea a fost modificată.'); navigate('requests?t=mine'); return; }
-    setMsg(msg,'Cererea a fost trimisă. O găsești în Cererile mele.','ok');
+    setMsg(msg,'Cererea a fost trimisă și e salvată în Cererile mele. Ofertele vânzătorilor apar în Ofertele primite.','ok');
+    { const a=document.createElement('a'); a.href='#/requests?t=mine'; a.className='msg-link'; a.textContent='Vezi cererile mele →'; msg.appendChild(document.createElement('br')); msg.appendChild(a); }
   }catch(err){ setMsg(msg,err.message,'error'); }
 }
 const SELL_TEXT = {
@@ -2676,7 +2677,7 @@ async function submitSell(e){
     }
     resetSellForm(); setSellMode(null); state.sellFilled=null;
     const live = r.listing && r.listing.status==='approved';
-    setMsg(msg, editing ? (r.resubmitted ? 'Modificările au fost salvate și anunțul a fost trimis din nou la verificare.' : 'Modificările au fost salvate.') : (live ? 'Anunțul a fost publicat. Te ducem la Anunțurile mele…' : 'Anunțul a fost trimis pentru verificare. Te ducem la Anunțurile mele…'),'ok');
+    setMsg(msg, editing ? (r.resubmitted ? 'Modificările au fost salvate și anunțul a fost trimis din nou la verificare.' : 'Modificările au fost salvate.') : (live ? 'Anunțul a fost publicat. Te ducem la Anunțurile mele…' : 'Anunțul a fost trimis pentru verificare și apare pe site după aprobare. Îl găsești în Anunțurile mele…'),'ok');
     setTimeout(()=>navigate('anunturile-mele'),1200);
   }catch(err){ setMsg(msg,err.message,'error'); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=state.editId?'Salvează modificările':'Publică anunțul'; } }
@@ -3430,7 +3431,8 @@ async function smartSearch(q){
 
 /* ---------- acțiuni UI ---------- */
 function doAction(a){
-  if(a==='account') currentUser ? navigate('cont') : openAuth('cont');
+  if(a==='plus') $('#plusModal').classList.remove('hidden');
+  else if(a==='account') currentUser ? navigate('cont') : openAuth('cont');
   else if(a==='request') navigate('cerere');
   else if(a==='sell') navigate('vinde');
   else if(a==='sell-dism') navigate('vinde?t=dism');
@@ -3617,6 +3619,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-adm-public-request]'))){ const rid=Number(el.dataset.admPublicRequest); closeAdminModal(); openRequestModal(rid,'public'); return; }
   if((el=t.closest('[data-adm-edit-save]'))){ safe(saveListingEdit)(el.dataset.admEditSave); return; }
   if((el=t.closest('[data-action]'))){ doAction(el.dataset.action); return; }
+  if((el=t.closest('[data-plus]'))){ closeModal($('#plusModal')); doAction(el.dataset.plus); return; }
   if((el=t.closest('[data-account]'))){ accountAction(el.dataset.account); return; }
   if((el=t.closest('[data-go]'))){ navigate(el.dataset.go); return; }
   if((el=t.closest('[data-legal]'))){ const am=$('#authModal'); if(am) am.classList.add('hidden'); navigate(el.dataset.legal); return; }
