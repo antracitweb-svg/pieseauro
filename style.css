@@ -4450,3 +4450,93 @@ html #listingGrid.ar-list:has(.mine-row){display:flex!important;flex-direction:c
 @media(max-width:800px){#avarGrid.ar-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(min-width:1300px){#listingGrid.ar-list{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
 @media(min-width:1101px) and (max-width:1299px){#listingGrid.ar-list{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+
+/* ===== v13 (mobil): meniu Contul meu mai fin — taburi +15% înălțime, butoane interioare -10%, iconițe line-art, light + dark ===== */
+@media(max-width:899px){
+  /* taburi VÂND / CUMPĂR / ... : ~34px -> 39px (+15%) */
+  #page-account .account-sections summary{
+    min-height:39px!important;padding:0 12px!important;gap:10px!important;align-items:center!important;
+    border-radius:10px!important;font-family:var(--font-sans)!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 1px 2px rgba(40,30,10,.10)!important}
+  #page-account .account-sections summary b{font-size:13px!important;line-height:1.15!important;font-weight:700;letter-spacing:1px!important}
+  #page-account .account-sections summary .acc-ico{width:20px!important;height:20px!important;flex:0 0 20px!important;font-size:11px!important;line-height:20px!important}
+  #page-account .account-sections summary .acc-caret{font-size:12px!important}
+  /* butoane din interior: 56px -> 50px (-10%), colturi 10px, umbra fina */
+  #page-account .account-sections details>button{
+    height:50px!important;min-height:50px!important;padding:0 12px!important;gap:10px!important;
+    border-radius:10px!important;font-family:var(--font-sans)!important;font-size:14px!important;font-weight:650;
+    box-shadow:0 1px 2px rgba(40,30,10,.06),0 2px 8px rgba(40,30,10,.05)!important;
+    margin-bottom:10px!important;--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");--ic-c:var(--gold-ink,#7a5a28)}
+  #page-account .account-sections details>button:active{transform:scale(.98)!important;box-shadow:none!important}
+  /* iconita line-art (mask) in loc de emoji */
+  #page-account .account-sections details>button::before{
+    content:""!important;display:block;width:20px;height:20px;flex:0 0 20px!important;font-size:0!important;
+    background-color:var(--ic-c);-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat}
+  /* insigna numerica mai mica */
+  #page-account .account-sections details>button .cnt{
+    min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:10px;line-height:16px;top:-6px!important;right:-4px!important}
+  /* bara de scurtaturi (Anunturi / Cereri / ...): mai subtire + umbra de derulare pe margini */
+  #page-account .acc-quick{
+    --qfade:#f7f5f0;gap:6px;padding:2px 0;
+    background:linear-gradient(90deg,var(--qfade) 30%,transparent) left center/36px 100% no-repeat local,
+               linear-gradient(270deg,var(--qfade) 30%,transparent) right center/36px 100% no-repeat local,
+               radial-gradient(farthest-side at 0 50%,rgba(40,30,10,.22),transparent) left center/12px 100% no-repeat scroll,
+               radial-gradient(farthest-side at 100% 50%,rgba(40,30,10,.22),transparent) right center/12px 100% no-repeat scroll}
+  #page-account .acc-quick .facet{min-height:34px;padding:0 12px;font-size:14px;font-family:var(--font-sans);border-radius:999px}
+  #page-account .container{padding-bottom:140px}
+}
+
+@media(max-width:899px){#page-account .account-sections details>button[data-account="listings"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpath d='M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="offers"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="orders-seller"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 2v6h6M16 13H8M16 17H8M10 9H8'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="offer-questions"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="requests"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7'/%3E%3Cpath d='M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="offers-received"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="favorites"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="orders"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='21' r='1'/%3E%3Ccircle cx='20' cy='21' r='1'/%3E%3Cpath d='M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="saved"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="messages"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z'/%3E%3Cpath d='M22 6l-10 7L2 6'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="notifications"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="bulk-price"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z'/%3E%3Cpath d='M7 7h.01'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="generator"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 2L3 14h9l-1 8 10-12h-9z'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="stats"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 20V10M12 20V4M6 20v-6'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="b2b"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="credits"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="transactions"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='1' y='4' width='22' height='16' rx='2'/%3E%3Cpath d='M1 10h22'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="invoices"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 2v6h6M16 13H8M16 17H8M10 9H8'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="ratings"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-account="settings"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6'/%3E%3C/svg%3E")}}
+@media(max-width:899px){#page-account .account-sections details>button[data-csv-import]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12'/%3E%3C/svg%3E")}}
+
+html.dark #page-account .acc-quick{--qfade:#0d1117}
+html.dark #page-account .account-sections details>button{--ic-c:#d8bd8d}
+
+/* Buton "Panou de administrare" (Contul meu): cărbune + auriu, ca butoanele principale ale site-ului */
+#page-account .account-admin-compat{margin:14px 0 0}
+#page-account .account-admin-compat button{
+  width:100%;min-height:46px;display:flex;align-items:center;justify-content:center;gap:9px;
+  border:1px solid #0e0f12;border-bottom:2px solid #b8935a;border-radius:10px;
+  background:linear-gradient(180deg,#24211b,#0e0f12);color:#e9d3a8;
+  font:700 14px/1 var(--font-sans);letter-spacing:.3px;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 6px 14px rgba(14,15,18,.22);transition:transform .12s ease,box-shadow .12s ease}
+#page-account .account-admin-compat button::before{
+  content:"";width:18px;height:18px;background:#d4b483;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='M9 12l2 2 4-4'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='M9 12l2 2 4-4'/%3E%3C/svg%3E") center/contain no-repeat}
+#page-account .account-admin-compat button:active{transform:scale(.98);box-shadow:none}
+html.dark #page-account .account-admin-compat button{border-bottom:2px solid #b8935a!important}
+
+/* Pagina Administrare: antet cărbune + auriu (dark: card închis cu margine aurie) */
+#page-admin .adm-hero{background:linear-gradient(180deg,#24211b,#0e0f12);border:1px solid #0e0f12;border-bottom:3px solid #b8935a;border-radius:12px}
+#page-admin .adm-hero .rv-hero-title{color:#e9d3a8;font-family:var(--font-sans)}
+#page-admin .adm-hero .rv-hero-desc{color:#bdb39d}
+#page-admin .adm-hero .adm-shield{background:linear-gradient(180deg,#f3dfae,#b8935a);color:#2a1f0a}
+#page-admin .adm-hero .back{color:#d8bd8d}
+html.dark #page-admin .adm-hero{background:var(--card)!important;border-color:var(--line)!important;border-bottom-color:#b8935a!important}
+html.dark #page-admin .adm-hero .rv-hero-title{color:#e9d3a8!important}
+html.dark #page-admin .adm-hero .rv-hero-desc{color:var(--muted)!important}
+
+/* Bara de jos: butonul + mai mic */
+@media(max-width:800px){
+  .bottom-nav .bn-sell span.bn-plus{width:30px;height:30px;margin-top:-6px;box-shadow:0 4px 10px rgba(184,147,90,.4),0 0 0 3px rgba(14,15,18,.9)}
+  .bottom-nav .bn-sell span.bn-plus svg{width:16px;height:16px}
+}
