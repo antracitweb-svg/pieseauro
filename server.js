@@ -570,7 +570,7 @@ async function dbReady(){
  );
  for(const q of migrations){ try{ await pool.query(q); }catch(e){ console.error('MIGRARE EȘUATĂ:',String(q).slice(0,160),'->',e.message); } }
  /* coloanele din messages sunt necesare pentru Primite/Trimise/Arhivate: le asigurăm separat, indiferent de alte migrări */
- for(const q of ['ALTER TABLE messages ADD COLUMN IF NOT EXISTS listing_id INTEGER','ALTER TABLE messages ADD COLUMN IF NOT EXISTS ref_title TEXT','ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT']){ try{ await pool.query(q); }catch(e){ console.error('MIGRARE messages EȘUATĂ:',q,'->',e.message); } }
+ for(const q of ['ALTER TABLE messages ADD COLUMN IF NOT EXISTS listing_id INTEGER','ALTER TABLE messages ADD COLUMN IF NOT EXISTS ref_title TEXT','ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_r BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE messages ADD COLUMN IF NOT EXISTS arch_s BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ','ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ','ALTER TABLE messages ADD COLUMN IF NOT EXISTS del_s BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE messages ADD COLUMN IF NOT EXISTS del_r BOOLEAN NOT NULL DEFAULT FALSE','ALTER TABLE users ADD COLUMN IF NOT EXISTS show_presence BOOLEAN NOT NULL DEFAULT TRUE','ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ','ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT']){ try{ await pool.query(q); }catch(e){ console.error('MIGRARE messages EȘUATĂ:',q,'->',e.message); } }
  const adminEmail=process.env.ADMIN_EMAIL, adminPass=process.env.ADMIN_PASSWORD;
  await pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
  await pool.query("DELETE FROM login_attempts WHERE at<NOW()-INTERVAL '1 hour'");
@@ -1052,7 +1052,7 @@ app.put('/api/account/details',requireDb,auth,async(req,res)=>{
 });
 app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
  try{
-  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_type,bill_name,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,(store_logo IS NOT NULL) has_logo,(avatar IS NOT NULL) has_avatar,mail_msg,mail_offer,mail_order,mail_alert,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
+  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_type,bill_name,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,(store_logo IS NOT NULL) has_logo,(avatar IS NOT NULL) has_avatar,mail_msg,mail_offer,mail_order,mail_alert,show_presence,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
   const phones=(await pool.query('SELECT id,phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id',[req.user.id])).rows;
   res.json({user:u,phones});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
@@ -1758,6 +1758,10 @@ app.get('/api/sellers',requireDb,async(req,res)=>{
 app.put('/api/account/notif-prefs',requireDb,auth,ah(async(req,res)=>{
   const b=req.body||{};
   await pool.query('UPDATE users SET mail_msg=$1,mail_offer=$2,mail_order=$3,mail_alert=COALESCE($5,mail_alert) WHERE id=$4',[!!b.mail_msg,!!b.mail_offer,!!b.mail_order,req.user.id,b.mail_alert===undefined?null:!!b.mail_alert]);
+  res.json({ok:true});
+}));
+app.put('/api/account/presence',requireDb,auth,ah(async(req,res)=>{
+  await pool.query('UPDATE users SET show_presence=$1 WHERE id=$2',[!(req.body&&req.body.show===false),req.user.id]);
   res.json({ok:true});
 }));
 app.get('/api/account/export',requireDb,auth,ah(async(req,res)=>{
@@ -2566,6 +2570,14 @@ function sseSend(userId,event,data){
  for(const res of set){try{res.write(payload);n++;}catch{set.delete(res);}}
  return n;
 }
+// Marchează ca livrate mesajele neprimite încă de `uid` și anunță expeditorii (două bife gri).
+async function markDelivered(uid){
+ const r=await pool.query('UPDATE messages SET delivered_at=NOW() WHERE recipient_id=$1 AND delivered_at IS NULL RETURNING id,sender_id',[uid]);
+ const by=new Map();
+ for(const m of r.rows){if(!by.has(m.sender_id))by.set(m.sender_id,[]);by.get(m.sender_id).push(m.id);}
+ for(const [sid,ids] of by)sseSend(sid,'msg_status',{with:uid,ids,status:'delivered'});
+ await pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[uid]);
+}
 function sseCount(){let n=0;for(const s of sseClients.values())n+=s.size;return n;}
 app.get('/api/stream',auth,requireDb,(req,res)=>{
  res.status(200).set({
@@ -2579,11 +2591,13 @@ app.get('/api/stream',auth,requireDb,(req,res)=>{
  if(!sseClients.has(uid))sseClients.set(uid,new Set());
  sseClients.get(uid).add(res);
  res.write('event: ready\ndata: {"ok":true}\n\n');
+ // WhatsApp: mesajele primite cât timp erai offline devin „livrate” (două bife) când te conectezi.
+ markDelivered(uid).catch(()=>{});
  const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},25000);
  const cleanup=()=>{
   clearInterval(hb);
   const set=sseClients.get(uid);
-  if(set){set.delete(res);if(!set.size)sseClients.delete(uid);}
+  if(set){set.delete(res);if(!set.size){sseClients.delete(uid);pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[uid]).catch(()=>{});}}
  };
  req.on('close',cleanup);
  req.on('error',cleanup);
@@ -2611,18 +2625,20 @@ app.post('/api/messages',auth,needVerified,requireDb,ah(async(req,res)=>{
   if(l){listingId=l.id;refTitle=l.title;}
  }
  const ins=await pool.query('INSERT INTO messages(sender_id,recipient_id,body,listing_id,ref_title) VALUES($1,$2,$3,$4,$5) RETURNING id,created_at',[req.user.id,to,body,listingId,refTitle]);
+ let deliveredNow=false;
+ if(sseClients.has(Number(to))&&sseClients.get(Number(to)).size){deliveredNow=true;await pool.query('UPDATE messages SET delivered_at=NOW() WHERE id=$1',[ins.rows[0].id]);}
  await notify(to,'Mesaj nou de la '+(req.user.nickname||req.user.name||'un utilizator'),'msg');
  // Chat în timp real: împinge mesajul către destinatar dacă are o conexiune SSE deschisă.
  sseSend(to,'message',{id:ins.rows[0].id,from:req.user.id,from_name:req.user.nickname||req.user.name||'Utilizator',body,created_at:ins.rows[0].created_at,listing_id:listingId,ref_title:refTitle});
- res.json({ok:true,id:ins.rows[0].id,created_at:ins.rows[0].created_at});
+ res.json({ok:true,id:ins.rows[0].id,created_at:ins.rows[0].created_at,delivered:deliveredNow});
 }));
 // Mesagerie: lista de mesaje pe căsuțe (primite / trimise / arhivate). Definit înaintea rutei /:uid.
 app.get('/api/messages/box',auth,requireDb,ah(async(req,res)=>{
  const box=['inbox','sent','archived'].includes(req.query.box)?req.query.box:'inbox';
  const where={
-  inbox:'m.recipient_id=$1 AND NOT m.arch_r'+BLK_IN,
-  sent:'m.sender_id=$1 AND NOT m.arch_s',
-  archived:'((m.recipient_id=$1 AND m.arch_r'+BLK_IN+') OR (m.sender_id=$1 AND m.arch_s))'
+  inbox:'m.recipient_id=$1 AND NOT m.arch_r AND NOT m.del_r'+BLK_IN,
+  sent:'m.sender_id=$1 AND NOT m.arch_s AND NOT m.del_s',
+  archived:'((m.recipient_id=$1 AND m.arch_r AND NOT m.del_r'+BLK_IN+') OR (m.sender_id=$1 AND m.arch_s AND NOT m.del_s))'
  }[box];
  const r=await pool.query(`SELECT m.id,m.body,m.created_at,m.is_read,m.listing_id,m.ref_title,(m.sender_id=$1) mine,
    CASE WHEN m.sender_id=$1 THEN m.recipient_id ELSE m.sender_id END other,
@@ -2642,21 +2658,75 @@ app.post('/api/messages/archive',auth,requireDb,ah(async(req,res)=>{
 }));
 app.post('/api/messages/read',auth,requireDb,ah(async(req,res)=>{
  const ids=(Array.isArray(req.body&&req.body.ids)?req.body.ids:[]).map(Number).filter(n=>Number.isInteger(n)&&n>0).slice(0,200);
- if(ids.length)await pool.query('UPDATE messages SET is_read=TRUE WHERE id=ANY($1::int[]) AND recipient_id=$2',[ids,req.user.id]);
+ if(ids.length){
+  const r=await pool.query('UPDATE messages SET is_read=TRUE,read_at=COALESCE(read_at,NOW()),delivered_at=COALESCE(delivered_at,NOW()) WHERE id=ANY($1::int[]) AND recipient_id=$2 AND NOT is_read RETURNING id,sender_id',[ids,req.user.id]);
+  const by=new Map(); for(const m of r.rows){if(!by.has(m.sender_id))by.set(m.sender_id,[]);by.get(m.sender_id).push(m.id);}
+  for(const [sid,list] of by)sseSend(sid,'msg_status',{with:req.user.id,ids:list,status:'read'});
+ }
  res.json({ok:true});
 }));
 app.get('/api/messages',auth,requireDb,ah(async(req,res)=>{
- const r=await pool.query(`SELECT t.other,COALESCE(u.nickname,u.name) AS name,t.body,t.created_at,t.unread FROM (SELECT other,body,created_at,SUM(ui) OVER (PARTITION BY other) unread,ROW_NUMBER() OVER (PARTITION BY other ORDER BY created_at DESC,id DESC) rn FROM (SELECT CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END other,body,created_at,id,CASE WHEN recipient_id=$1 AND NOT is_read THEN 1 ELSE 0 END ui FROM messages WHERE (sender_id=$1 OR recipient_id=$1) AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=(CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END))) m) t JOIN users u ON u.id=t.other WHERE t.rn=1 ORDER BY t.created_at DESC LIMIT 100`,[req.user.id]);
+ // O singură căsuță pe persoană (ca pe WhatsApp): ultimul mesaj + numărul de necitite.
+ const r=await pool.query(`WITH m AS (
+   SELECT id,body,created_at,listing_id,ref_title,is_read,delivered_at,(sender_id=$1) mine,
+    CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END other
+   FROM messages
+   WHERE ((sender_id=$1 AND NOT del_s) OR (recipient_id=$1 AND NOT del_r))
+    AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=(CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END))
+  )
+  SELECT t.other,COALESCE(u.nickname,u.name) AS name,t.body,t.created_at,t.mine,t.is_read,(t.delivered_at IS NOT NULL) delivered,COALESCE(t.listing_id,rl.listing_id) listing_id,COALESCE(t.ref_title,rl.ref_title) ref_title,
+   (SELECT COUNT(*)::int FROM m x WHERE x.other=t.other AND NOT x.mine AND NOT x.is_read) unread
+  FROM (SELECT DISTINCT ON (other) * FROM m ORDER BY other,created_at DESC,id DESC) t JOIN users u ON u.id=t.other
+  LEFT JOIN LATERAL (SELECT x.listing_id,x.ref_title FROM m x WHERE x.other=t.other AND x.listing_id IS NOT NULL ORDER BY x.created_at DESC,x.id DESC LIMIT 1) rl ON TRUE
+  ORDER BY t.created_at DESC LIMIT 200`,[req.user.id]);
  res.json({threads:r.rows.map(x=>({...x,unread:Number(x.unread)}))});
+}));
+async function presenceOf(uid){
+ const u=(await pool.query('SELECT show_presence,last_seen FROM users WHERE id=$1',[uid])).rows[0];
+ if(!u||u.show_presence===false)return {hidden:true};
+ return {hidden:false,online:sseClients.has(Number(uid)),last_seen:u.last_seen};
+}
+app.get('/api/messages/presence/:uid',auth,requireDb,ah(async(req,res)=>{
+ if(!/^\d{1,10}$/.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
+ res.set('Cache-Control','no-store');
+ res.json(await presenceOf(Number(req.params.uid)));
+}));
+// „scrie…”: semnal efemer prin SSE, nu se salvează nimic.
+app.post('/api/messages/typing',auth,requireDb,ah(async(req,res)=>{
+ const to=Number(req.body&&req.body.to);
+ if(!Number.isInteger(to)||to<=0||to===req.user.id)return res.status(400).json({error:'DESTINATAR_INVALID'});
+ if(!throttle(authAttempts,'typ:'+req.user.id,90,60*1000))return res.json({ok:true});
+ const me=(await pool.query('SELECT show_presence FROM users WHERE id=$1',[req.user.id])).rows[0];
+ if(me&&me.show_presence===false)return res.json({ok:true});
+ const bs=await blockState(req.user.id,to); if(bs.byMe||bs.byThem)return res.json({ok:true});
+ sseSend(to,'typing',{from:req.user.id});
+ res.json({ok:true});
+}));
+// Ștergere „la mine” (ca pe WhatsApp): mesajele dispar doar din conversația ta.
+app.post('/api/messages/delete',auth,requireDb,ah(async(req,res)=>{
+ const b=req.body||{};
+ if(/^\d{1,10}$/.test(String(b.with||''))){
+  const o=Number(b.with);
+  await pool.query('UPDATE messages SET del_s=TRUE WHERE sender_id=$1 AND recipient_id=$2',[req.user.id,o]);
+  await pool.query('UPDATE messages SET del_r=TRUE WHERE recipient_id=$1 AND sender_id=$2',[req.user.id,o]);
+  return res.json({ok:true});
+ }
+ const ids=(Array.isArray(b.ids)?b.ids:[]).map(Number).filter(n=>Number.isInteger(n)&&n>0).slice(0,200);
+ if(!ids.length)return res.status(400).json({error:'DATE_INVALIDE'});
+ await pool.query('UPDATE messages SET del_s=TRUE WHERE id=ANY($1::int[]) AND sender_id=$2',[ids,req.user.id]);
+ await pool.query('UPDATE messages SET del_r=TRUE WHERE id=ANY($1::int[]) AND recipient_id=$2',[ids,req.user.id]);
+ res.json({ok:true});
 }));
 app.get('/api/messages/:uid',auth,requireDb,ah(async(req,res)=>{
  if(!/^\d{1,10}$/.test(req.params.uid))return res.status(400).json({error:'ID_INVALID'});
  const other=(await pool.query("SELECT id,COALESCE(nickname,name) AS name FROM users WHERE id=$1 AND status='active'",[req.params.uid])).rows[0];
  if(!other)return res.status(404).json({error:'NOT_FOUND'});
- const m=await pool.query('SELECT id,body,created_at,listing_id,ref_title,(sender_id=$1) mine FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at,id LIMIT 500',[req.user.id,other.id]);
- await pool.query('UPDATE messages SET is_read=TRUE WHERE recipient_id=$1 AND sender_id=$2 AND NOT is_read',[req.user.id,other.id]);
+ const m=await pool.query('SELECT id,body,created_at,listing_id,ref_title,(sender_id=$1) mine,is_read,(delivered_at IS NOT NULL) delivered FROM messages WHERE (sender_id=$1 AND recipient_id=$2 AND NOT del_s) OR (sender_id=$2 AND recipient_id=$1 AND NOT del_r) ORDER BY created_at,id LIMIT 500',[req.user.id,other.id]);
+ // Deschiderea conversației = „citit”: expeditorul vede bifele albastre.
+ const rd=await pool.query('UPDATE messages SET is_read=TRUE,read_at=COALESCE(read_at,NOW()),delivered_at=COALESCE(delivered_at,NOW()) WHERE recipient_id=$1 AND sender_id=$2 AND NOT is_read RETURNING id',[req.user.id,other.id]);
+ if(rd.rows.length)sseSend(other.id,'msg_status',{with:req.user.id,ids:rd.rows.map(x=>x.id),status:'read'});
  const bs=await blockState(req.user.id,other.id);
- res.json({other,messages:m.rows,blocked_by_me:bs.byMe,blocked_me:bs.byThem});
+ res.json({other,messages:m.rows,blocked_by_me:bs.byMe,blocked_me:bs.byThem,presence:await presenceOf(other.id)});
 }));
 app.post('/api/orders',auth,needVerified,requireDb,ah(async(req,res)=>{
  if(!throttle(authAttempts,'order:'+req.user.id,20,60*60*1000))return res.status(429).json({error:'PREA_MULTE_COMENZI'});
@@ -2900,7 +2970,7 @@ app.post('/api/listings/import',auth,needVerified,requireDb,ah(async(req,res)=>{
 /* ===== Contoare pentru insigne (meniu, mesaje, comenzi, oferte, alerte, anunțuri care expiră) ===== */
 app.get('/api/counts',auth,requireDb,ah(async(req,res)=>{
  const r=(await pool.query(`SELECT
-  (SELECT COUNT(*)::int FROM messages m WHERE m.recipient_id=$1 AND NOT m.arch_r AND NOT m.is_read AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=m.sender_id)) AS messages,
+  (SELECT COUNT(*)::int FROM messages m WHERE m.recipient_id=$1 AND NOT m.arch_r AND NOT m.del_r AND NOT m.is_read AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=m.sender_id)) AS messages,
   (SELECT COUNT(*)::int FROM orders WHERE seller_id=$1 AND status='new') AS orders_seller,
   (SELECT COUNT(*)::int FROM orders WHERE buyer_id=$1 AND status IN ('confirmed','shipped') AND buyer_seen_status IS DISTINCT FROM status) AS orders_buyer,
   (SELECT COUNT(*)::int FROM offers o JOIN part_requests q ON q.id=o.request_id WHERE q.user_id=$1 AND q.status='open' AND o.status='pending') AS offers_received,
