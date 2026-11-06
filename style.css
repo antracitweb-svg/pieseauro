@@ -4425,3 +4425,26 @@ html[data-view="grid"] #dismGrid.ar-list{display:grid!important;grid-template-co
 #dismGrid .ar-ph:not(:has(svg)),html[data-view="grid"] #dismGrid .ar-ph:not(:has(svg)){font-size:0;color:transparent}html[data-view="grid"] #dismGrid .ar-ph:not(:has(svg))::before{content:"";display:block;width:46%;max-width:72px;aspect-ratio:64/40;background:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 40%22 fill=%22none%22 stroke=%22%23b8935a%22 stroke-width=%221.7%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 aria-hidden=%22true%22 focusable=%22false%22%3E%3Cpath d=%22M4 29v-7c0-2 1.2-3 3-3.5l9-2.5 6-7.5h20l8 7.5 8 2.5c2 .5 3 1.5 3 3.5v7%22/%3E%3Cpath d=%22M4 29h8M22 29h20M52 29h8M25 11.5l-4.5 7h12v-7zM36 11.5v7h10.5l-6-7z%22/%3E%3Ccircle cx=%2217%22 cy=%2229.5%22 r=%225%22/%3E%3Ccircle cx=%2247%22 cy=%2229.5%22 r=%225%22/%3E%3C/svg%3E") center/contain no-repeat}html[data-view="grid"] #dismGrid .ar-ph:not(:has(svg))::after{content:"Fără poză";font-size:11px;font-weight:600;color:#a39270;letter-spacing:.02em}html[data-view="grid"] statistici */
 html.dark #dismGrid .ar-row,html.dark[data-view="grid"] #dismGrid .ar-row{background:var(--card);border-color:var(--line);color:var(--ink)}html.dark[data-view="grid"] #dismGrid .ar-row:hover{background:#1e2632}html.dark[data-view="grid"] #dismGrid .ar-price{color:var(--ink)!important}html.dark[data-view="grid"] #dismGrid .ar-fav{background:rgba(22,28,38,.88)!important;background-image:none!important;border:1px solid rgba(255,255,255,.18)!important;color:#e9e7e2!important;box-shadow:0 2px 8px rgba(0,0,0,.5)!important}html.dark[data-view="grid"] #dismGrid .ar-fav.on{background:rgba(42,21,24,.92)!important;border-color:#5a2c28!important;color:#ff7a74!important}html[data-view="grid"] #dismGrid .ar-row.is-promoted{border-color:#b8935a!important;box-shadow:0 0 0 1px #b8935a;background:#fcf8ef}html[data-view="grid"] #dismGrid .ar-row.is-promoted:hover{background:#fcf8ef;box-shadow:0 0 0 1px #b8935a,0 10px 28px rgba(184,147,90,.22)}html.dark[data-view="grid"] #dismGrid .ar-row.is-promoted{border-color:#b8935a!important;box-shadow:0 0 0 1px #b8935a;background:rgba(184,147,90,.08)}
 html[data-view="grid"] #dismGrid .ar-thumb,html[data-view="grid"] #dismGrid .ar-main{margin:0!important}
+
+/* === Comutator Grilă/Listă: colț dreapta-sus pe pagina principală === */
+#page-home .home-wrap{position:relative}
+#homeFeedWrap .vt-bar{position:absolute;top:4px;right:12px;margin:0;z-index:5}
+#homeFeedWrap .vt{padding:2px;border-radius:9px}
+#homeFeedWrap .vt button{width:28px;height:24px;border-radius:7px}
+#homeFeedWrap .vt button svg{width:15px;height:15px}
+@media(min-width:801px){
+  #homeFeedWrap .vt-bar{top:14px;right:0}
+  #homeFeedWrap .vt{padding:3px;border-radius:12px}
+  #homeFeedWrap .vt button{width:40px;height:34px;border-radius:9px}
+  #homeFeedWrap .vt button svg{width:20px;height:20px}
+}
+
+/* === Butoane Grilă/Listă mici pe telefon, pe toate paginile === */
+@media(max-width:800px){
+  .vt{padding:2px;border-radius:9px}
+  .vt button{width:28px;height:24px;border-radius:7px}
+  .vt button svg{width:15px;height:15px}
+  .vt-bar{margin:0 0 6px}
+}
+/* === „Anunțurile mele” rămân mereu listă, indiferent de alegerea Grilă/Listă === */
+html #listingGrid.ar-list:has(.mine-row){display:flex!important;flex-direction:column!important;grid-template-columns:none!important;gap:0!important;max-width:none!important}
