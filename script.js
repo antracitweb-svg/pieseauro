@@ -110,6 +110,16 @@ function cvTicksHtml(m){
   const st=m.is_read?'read':(m.delivered?'delivered':'sent');
   return ' <span class="cv-ticks '+st+'" data-st="'+st+'" aria-label="'+(st==='read'?'Citit':st==='delivered'?'Livrat':'Trimis')+'">'+(st==='sent'?'✓':'✓✓')+'</span>';
 }
+function cvAppend(m){
+  const log=document.getElementById('cvLog'); if(!log) return null;
+  const tmp=document.createElement('div');
+  tmp.innerHTML=cvMessagesHtml([m],(document.getElementById('cvListing')||{dataset:{}}).dataset.id);
+  const lastDay=[...log.querySelectorAll('.cv-day')].pop(), first=tmp.firstElementChild;
+  if(first&&first.classList.contains('cv-day')&&lastDay&&lastDay.textContent===first.textContent) first.remove();
+  const empty=log.querySelector('p.muted'); if(empty) empty.remove();
+  let row=null; while(tmp.firstChild){ const n=tmp.firstChild; if(n.classList&&n.classList.contains('cv-row')) row=n; log.appendChild(n); }
+  cvScrollEnd(); return row;
+}
 function cvSetStatus(ids,st){
   (ids||[]).forEach(id=>{
     const t=document.querySelector('.cv-row[data-mid="'+Number(id)+'"] .cv-ticks'); if(!t) return;
@@ -712,7 +722,7 @@ async function loadToolData(view, box, withId, refId){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
       const cvCard=/^\d+$/.test(refId||'')?String(refId):String(([...r.messages].reverse().find(m=>m.listing_id)||{}).listing_id||'');
-      box.insertAdjacentHTML('beforeend',`<div class="tool-list cv"><div class="thread-head"><span class="thread-who">${avatarSpan(r.other.id,r.other.name||'U','mrow-av')}<span class="thread-name"><b>${nm}</b><small class="cv-presence" id="cvPresence" data-uid="${esc(String(r.other.id))}" data-base="${esc(cvPresenceText(r.presence))}">${esc(cvPresenceText(r.presence))}</small></span></span><span class="thread-acts"><button type="button" class="text-btn" data-conv-del="${esc(withId)}" title="Șterge conversația">🗑</button><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></span></div>${cvCard?`<div class="cv-listing-slot" id="cvListing" data-id="${esc(cvCard)}"></div>`:''}<div class="cv-log" id="cvLog">${cvMessagesHtml(r.messages,cvCard)||'<p class="muted">Niciun mesaj încă.</p>'}</div>${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="cv-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="1" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="cv-send" aria-label="Trimite mesajul"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l-.01 6.5L15 12 3.39 13.9z"/></svg></button></form>`}</div>`); cvScrollEnd(); if(cvCard) cvLoadListing(cvCard,r.messages);
+      box.insertAdjacentHTML('beforeend',`<div class="tool-list cv"><div class="thread-head"><span class="thread-who"><button type="button" class="av-zoom-btn" data-av-zoom="${esc(String(r.other.id))}" aria-label="Mărește poza">${avatarSpan(r.other.id,r.other.name||'U','mrow-av')}</button><span class="thread-name"><b>${nm}</b><small class="cv-presence" id="cvPresence" data-uid="${esc(String(r.other.id))}" data-base="${esc(cvPresenceText(r.presence))}">${esc(cvPresenceText(r.presence))}</small></span></span><span class="thread-acts"><button type="button" class="text-btn" data-conv-del="${esc(withId)}" title="Șterge conversația">🗑</button><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></span></div>${cvCard?`<div class="cv-listing-slot" id="cvListing" data-id="${esc(cvCard)}"></div>`:''}<div class="cv-log" id="cvLog">${cvMessagesHtml(r.messages,cvCard)||'<p class="muted">Niciun mesaj încă.</p>'}</div>${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="cv-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="1" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="cv-send" aria-label="Trimite mesajul"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l-.01 6.5L15 12 3.39 13.9z"/></svg></button></form>`}</div>`); cvScrollEnd(); if(cvCard) cvLoadListing(cvCard,r.messages);
       return;
     }
     const r=await api('/api/messages');
@@ -3698,25 +3708,26 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); return; }
   const m=e.target.closest('[data-move-sell-image]'); if(m){ const i=Number(m.dataset.moveSellImage), k=i+Number(m.dataset.dir), a=state.sellImages; if(k>=0&&k<a.length){ [a[i],a[k]]=[a[k],a[i]]; renderSellImages(); } } });
-/* Trimitere mesaj: un singur mesaj chiar dacă apeși de două ori (iPhone/Android). Butonul se blochează până se termină tot. */
-let msgSending=false;
+/* Trimitere mesaj fără lag: bula apare instant, serverul confirmă în fundal (nu se mai reîncarcă conversația).
+   Câmpul se golește imediat, deci o dublă apăsare nu mai trimite nimic a doua oară. */
 document.addEventListener('submit', e=>{
   const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault();
-  if(msgSending) return;
   const ta=$('#msgBody'), body=(ta.value||'').trim(); if(!body) return;
-  msgSending=true;
-  const btn=f.querySelector('.cv-send'); if(btn) btn.disabled=true; ta.readOnly=true;
-  safe(async()=>{
-    try{
-      await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(f.dataset.to),body,listing_id:f.dataset.ref?Number(f.dataset.ref):undefined})});
-      ta.value='';
-      await renderAccountTool('messages',f.dataset.to,f.dataset.ref);
-    }finally{
-      msgSending=false;
-      const b2=document.querySelector('#msgForm .cv-send'); if(b2) b2.disabled=false;
-      const t2=document.getElementById('msgBody'); if(t2) t2.readOnly=false;
-    }
-  })();
+  const to=Number(f.dataset.to), ref=f.dataset.ref?Number(f.dataset.ref):undefined;
+  ta.value=''; ta.style.height='auto'; try{ ta.focus({preventScroll:true}); }catch(_){}
+  const row=cvAppend({id:0,body,created_at:new Date().toISOString(),mine:true,is_read:false,delivered:false,listing_id:ref});
+  if(row){ row.classList.add('sending'); const t=row.querySelector('.cv-ticks'); if(t){ t.textContent='🕓'; t.dataset.st='pending'; t.className='cv-ticks pending'; } }
+  api('/api/messages',{method:'POST',body:JSON.stringify({to,body,listing_id:ref})}).then(r=>{
+    if(!row) return;
+    if(r&&r.duplicate){ row.remove(); return; }   /* același text trimis de două ori în câteva secunde: serverul l-a păstrat o singură dată */
+    row.classList.remove('sending');
+    if(r&&r.id) row.dataset.mid=String(r.id);
+    const t=row.querySelector('.cv-ticks'); if(t){ const st=(r&&r.delivered)?'delivered':'sent'; t.dataset.st=st; t.className='cv-ticks '+st; t.textContent=(st==='sent'?'✓':'✓✓'); t.setAttribute('aria-label',st==='delivered'?'Livrat':'Trimis'); }
+  }).catch(err=>{
+    if(row) row.remove();
+    const cur=document.getElementById('msgBody'); if(cur&&!cur.value) cur.value=body;
+    toast((err&&err.message)||'Mesajul nu a putut fi trimis.');
+  });
 });
 document.addEventListener('keydown', e=>{
   if(!$('#imageLightbox')?.classList.contains('hidden')){
@@ -4157,11 +4168,7 @@ const MSG_PER_PAGE = 30;
 const msgs = { box:'inbox', items:[], unread:0, q:'', unreadOnly:false, page:1 };
 function cvPresenceText(p){
   if(!p||p.hidden) return '';
-  if(p.online) return 'online';
-  if(!p.last_seen) return '';
-  const d=new Date(p.last_seen); if(isNaN(d)) return '';
-  const t=d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}), l=cvDayLabel(d);
-  return l==='Azi' ? 'văzut ultima dată azi la '+t : l==='Ieri' ? 'văzut ultima dată ieri la '+t : 'văzut ultima dată pe '+l;
+  return p.online ? 'online' : 'offline';
 }
 async function enterMessages(box){
   msgs.box = 'inbox';
@@ -4221,6 +4228,17 @@ document.addEventListener('input', e=>{
   msgs.q=e.target.value; msgs.page=1; renderMessages();
 });
 /* ---------- Conversație: ștergere mesaj (apăsare lungă / click dreapta), ștergere conversație, „scrie…”, online ---------- */
+/* Poza de profil se mărește ușor când o atingi; se închide la un nou tap sau cu Escape. */
+document.addEventListener('click', e=>{
+  const z=document.querySelector('.av-zoom');
+  if(z){ z.classList.remove('show'); setTimeout(()=>z.remove(),160); if(!e.target.closest('[data-av-zoom]')) return; }
+  const b=e.target.closest&&e.target.closest('[data-av-zoom]'); if(!b) return;
+  const im=b.querySelector('img[data-av]'); if(!im||!im.complete||!im.naturalWidth){ return; }   /* fără poză: nu se întâmplă nimic */
+  e.preventDefault();
+  const o=document.createElement('div'); o.className='av-zoom'; o.innerHTML='<img alt="">'; o.firstChild.src=im.src;
+  document.body.appendChild(o); requestAnimationFrame(()=>o.classList.add('show'));
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ const z=document.querySelector('.av-zoom'); if(z) z.remove(); } });
 let cvDelBusy=false, cvLP=null, cvTypTimer=null, cvLastTyping=0;
 async function cvDelMsg(row){
   if(cvDelBusy||!row) return; cvDelBusy=true;
@@ -4433,13 +4451,7 @@ function initLive(){
     const inThread = log && h.name==='account-tool' && h.params.get('view')==='messages' && String(h.params.get('with'))===String(m.from);
     if(inThread){
       if(!log.querySelector('.cv-row[data-mid="'+Number(m.id)+'"]')){
-        const tmp=document.createElement('div');
-        tmp.innerHTML=cvMessagesHtml([{id:m.id,body:m.body,created_at:m.created_at,mine:false,listing_id:m.listing_id,ref_title:m.ref_title}], (document.getElementById('cvListing')||{dataset:{}}).dataset.id);
-        const lastDay=[...log.querySelectorAll('.cv-day')].pop(), first=tmp.firstElementChild;
-        if(first&&first.classList.contains('cv-day')&&lastDay&&lastDay.textContent===first.textContent) first.remove();
-        const empty=log.querySelector('p.muted'); if(empty) empty.remove();
-        while(tmp.firstChild) log.appendChild(tmp.firstChild);
-        cvScrollEnd();
+        cvAppend({id:m.id,body:m.body,created_at:m.created_at,mine:false,listing_id:m.listing_id,ref_title:m.ref_title});
       }
       const pres=document.getElementById('cvPresence'); if(pres){ pres.classList.remove('typing'); pres.textContent=pres.dataset.base||''; }
       api('/api/messages/read',{method:'POST',body:JSON.stringify({ids:[m.id]})}).catch(()=>{});
@@ -4447,8 +4459,29 @@ function initLive(){
     refreshList();
     bumpUnreadBadge();
   });
+  // După ce aplicația a stat în fundal (conexiunea live a fost închisă), recuperează ce s-a pierdut.
+  let firstReady=true;
+  live.on('ready', ()=>{
+    if(firstReady){ firstReady=false; return; }
+    bumpUnreadBadge(); refreshList();
+    const h=parseHash(), log=document.getElementById('cvLog');
+    if(log && h.name==='account-tool' && h.params.get('view')==='messages' && h.params.get('with')){
+      safe(async()=>{
+        const r=await api('/api/messages/'+encodeURIComponent(h.params.get('with')));
+        const cur=document.getElementById('cvLog'); if(!cur) return;
+        cur.innerHTML=cvMessagesHtml(r.messages,(document.getElementById('cvListing')||{dataset:{}}).dataset.id)||'<p class="muted">Niciun mesaj încă.</p>';
+        cvShowPresence(cvPresenceText(r.presence)); cvScrollEnd();
+      })();
+    }
+  });
   // Bife: ✓✓ livrat, ✓✓ albastre citit (actualizate direct în conversație și în listă).
   live.on('msg_status', d=>{ if(!d||!d.ids) return; cvSetStatus(d.ids,d.status); refreshList(); });
+  // Online / offline instant, fără să aștepți reîmprospătarea.
+  live.on('presence', d=>{
+    const el=document.getElementById('cvPresence'); if(!el||!d||String(el.dataset.uid)!==String(d.uid)) return;
+    if(!d.online){ el.classList.remove('typing'); clearTimeout(cvTypTimer); }
+    cvShowPresence(d.online?'online':'offline');
+  });
   // „scrie…” în antetul conversației, 4 secunde de la ultimul semnal.
   live.on('typing', d=>{
     const el=document.getElementById('cvPresence'); if(!el||!d||String(el.dataset.uid)!==String(d.from)) return;

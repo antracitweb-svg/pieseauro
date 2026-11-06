@@ -2570,6 +2570,16 @@ function sseSend(userId,event,data){
  for(const res of set){try{res.write(payload);n++;}catch{set.delete(res);}}
  return n;
 }
+// Prezență instant: când cineva se conectează / deconectează, contactele lui conectate primesc imediat „online / offline”.
+const offlineTimers=new Map();
+async function broadcastPresence(uid,online){
+ try{
+  const u=(await pool.query('SELECT show_presence FROM users WHERE id=$1',[uid])).rows[0];
+  if(!u||u.show_presence===false)return;
+  const c=await pool.query('SELECT DISTINCT CASE WHEN sender_id=$1 THEN recipient_id ELSE sender_id END AS o FROM messages WHERE sender_id=$1 OR recipient_id=$1 LIMIT 500',[uid]);
+  for(const r of c.rows)sseSend(r.o,'presence',{uid,online});
+ }catch{}
+}
 // Marchează ca livrate mesajele neprimite încă de `uid` și anunță expeditorii (două bife gri).
 async function markDelivered(uid){
  const r=await pool.query('UPDATE messages SET delivered_at=NOW() WHERE recipient_id=$1 AND delivered_at IS NULL RETURNING id,sender_id',[uid]);
@@ -2589,15 +2599,24 @@ app.get('/api/stream',auth,requireDb,(req,res)=>{
  res.flushHeaders?.();
  const uid=req.user.id;
  if(!sseClients.has(uid))sseClients.set(uid,new Set());
+ const wasOffline=!sseClients.get(uid).size;
  sseClients.get(uid).add(res);
+ clearTimeout(offlineTimers.get(uid));offlineTimers.delete(uid);
+ if(wasOffline)broadcastPresence(uid,true);
  res.write('event: ready\ndata: {"ok":true}\n\n');
  // WhatsApp: mesajele primite cât timp erai offline devin „livrate” (două bife) când te conectezi.
  markDelivered(uid).catch(()=>{});
- const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},25000);
+ const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{cleanup();}},25000);
  const cleanup=()=>{
   clearInterval(hb);
   const set=sseClients.get(uid);
-  if(set){set.delete(res);if(!set.size){sseClients.delete(uid);pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[uid]).catch(()=>{});}}
+  if(set){set.delete(res);if(!set.size){
+   sseClients.delete(uid);
+   pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1',[uid]).catch(()=>{});
+   // 2 secunde de grație: o reîncărcare a paginii nu trebuie să facă omul „offline” pentru o clipă.
+   clearTimeout(offlineTimers.get(uid));
+   offlineTimers.set(uid,setTimeout(()=>{offlineTimers.delete(uid);if(!sseClients.has(uid))broadcastPresence(uid,false);},2000));
+  }}
  };
  req.on('close',cleanup);
  req.on('error',cleanup);

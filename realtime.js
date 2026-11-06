@@ -13,7 +13,7 @@
   var retryTimer = null;
   var hiddenAt = 0;
   var stopped = true;
-  var listeners = { message: [], notification: [], ready: [] };
+  var listeners = { message: [], notification: [], ready: [], msg_status: [], typing: [], presence: [] };
 
   function emit(kind, data){
     var list = listeners[kind] || [];
@@ -38,10 +38,19 @@
     } catch(e){ scheduleRetry(); return; }
 
     source.addEventListener('open', function(){ retry = 0; });
-    source.addEventListener('ready', function(){ retry = 0; });
+    source.addEventListener('ready', function(){ retry = 0; emit('ready', {}); });
 
     source.addEventListener('message', function(ev){
       try { emit('message', JSON.parse(ev.data)); } catch(e){}
+    });
+    source.addEventListener('msg_status', function(ev){
+      try { emit('msg_status', JSON.parse(ev.data)); } catch(e){}
+    });
+    source.addEventListener('presence', function(ev){
+      try { emit('presence', JSON.parse(ev.data)); } catch(e){}
+    });
+    source.addEventListener('typing', function(ev){
+      try { emit('typing', JSON.parse(ev.data)); } catch(e){}
     });
     source.addEventListener('notification', function(ev){
       try { emit('notification', JSON.parse(ev.data)); } catch(e){}
@@ -85,17 +94,25 @@
   }
 
   // Pagina ascunsă mult timp: închidem conexiunea; la revenire o redeschidem.
+  // Aplicația trece în fundal / se închide: după ~3 secunde închidem conexiunea, ca ceilalți să te vadă „offline”
+  // (notificările continuă prin Web Push). La revenire reconectăm și pagina recuperează ce s-a pierdut.
+  var sleepTimer = null, sleeping = false;
   document.addEventListener('visibilitychange', function(){
     if(document.hidden){
       hiddenAt = Date.now();
+      clearTimeout(sleepTimer);
+      sleepTimer = setTimeout(function(){
+        if(!document.hidden || stopped) return;
+        sleeping = true; stop();
+      }, 3000);
       return;
     }
-    if(hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000){
-      stop();
-      start();
-    }
+    clearTimeout(sleepTimer);
+    if(sleeping){ sleeping = false; start(); }
     hiddenAt = 0;
   });
+  window.addEventListener('pagehide', function(){ if(!stopped){ sleeping = true; stop(); } });
+  window.addEventListener('pageshow', function(){ if(sleeping){ sleeping = false; start(); } });
 
   window.addEventListener('online', function(){ if(stopped === false) return; });
 
