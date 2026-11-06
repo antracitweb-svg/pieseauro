@@ -4415,7 +4415,6 @@ html[data-view="list"] :is(#homeFeed,#listingGrid,#avarGrid) .ar-acts{position:a
 html[data-view="list"] :is(#homeFeed,#listingGrid,#avarGrid) .ar-row{grid-template-columns:240px minmax(0,1fr)!important;min-height:168px}
 html[data-view="list"] :is(#homeFeed,#listingGrid,#avarGrid) .ar-thumb{min-height:168px}
 html[data-view="list"] :is(#homeFeed,#listingGrid,#avarGrid) .ar-title{font-size:17px!important}
-html[data-view="list"] #homeFeed.ar-list{max-width:960px!important}
 }
 
 /* ===== Mod „Grilă” și pe Dezmembrări (care este implicit pe listă): aceleași reguli ca la rezultate ===== */
@@ -4444,3 +4443,10 @@ html[data-view="grid"] #dismGrid .ar-thumb,html[data-view="grid"] #dismGrid .ar-
 }
 /* === „Anunțurile mele” rămân mereu listă, indiferent de alegerea Grilă/Listă === */
 html #listingGrid.ar-list:has(.mine-row){display:flex!important;flex-direction:column!important;grid-template-columns:none!important;gap:0!important;max-width:none!important}
+
+/* === Grilă uniformă: Acasă și Mașini avariate = 4 / 3 / 2 coloane; Rezultate = 4 / 3 / 2 ținând cont de bara de filtre === */
+#avarGrid.ar-list{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+@media(max-width:1100px){#avarGrid.ar-list{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:800px){#avarGrid.ar-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(min-width:1300px){#listingGrid.ar-list{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+@media(min-width:1101px) and (max-width:1299px){#listingGrid.ar-list{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
