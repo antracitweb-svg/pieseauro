@@ -1361,7 +1361,7 @@ app.get('/api/listings/:id/img/:n(\\d{1,2})',requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
  const r=await pool.query("SELECT images[$2::int] img FROM listings WHERE id=$1 AND status NOT IN ('blocked','rejected')",[req.params.id,n+1]);
  const img=r.rowCount?(r.rows[0].img||''):'';
- if(/^https?:\/\//.test(img))return res.redirect(302,img);
+ if(/^https?:\/\//.test(img)){res.set('Cache-Control','public, max-age=600');return res.redirect(302,img);}
  const m=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/.exec(img);
  if(!m)return res.status(404).end();
  res.set({'Content-Type':m[1],'Cache-Control':'public, max-age=86400'}).send(Buffer.from(m[2],'base64'));
