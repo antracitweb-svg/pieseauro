@@ -4529,12 +4529,9 @@ html body .plus-sheet .plus-item:hover,html body .plus-sheet .plus-item:focus-vi
 .mdrawer .menu-post b,.mdrawer .menu-post i{color:#2a2113!important}
 .mdrawer .menu-post .mi{background:rgba(42,33,19,.14)!important;border-color:rgba(42,33,19,.22)!important;color:#2a2113!important;font-size:26px;font-weight:600;font-style:normal}
 .mdrawer .mi{background:linear-gradient(145deg,rgba(255,255,255,.2),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
-/* antet: inima din sticlă */
-.header #favoritesBtn{color:#f4ead4;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.26);border-radius:999px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 4px 12px rgba(0,0,0,.18);-webkit-backdrop-filter:blur(10px) saturate(170%);backdrop-filter:blur(10px) saturate(170%);transition:transform .16s cubic-bezier(.3,1.4,.5,1),background .16s}
-.header #favoritesBtn:active{transform:scale(.93);background:rgba(255,255,255,.22)}
 /* bara de jos: bula de sticlă care urmărește degetul */
 .bottom-nav{touch-action:none;-webkit-user-select:none;user-select:none}
-.bn-bubble{position:absolute;top:1px;bottom:1px;left:0;width:0;z-index:0;border-radius:14px;pointer-events:none;opacity:0;transform:scale(.7);
+.bn-bubble{position:absolute;top:0;left:0;width:0;height:0;z-index:0;border-radius:14px;pointer-events:none;opacity:0;transform:scale(.7);
   background:rgba(255,255,255,.26);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(255,255,255,.2),0 6px 16px rgba(0,0,0,.28);
   -webkit-backdrop-filter:brightness(1.25) saturate(160%);backdrop-filter:brightness(1.25) saturate(160%);
   transition:left .18s cubic-bezier(.3,1.3,.5,1),width .18s cubic-bezier(.3,1.3,.5,1),opacity .14s ease,transform .24s cubic-bezier(.3,1.6,.5,1)}
@@ -4542,7 +4539,23 @@ html body .plus-sheet .plus-item:hover,html body .plus-sheet .plus-item:focus-vi
 .bottom-nav button{position:relative;z-index:1}
 /* viteză: blur mai ușor pe telefoane slabe, fără blur unde nu e suportat sau cerut */
 .lite-glass .bottom-nav,.lite-glass .plus-sheet,.lite-glass .mdrawer{-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%)}
-.lite-glass #plusModal.modal,.lite-glass .header #favoritesBtn,.lite-glass .bn-bubble{-webkit-backdrop-filter:none;backdrop-filter:none}
+.lite-glass #plusModal.modal,.lite-glass .bn-bubble{-webkit-backdrop-filter:none;backdrop-filter:none}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.plus-sheet{background:#26272c}.bn-bubble{background:rgba(255,255,255,.3)}}
 @media (prefers-reduced-transparency:reduce){.plus-sheet{background:#26272c;-webkit-backdrop-filter:none;backdrop-filter:none}}
 @media (prefers-reduced-motion:reduce){.plus-sheet,.plus-sheet .plus-item,#plusModal.closing .plus-sheet{animation:none!important}.bn-bubble{transition:none}}
+
+/* === V46b: bula de sticlă și în antet, undă de apă în meniul lateral === */
+.nav-actions{position:relative;isolation:isolate;touch-action:none}
+.nav-actions>button,.nav-actions>form{position:relative;z-index:1}
+.nav-actions>.bn-bubble{border-radius:999px}
+.nav-actions.pressing>.bn-bubble,.mdrawer-body.pressing>.bn-bubble{opacity:1}
+.nav-actions.pressing>.bn-bubble{transform:scale(1.18)}
+.mdrawer-body{position:relative}
+.mdrawer-body>.bn-bubble{z-index:2;border-radius:18px;background:rgba(255,255,255,.14)}
+.mdrawer-body.pressing>.bn-bubble{transform:scale(1.025,1.06)}
+.mdrawer .menu-card button{position:relative;overflow:hidden}
+.water{position:absolute;width:170px;height:170px;margin:-85px 0 0 -85px;border-radius:50%;pointer-events:none;z-index:3;
+  background:radial-gradient(circle,rgba(255,255,255,.42),rgba(255,255,255,.14) 45%,rgba(255,255,255,0) 70%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);
+  transform:scale(0);animation:waterRip .65s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes waterRip{to{transform:scale(2.6);opacity:0}}
+@media (prefers-reduced-motion:reduce){.water{animation:none;display:none}}
