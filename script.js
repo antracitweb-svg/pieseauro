@@ -3505,7 +3505,8 @@ async function smartSearch(q){
 
 /* ---------- acțiuni UI ---------- */
 function doAction(a){
-  if(a==='plus') $('#plusModal').classList.remove('hidden');
+  if(a==='plus') openPlus();
+  else if(a==='plus-menu') setTimeout(openPlus,210);
   else if(a==='account') currentUser ? navigate('cont') : openAuth('cont');
   else if(a==='request') navigate('cerere');
   else if(a==='sell') navigate('vinde');
@@ -5074,4 +5075,41 @@ function addSwipe(el, onSwipe){
   new MutationObserver(sched).observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true});
   window.addEventListener('hashchange',sched);
   init();
+})();
+
+
+/* ---------- foaia „Ce postezi?” + bară de jos cu bulă de sticlă ---------- */
+function openPlus(){
+  const m=$('#plusModal'); if(!m) return;
+  m.classList.remove('hidden','closing'); document.documentElement.classList.add('plus-open');
+  setTimeout(()=>{ const f=m.querySelector('.plus-item'); if(f) f.focus({preventScroll:true}); },80);
+}
+function closePlus(){
+  const m=$('#plusModal'); if(!m || m.classList.contains('hidden')) return;
+  m.classList.add('closing');
+  setTimeout(()=>{ m.classList.add('hidden'); m.classList.remove('closing'); },230);
+}
+(function(){
+  const root=document.documentElement;
+  if((navigator.deviceMemory&&navigator.deviceMemory<=3)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)) root.classList.add('lite-glass');
+  const m=document.getElementById('plusModal');
+  if(m){
+    new MutationObserver(()=>{ if(m.classList.contains('hidden')) root.classList.remove('plus-open'); }).observe(m,{attributes:true,attributeFilter:['class']});
+    m.addEventListener('click',e=>{ if(e.target===m || e.target.closest('[data-close]')){ e.stopPropagation(); closePlus(); } },true);
+    const sh=m.querySelector('.plus-sheet'); let on=false,sx=0,sy=0,dx=0,dy=0;
+    const side=()=>matchMedia('(min-width:801px)').matches;
+    sh.addEventListener('pointerdown',e=>{ if(e.target.closest('.plus-item,.close')) return; on=true; sx=e.clientX; sy=e.clientY; sh.style.transition='none'; sh.setPointerCapture(e.pointerId); });
+    sh.addEventListener('pointermove',e=>{ if(!on) return; dx=Math.max(0,e.clientX-sx); dy=Math.max(0,e.clientY-sy); sh.style.transform=side()?'translateX('+dx+'px)':'translateY('+dy+'px)'; });
+    const up=()=>{ if(!on) return; on=false; const far=side()?dx>90:dy>90; sh.style.transition=''; sh.style.transform=''; dx=dy=0; if(far) closePlus(); };
+    sh.addEventListener('pointerup',up); sh.addEventListener('pointercancel',up);
+  }
+  const nav=document.getElementById('bottomNav'); if(!nav) return;
+  const b=document.createElement('i'); b.className='bn-bubble'; b.setAttribute('aria-hidden','true'); nav.prepend(b);
+  let down=null;
+  const pick=(x,y)=>{ const el=document.elementFromPoint(x,y); return el&&el.closest?el.closest('#bottomNav button'):null; };
+  const place=btn=>{ const n=nav.getBoundingClientRect(), r=btn.getBoundingClientRect(); b.style.left=(r.left-n.left)+'px'; b.style.width=r.width+'px'; };
+  nav.addEventListener('pointerdown',e=>{ down=pick(e.clientX,e.clientY); if(!down) return; place(down); nav.classList.add('pressing'); });
+  nav.addEventListener('pointermove',e=>{ if(!down) return; const t=pick(e.clientX,e.clientY); if(t) place(t); });
+  const end=e=>{ if(!down) return; const t=pick(e.clientX,e.clientY), d=down; down=null; nav.classList.remove('pressing'); if(e.type==='pointerup' && t && t!==d) t.click(); };
+  nav.addEventListener('pointerup',end); nav.addEventListener('pointercancel',end);
 })();

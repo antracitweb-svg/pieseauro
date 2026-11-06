@@ -4484,3 +4484,65 @@ html.dark .cv-ticks.read{color:#4aa3ff}
 /* Mesagerie fără taburi: conținutul urcă */
 #page-messages .mine-card{padding-top:6px}
 #page-messages .mine-bar{margin-top:6px}
+
+/* === V46: foaia „Ce postezi?” (jos pe telefon, lateral pe laptop), bulă de sticlă în bara de jos, inimă din sticlă === */
+html.plus-open{overflow:hidden}
+html.plus-open .bottom-nav{transform:translateY(220%)!important;opacity:0;pointer-events:none}
+html body #plusModal.modal{padding:0;place-items:end stretch;background:rgba(10,9,6,.4);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);transition:opacity .22s ease}
+html body #plusModal.modal.closing{opacity:0}
+.plus-sheet{position:relative;width:100%;max-width:560px;margin:0 auto;padding:10px 16px calc(20px + env(safe-area-inset-bottom,0px));border-radius:28px 28px 0 0;color:#f4ead4;
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.04) 42%),rgba(35,36,41,.74);
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+  border:1px solid rgba(255,255,255,.22);border-bottom:0;box-shadow:0 -14px 44px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.4);
+  animation:psUp .38s cubic-bezier(.2,.9,.25,1.04);touch-action:pan-y}
+#plusModal.closing .plus-sheet{animation:psDown .22s ease forwards}
+.ps-grab{display:block;width:40px;height:5px;margin:2px auto 12px;border-radius:3px;background:rgba(255,255,255,.35)}
+.plus-sheet h2{margin:0;padding-right:44px;font-size:24px;line-height:1.2;color:#fff}
+.plus-sheet .ps-sub{margin:4px 0 0;font-size:13px;color:#cfc6b2}
+.plus-sheet .close{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.1);color:#fff;font-size:20px;line-height:1;cursor:pointer}
+.plus-sheet .plus-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+html body .plus-sheet .plus-item{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:12px;width:auto;min-height:136px;padding:14px;border-radius:20px;text-align:left;color:#f4ead4;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.32);transition:transform .18s cubic-bezier(.3,1.4,.5,1),background .18s;animation:psIn .42s cubic-bezier(.2,.9,.25,1.05) both}
+.plus-sheet .plus-item:nth-child(2){animation-delay:.05s}.plus-sheet .plus-item:nth-child(3){animation-delay:.1s}.plus-sheet .plus-item:nth-child(4){animation-delay:.15s}
+html body .plus-sheet .plus-item:active{transform:scale(.95);background:rgba(255,255,255,.18)}
+html body .plus-sheet .plus-item:hover,html body .plus-sheet .plus-item:focus-visible{background:rgba(255,255,255,.15);border-color:rgba(231,205,150,.7)}
+.plus-sheet .plus-ico{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:50%;color:#2a2113;background:radial-gradient(circle at 30% 25%,#f0dcab,#b8935a 72%);box-shadow:0 6px 14px rgba(184,147,90,.4),inset 0 1px 0 rgba(255,255,255,.7)}
+.plus-sheet .plus-ico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.plus-sheet .plus-txt b{display:block;font-size:15px;line-height:1.25;color:#fff}
+.plus-sheet .plus-txt small{display:block;margin-top:3px;font-size:12px;line-height:1.35;color:#cfc6b2}
+.plus-sheet .plus-item>i{display:none}
+@keyframes psUp{from{transform:translateY(105%)}to{transform:none}}
+@keyframes psDown{to{transform:translateY(105%)}}
+@keyframes psSide{from{transform:translateX(112%)}to{transform:none}}
+@keyframes psSideOut{to{transform:translateX(112%)}}
+@keyframes psIn{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+@media(min-width:801px){
+  html body #plusModal.modal{place-items:start end;padding:68px 14px 14px}
+  .plus-sheet{width:min(400px,92vw);max-width:none;margin:0;padding:22px 20px;border-radius:26px;border-bottom:1px solid rgba(255,255,255,.22);animation:psSide .42s cubic-bezier(.2,.9,.25,1.02);box-shadow:0 20px 60px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.4)}
+  #plusModal.closing .plus-sheet{animation:psSideOut .24s ease forwards}
+  .ps-grab{display:none}
+  .plus-sheet .plus-list{grid-template-columns:1fr}
+  html body .plus-sheet .plus-item{flex-direction:row;align-items:center;min-height:0;padding:12px 14px}
+}
+/* meniul lateral: un singur buton auriu pentru postare + iconițe de sticlă */
+.mdrawer .menu-post{background:linear-gradient(135deg,#f0dcab,#b8935a)!important;border-color:rgba(255,255,255,.55)!important;box-shadow:0 10px 24px rgba(184,147,90,.38),inset 0 1px 0 rgba(255,255,255,.7)!important}
+.mdrawer .menu-post b,.mdrawer .menu-post i{color:#2a2113!important}
+.mdrawer .menu-post .mi{background:rgba(42,33,19,.14)!important;border-color:rgba(42,33,19,.22)!important;color:#2a2113!important;font-size:26px;font-weight:600;font-style:normal}
+.mdrawer .mi{background:linear-gradient(145deg,rgba(255,255,255,.2),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+/* antet: inima din sticlă */
+.header #favoritesBtn{color:#f4ead4;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.26);border-radius:999px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 4px 12px rgba(0,0,0,.18);-webkit-backdrop-filter:blur(10px) saturate(170%);backdrop-filter:blur(10px) saturate(170%);transition:transform .16s cubic-bezier(.3,1.4,.5,1),background .16s}
+.header #favoritesBtn:active{transform:scale(.93);background:rgba(255,255,255,.22)}
+/* bara de jos: bula de sticlă care urmărește degetul */
+.bottom-nav{touch-action:none;-webkit-user-select:none;user-select:none}
+.bn-bubble{position:absolute;top:1px;bottom:1px;left:0;width:0;z-index:0;border-radius:14px;pointer-events:none;opacity:0;transform:scale(.7);
+  background:rgba(255,255,255,.26);box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -1px 0 rgba(255,255,255,.2),0 6px 16px rgba(0,0,0,.28);
+  -webkit-backdrop-filter:brightness(1.25) saturate(160%);backdrop-filter:brightness(1.25) saturate(160%);
+  transition:left .18s cubic-bezier(.3,1.3,.5,1),width .18s cubic-bezier(.3,1.3,.5,1),opacity .14s ease,transform .24s cubic-bezier(.3,1.6,.5,1)}
+.bottom-nav.pressing .bn-bubble{opacity:1;transform:scale(1.12,1.5)}
+.bottom-nav button{position:relative;z-index:1}
+/* viteză: blur mai ușor pe telefoane slabe, fără blur unde nu e suportat sau cerut */
+.lite-glass .bottom-nav,.lite-glass .plus-sheet,.lite-glass .mdrawer{-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%)}
+.lite-glass #plusModal.modal,.lite-glass .header #favoritesBtn,.lite-glass .bn-bubble{-webkit-backdrop-filter:none;backdrop-filter:none}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.plus-sheet{background:#26272c}.bn-bubble{background:rgba(255,255,255,.3)}}
+@media (prefers-reduced-transparency:reduce){.plus-sheet{background:#26272c;-webkit-backdrop-filter:none;backdrop-filter:none}}
+@media (prefers-reduced-motion:reduce){.plus-sheet,.plus-sheet .plus-item,#plusModal.closing .plus-sheet{animation:none!important}.bn-bubble{transition:none}}
