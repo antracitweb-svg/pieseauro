@@ -4559,3 +4559,22 @@ html body .plus-sheet .plus-item:hover,html body .plus-sheet .plus-item:focus-vi
   transform:scale(0);animation:waterRip .65s cubic-bezier(.2,.7,.3,1) forwards}
 @keyframes waterRip{to{transform:scale(2.6);opacity:0}}
 @media (prefers-reduced-motion:reduce){.water{animation:none;display:none}}
+
+/* === V46c: foaia și bara de jos plutesc la aceeași distanță de margini === */
+:root{--fx:22px;--fb:calc(14px + env(safe-area-inset-bottom,0px))}
+@keyframes psUp{from{transform:translateY(135%)}to{transform:none}}
+@keyframes psDown{to{transform:translateY(135%)}}
+@media(max-width:800px){
+  .bottom-nav{left:var(--fx);right:var(--fx);bottom:var(--fb)}
+  html body #plusModal.modal{place-items:end center}
+  .plus-sheet{width:calc(100% - 2*var(--fx));max-width:420px;margin:0 0 var(--fb);padding:10px 14px 14px;border-radius:26px;border-bottom:1px solid rgba(255,255,255,.22)}
+  .plus-sheet h2{font-size:21px}
+  .plus-sheet .plus-list{gap:8px;margin-top:12px}
+  html body .plus-sheet .plus-item{min-height:100px;padding:11px;gap:8px;border-radius:18px}
+  .plus-sheet .plus-ico{width:38px;height:38px}
+  .plus-sheet .plus-ico svg{width:19px;height:19px}
+  .plus-sheet .plus-txt b{font-size:14px}
+  .plus-sheet .plus-txt small{font-size:11.5px}
+}
+html body .plus-sheet .close{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.plus-sheet:focus{outline:none}
