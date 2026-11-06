@@ -291,7 +291,18 @@ app.use(async(req,res,next)=>{
  }catch(e){next(e);}
 });
 /* ===== BOT-GUARD:END ===== */
-for(const f of PUBLIC_FILES) app.get('/'+f,(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,f));});
+// index.html se trimite cu adresa reală a site-ului în tag-urile de partajare (og:url, og:image, canonical).
+// Așa merge fără domeniu propriu (adresa de pe Render) și se schimbă singur dacă îți iei un domeniu și setezi APP_URL.
+let INDEX_HTML_RAW=null;
+function sendIndexHtml(req,res){
+ try{
+  if(INDEX_HTML_RAW===null)INDEX_HTML_RAW=require('fs').readFileSync(path.join(__dirname,'index.html'),'utf8');
+  const base=appBaseUrl(req);
+  const html=INDEX_HTML_RAW.split('https://pieseauto.ro').join(base).replace('<link rel="canonical" href="/">','<link rel="canonical" href="'+base+'/">');
+  res.set('Cache-Control','no-cache');res.type('html').send(html);
+ }catch(e){res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,'index.html'));}
+}
+for(const f of PUBLIC_FILES) app.get('/'+f,f==='index.html'?sendIndexHtml:(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,f));});
 app.use('/assets',express.static(ASSETS_DIR,{index:false,dotfiles:'ignore',maxAge:'7d'}));
 
 const VEHICLE_SCHEMA=[
@@ -3064,7 +3075,7 @@ async function seoListingPage(req,res,o){
  const title=`${o.h1}${page>1?` – pagina ${page}`:''} | AutoParts`;
  const desc=`${o.h1}: ${seoPlural(total,'anunț','anunțuri')}${pmin?` de la ${fmt(pmin)} lei`:''}. Piese noi și second hand, contact direct cu vânzătorul pe AutoParts.`.slice(0,158);
  const pager=pages>1?`<nav class="ssr-pager" aria-label="Pagini">${page>1?`<a rel="prev" href="${escapeHtml(o.path+(page>2?`?p=${page-1}`:''))}">‹ Înapoi</a>`:'<span></span>'}<span>Pagina ${page} din ${pages}</span>${page<pages?`<a rel="next" href="${escapeHtml(o.path+`?p=${page+1}`)}">Înainte ›</a>`:'<span></span>'}</nav>`:'';
- const ld=[seoCrumbLd(base,o.crumbs),{'@context':'https://schema.org','@type':'Organization',name:'AutoParts',url:base,logo:'https://pieseauto.ro/assets/icon-512.png',description:'Caută piese auto noi și second-hand după cod OEM, marcă și model.'},{'@context':'https://schema.org','@type':'CollectionPage',name:o.h1,url:url(page),description:desc,mainEntity:{'@type':'ItemList',numberOfItems:total,itemListElement:rows.rows.map((x,i)=>({'@type':'ListItem',position:offset+i+1,url:`${base}/piese/${x.id}-${slugify(x.title)}`,name:x.title}))}}];
+ const ld=[seoCrumbLd(base,o.crumbs),{'@context':'https://schema.org','@type':'Organization',name:'AutoParts',url:base,logo:base+'/assets/icon-512.png',description:'Caută piese auto noi și second-hand după cod OEM, marcă și model.'},{'@context':'https://schema.org','@type':'CollectionPage',name:o.h1,url:url(page),description:desc,mainEntity:{'@type':'ItemList',numberOfItems:total,itemListElement:rows.rows.map((x,i)=>({'@type':'ListItem',position:offset+i+1,url:`${base}/piese/${x.id}-${slugify(x.title)}`,name:x.title}))}}];
  const body=`${seoCrumbs(o.crumbs)}<h1>${escapeHtml(o.h1)}</h1><p class="ssr-intro">${escapeHtml(intro)}</p>${o.extra||''}<ul class="ssr-list">${rows.rows.map(seoRow).join('')}</ul>${pager}<p class="ssr-cta"><a class="btn primary" href="${escapeHtml(o.spa)}">Filtrează și caută în rezultate</a> <a class="btn ghost" href="/#/cerere-noua">Primește oferte piese</a></p>`;
  res.set('Cache-Control','public, max-age=300').type('html').send(seoShell(req,{title,desc,canonical:url(page),ld,body,prev:page>1?url(page-1):'',next:page<pages?url(page+1):''}));
 }
@@ -3149,7 +3160,7 @@ app.get('/piese/:idSlug',async(req,res,next)=>{
 });
 
 app.use('/api',(req,res)=>res.status(404).json({error:'NOT_FOUND'}));
-app.get('*',(req,res)=>{if(path.extname(req.path))return res.status(404).type('text/plain').send('Not found');res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,'index.html'));});
+app.get('*',(req,res)=>{if(path.extname(req.path))return res.status(404).type('text/plain').send('Not found');return sendIndexHtml(req,res);});
 app.use((err,req,res,next)=>{console.error('Unhandled error:',err);if(res.headersSent)return next(err);if(err&&err.type==='entity.too.large')return res.status(413).json({error:'DATE_INVALIDE'});if(err instanceof SyntaxError&&err.status===400)return res.status(400).json({error:'DATE_INVALIDE'});res.status(500).json({error:'SERVER_ERROR'});});
 process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
 (async()=>{
