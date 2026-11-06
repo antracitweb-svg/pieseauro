@@ -4430,7 +4430,7 @@ html[data-view="grid"] #dismGrid .ar-thumb,html[data-view="grid"] #dismGrid .ar-
 #page-home .home-center{position:relative}
 #page-home .vt-bar-home{position:absolute;top:0;right:0;margin:0;z-index:5}
 @media(max-width:800px){
-  #page-home .home-center h1{padding-right:76px}
+  #page-home .home-center h1{padding:0 68px;font-size:clamp(22px,min(8vw,calc((100vw - 164px)/7.7)),48px)!important}
 }
 /* Pe celelalte pagini butoanele stau în dreapta */
 .vt-bar:not(.vt-bar-home){justify-content:flex-end}
