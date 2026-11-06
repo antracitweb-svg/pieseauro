@@ -4940,3 +4940,37 @@ function addSwipe(el, onSwipe){
   ensure();
   new MutationObserver(sched).observe(document.body,{childList:true,subtree:true});
 })();
+
+/* ===== Comutator Grilă / Listă pentru anunțuri (prima pagină, rezultate, anunțurile unui vânzător, dezmembrări, avariate) =====
+   Fără o alegere salvată, fiecare pagină arată ca înainte. Alegerea se ține minte în browser (localStorage). */
+(function(){
+  const KEY='autopiese_view';
+  const DEF={homeFeed:'grid',listingGrid:'grid',avarGrid:'grid',dismGrid:'list'};
+  const ICO_GRID='<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>';
+  const ICO_LIST='<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><rect x="3" y="4" width="5" height="5" rx="1.4"/><rect x="10" y="5" width="11" height="3" rx="1.5"/><rect x="3" y="15" width="5" height="5" rx="1.4"/><rect x="10" y="16" width="11" height="3" rx="1.5"/></svg>';
+  function getPref(){ try{ const v=localStorage.getItem(KEY); return (v==='grid'||v==='list')?v:''; }catch(e){ return ''; } }
+  function setPref(v){ try{ localStorage.setItem(KEY,v); }catch(e){} apply(); }
+  function apply(){
+    const v=getPref(), de=document.documentElement;
+    if(v) de.setAttribute('data-view',v); else de.removeAttribute('data-view');
+    document.querySelectorAll('.vt').forEach(vt=>{
+      const cur=v||DEF[vt.dataset.for]||'grid';
+      vt.querySelectorAll('button[data-vt]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.vt===cur)));
+    });
+  }
+  function init(){
+    Object.keys(DEF).forEach(id=>{
+      const g=document.getElementById(id); if(!g||g.dataset.vtInit||!g.parentNode) return;
+      g.dataset.vtInit='1';
+      const bar=document.createElement('div'); bar.className='vt-bar';
+      bar.innerHTML='<div class="vt" role="group" aria-label="Mod afișare anunțuri" data-for="'+id+'"><button type="button" data-vt="grid" aria-label="Grilă" title="Grilă">'+ICO_GRID+'</button><button type="button" data-vt="list" aria-label="Listă" title="Listă">'+ICO_LIST+'</button></div>';
+      g.parentNode.insertBefore(bar,g);
+      const sync=()=>{ bar.hidden=!g.querySelector('.ar-row'); };   /* ascuns când nu sunt anunțuri (ex. „Anunțurile mele” are alt format) */
+      new MutationObserver(sync).observe(g,{childList:true}); sync();
+    });
+    apply();
+  }
+  document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('.vt button[data-vt]'); if(!b) return; e.preventDefault(); setPref(b.dataset.vt); });
+  init();
+})();
+
