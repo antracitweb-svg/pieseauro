@@ -4352,3 +4352,39 @@ html.dark .cv-row.theirs .cv-bubble{background:#1c232e;color:#e8ecf2;border-colo
 html.dark .cv-form{background:#151a22;border-color:#2a323f}
 
 html.dark .cv-form textarea,.cv-form textarea{background:transparent!important;border:0!important;box-shadow:none!important}
+
+/* ===== Cardul anunțului în conversație ===== */
+.cv-listing-slot:empty{display:none}
+.cv-listing{display:flex;align-items:center;gap:12px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:#fff;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.cv-listing-img{flex:0 0 52px;width:52px;height:52px;border-radius:10px;background:#ece7db;overflow:hidden;display:block}
+.cv-listing-img img{width:100%;height:100%;object-fit:cover;display:block}
+.cv-listing-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cv-listing-txt b{font-size:14px;line-height:1.25;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cv-listing-txt em{font-style:normal;font-size:14px;font-weight:700;color:#8f6d38}
+.cv-listing-go{flex:none;font-size:24px;line-height:1;color:#a29e93}
+html.dark .cv-listing{background:#151a22;border-color:#2a323f}
+html.dark .cv-listing-img{background:#20262f}
+html.dark .cv-listing-txt em{color:#d4b483}
+
+/* ===== Lista de mesaje: rânduri subțiri (avatar, nume, ultimul mesaj pe un rând, ora în dreapta) ===== */
+.mrow{grid-template-columns:20px minmax(0,1fr);gap:0 10px;padding:10px 2px;align-items:center}
+.mrow .mine-check{align-self:center;padding:0}
+.mrow .mine-check input{width:18px;height:18px}
+.mrow-main{display:grid;grid-template-columns:46px minmax(0,1fr);grid-template-areas:"av head" "av body" "av ref";column-gap:12px;row-gap:1px;align-items:center}
+.mrow-av-hit{grid-area:av;border:0;background:none;padding:0;cursor:pointer;align-self:center;display:block}
+.mrow .mrow-av{width:46px;height:46px;flex-basis:46px;font-size:18px}
+.mrow-head{grid-area:head}
+.mrow-user{gap:8px;font-size:16px;color:#2a2214}
+.mrow-name{font-size:16px;font-weight:600}
+.mrow-date{font-size:12px;color:#8a8478}
+.mrow-dot{width:9px;height:9px;background:#b8935a}
+.mrow-body{grid-area:body;-webkit-line-clamp:1;font-size:14px;line-height:1.3;color:#6b6456}
+.mrow-ref{grid-area:ref;font-size:12px;line-height:1.3}
+.mrow-ref .ref-link{font-size:12px}
+.mrow.unread .mrow-name,.mrow.unread .mrow-body{font-weight:700}
+.mrow.unread .mrow-body{color:#2a2214}
+.mrow.unread .mrow-date{color:#8f6d38;font-weight:700}
+html.dark .mrow-user{color:#e8ecf2}
+html.dark .mrow-date{color:#8d95a3!important}
+html.dark .mrow.unread .mrow-date{color:#d4b483!important}
+

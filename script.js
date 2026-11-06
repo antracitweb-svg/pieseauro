@@ -105,12 +105,12 @@ function cvDayLabel(d){
   const o={day:'numeric',month:'short'}; if(d.getFullYear()!==now.getFullYear()) o.year='numeric';
   return d.toLocaleDateString('ro-RO',o);
 }
-function cvMessagesHtml(list){
-  let out='', lastDay='', lastMine=null, lastT=0, lastRef=null;
+function cvMessagesHtml(list,skipRef){
+  let out='', lastDay='', lastMine=null, lastT=0, lastRef=(skipRef?String(skipRef):null);
   for(const m of (list||[])){
     const d=new Date(m.created_at), ok=!isNaN(d);
     const dayKey=ok?(d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()):'';
-    if(ok && dayKey!==lastDay){ out+='<div class="cv-day"><span>'+esc(cvDayLabel(d))+'</span></div>'; lastDay=dayKey; lastMine=null; lastRef=null; }
+    if(ok && dayKey!==lastDay){ out+='<div class="cv-day"><span>'+esc(cvDayLabel(d))+'</span></div>'; lastDay=dayKey; lastMine=null; }
     const t=ok?d.getTime():0, mine=!!m.mine;
     const cont=(lastMine===mine) && (t-lastT<5*60*1000);
     const time=ok?d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}):'';
@@ -121,6 +121,27 @@ function cvMessagesHtml(list){
     lastMine=mine; lastT=t; if(hasRef) lastRef=m.listing_id;
   }
   return out;
+}
+/* Cardul anunțului din capul conversației (poză, titlu, preț). Date din API-ul public existent, fără modificări în server. */
+function cvListingCardHtml(id,title,price,img){
+  return '<button type="button" class="cv-listing" data-open="'+Number(id)+'"><span class="cv-listing-img">'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy" decoding="async">':'')+'</span><span class="cv-listing-txt"><b>'+esc(title||'Anunț')+'</b>'+(price?'<em>'+esc(price)+'</em>':'')+'</span><span class="cv-listing-go" aria-hidden="true">›</span></button>';
+}
+async function cvLoadListing(id,messages){
+  const slot=document.getElementById('cvListing'); if(!slot||slot.dataset.id!==String(id)) return;
+  const m=(messages||[]).slice().reverse().find(x=>String(x.listing_id)===String(id)&&x.ref_title);
+  if(m) slot.innerHTML=cvListingCardHtml(id,m.ref_title,'','');
+  try{
+    const r=await api('/api/listings/'+encodeURIComponent(id)+'?noview=1'), x=r&&r.listing; if(!x) return;
+    const cur=document.getElementById('cvListing'); if(!cur||cur.dataset.id!==String(id)) return;
+    const img=(Array.isArray(x.images)&&x.images[0])?x.images[0]:'';
+    cur.innerHTML=cvListingCardHtml(id,x.title,money(x.price,x.currency),img);
+  }catch(e){ /* anunț șters sau inactiv: rămâne cardul cu titlul din mesaj, dacă există */ }
+}
+/* Data scurtă pentru lista de conversații: azi = ora, altfel Ieri / 3 nov. */
+function cvListDate(iso){
+  const d=new Date(iso); if(isNaN(d)) return '';
+  const l=cvDayLabel(d);
+  return l==='Azi' ? d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}) : l;
 }
 function cvScrollEnd(){ requestAnimationFrame(()=>{ const f=document.getElementById('msgForm')||document.getElementById('cvLog'); if(f&&f.scrollIntoView) f.scrollIntoView({block:'end',behavior:'instant'}); }); }
 document.addEventListener('input',e=>{ const t=e.target; if(t&&t.id==='msgBody'){ t.style.height='auto'; t.style.height=Math.min(t.scrollHeight,120)+'px'; } });
@@ -677,7 +698,8 @@ async function loadToolData(view, box, withId, refId){
   }else if(view==='messages'){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
-      box.insertAdjacentHTML('beforeend',`<div class="tool-list cv"><div class="thread-head"><span class="thread-who">${avatarSpan(r.other.id,r.other.name||'U','mrow-av')}<b>${nm}</b></span><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></div><div class="cv-log" id="cvLog">${cvMessagesHtml(r.messages)||'<p class="muted">Niciun mesaj încă.</p>'}</div>${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="cv-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="1" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="cv-send" aria-label="Trimite mesajul"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l-.01 6.5L15 12 3.39 13.9z"/></svg></button></form>`}</div>`); cvScrollEnd();
+      const cvCard=/^\d+$/.test(refId||'')?String(refId):String(([...r.messages].reverse().find(m=>m.listing_id)||{}).listing_id||'');
+      box.insertAdjacentHTML('beforeend',`<div class="tool-list cv"><div class="thread-head"><span class="thread-who">${avatarSpan(r.other.id,r.other.name||'U','mrow-av')}<b>${nm}</b></span><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></div>${cvCard?`<div class="cv-listing-slot" id="cvListing" data-id="${esc(cvCard)}"></div>`:''}<div class="cv-log" id="cvLog">${cvMessagesHtml(r.messages,cvCard)||'<p class="muted">Niciun mesaj încă.</p>'}</div>${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="cv-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="1" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="cv-send" aria-label="Trimite mesajul"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l-.01 6.5L15 12 3.39 13.9z"/></svg></button></form>`}</div>`); cvScrollEnd(); if(cvCard) cvLoadListing(cvCard,r.messages);
       return;
     }
     const r=await api('/api/messages');
@@ -4142,9 +4164,10 @@ function msgRow(m){
   return `<article class="mrow${unread?' unread':''}">
     <label class="mine-check"><input type="checkbox" data-ms-check="${m.id}" ${msgs.sel.has(m.id)?'checked':''} aria-label="Selectează mesajul"></label>
     <div class="mrow-main">
-      <button type="button" class="mrow-head" data-go="${esc(go)}"><span class="mrow-user">${avatarSpan(m.other,m.other_name||'U','mrow-av')}<span class="mrow-name">${m.mine&&msgs.box!=='inbox'?'Către ':''}${name}</span>${unread?'<em class="mrow-dot" aria-label="Necitit"></em>':''}</span><span class="mrow-date">${msgFmtDate(m.created_at)}</span></button>
+      <button type="button" class="mrow-av-hit" data-go="${esc(go)}" tabindex="-1" aria-hidden="true">${avatarSpan(m.other,m.other_name||'U','mrow-av')}</button>
+      <button type="button" class="mrow-head" data-go="${esc(go)}"><span class="mrow-user"><span class="mrow-name">${m.mine&&msgs.box!=='inbox'?'Către ':''}${name}</span>${unread?'<em class="mrow-dot" aria-label="Necitit"></em>':''}</span><span class="mrow-date">${cvListDate(m.created_at)}</span></button>
       <button type="button" class="mrow-body" data-go="${esc(go)}">${m.mine?'<span class="mrow-ok">✓</span> ':''}${esc(m.body)}</button>
-      ${m.ref_title&&m.listing_id?`<div class="mrow-ref">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></div>`:''}
+      ${m.ref_title&&m.listing_id?`<div class="mrow-ref">📎 <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></div>`:''}
     </div></article>`;
 }
 function renderMessages(){
