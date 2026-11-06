@@ -95,6 +95,35 @@ function priceHtml(x){
 function promoUntilTxt(x){ const d=new Date(x&&x.promoted_until); return isNaN(d)?'':d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'}); }
 function promoBadge(){ return '<span class="promo-badge" title="Anunț promovat"><span aria-hidden="true">⭐</span> Promovat</span>'; }
 function fmtDate(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('ro-RO'); }
+
+/* ---------- conversație: baloane ca pe WhatsApp ---------- */
+function cvDayLabel(d){
+  const now=new Date(), day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((day(now)-day(d))/86400000);
+  if(diff===0) return 'Azi';
+  if(diff===1) return 'Ieri';
+  const o={day:'numeric',month:'short'}; if(d.getFullYear()!==now.getFullYear()) o.year='numeric';
+  return d.toLocaleDateString('ro-RO',o);
+}
+function cvMessagesHtml(list){
+  let out='', lastDay='', lastMine=null, lastT=0, lastRef=null;
+  for(const m of (list||[])){
+    const d=new Date(m.created_at), ok=!isNaN(d);
+    const dayKey=ok?(d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()):'';
+    if(ok && dayKey!==lastDay){ out+='<div class="cv-day"><span>'+esc(cvDayLabel(d))+'</span></div>'; lastDay=dayKey; lastMine=null; lastRef=null; }
+    const t=ok?d.getTime():0, mine=!!m.mine;
+    const cont=(lastMine===mine) && (t-lastT<5*60*1000);
+    const time=ok?d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}):'';
+    const hasRef=!!(m.ref_title&&m.listing_id);
+    const ref=(hasRef && String(m.listing_id)!==String(lastRef))
+      ? '<button type="button" class="ref-link cv-ref" data-open="'+m.listing_id+'">📎 '+esc(m.ref_title)+'</button>' : '';
+    out+='<div class="cv-row '+(mine?'mine':'theirs')+(cont?' cont':'')+'"><div class="cv-bubble">'+ref+'<span class="cv-text">'+esc(m.body)+'</span><span class="cv-time">'+esc(time)+'</span></div></div>';
+    lastMine=mine; lastT=t; if(hasRef) lastRef=m.listing_id;
+  }
+  return out;
+}
+function cvScrollEnd(){ requestAnimationFrame(()=>{ const f=document.getElementById('msgForm')||document.getElementById('cvLog'); if(f&&f.scrollIntoView) f.scrollIntoView({block:'end',behavior:'instant'}); }); }
+document.addEventListener('input',e=>{ const t=e.target; if(t&&t.id==='msgBody'){ t.style.height='auto'; t.style.height=Math.min(t.scrollHeight,120)+'px'; } });
 function fmtDateTime(iso){
   const d=new Date(iso); if(isNaN(d)) return '';
   return d.toLocaleDateString('ro-RO',{day:'numeric',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'});
@@ -648,7 +677,7 @@ async function loadToolData(view, box, withId, refId){
   }else if(view==='messages'){
     if(withId){
       const r=await api('/api/messages/'+encodeURIComponent(withId)), nm=esc(r.other.name||'Utilizator');
-      box.insertAdjacentHTML('beforeend',`<div class="tool-list"><div class="thread-head"><span class="thread-who">${avatarSpan(r.other.id,r.other.name||'U','mrow-av')}<b>${nm}</b></span><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></div>${r.messages.map(m=>`<div class="info-card tool-item"><p>${esc(m.body)}</p>${m.ref_title&&m.listing_id?`<p class="muted">Ref: <button type="button" class="ref-link" data-open="${m.listing_id}">${esc(m.ref_title)}</button></p>`:''}<p class="muted">${m.mine?'Tu':nm} · ${fmtDate(m.created_at)}</p></div>`).join('')||'<p class="muted">Niciun mesaj încă.</p>'}${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="clean-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="3" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="btn primary">Trimite</button></form>`}</div>`);
+      box.insertAdjacentHTML('beforeend',`<div class="tool-list cv"><div class="thread-head"><span class="thread-who">${avatarSpan(r.other.id,r.other.name||'U','mrow-av')}<b>${nm}</b></span><button type="button" class="text-btn" data-block-toggle="${esc(withId)}" data-blocked="${r.blocked_by_me?1:0}">${r.blocked_by_me?'Deblochează':'🚫 Blochează'}</button></div><div class="cv-log" id="cvLog">${cvMessagesHtml(r.messages)||'<p class="muted">Niciun mesaj încă.</p>'}</div>${/^\d+$/.test(refId||'')?`<p class="muted">Mesajul tău va avea ca referință anunțul #${esc(refId)}.</p>`:''}${(r.blocked_by_me||r.blocked_me)?`<p class="muted">${r.blocked_by_me?'Ai blocat acest utilizator. Deblochează-l ca să îi poți scrie.':'Nu poți trimite mesaje acestui utilizator.'}</p>`:`<form class="cv-form" id="msgForm" data-to="${esc(withId)}" data-ref="${esc(/^\d+$/.test(refId||'')?refId:'')}"><textarea id="msgBody" rows="1" maxlength="2000" placeholder="Scrie un mesaj…" required></textarea><button class="cv-send" aria-label="Trimite mesajul"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l-.01 6.5L15 12 3.39 13.9z"/></svg></button></form>`}</div>`); cvScrollEnd();
       return;
     }
     const r=await api('/api/messages');

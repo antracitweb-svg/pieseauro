@@ -4325,3 +4325,30 @@ html body .page-head>div:has(>h2)>p.req-lock-note{grid-column:1 / -1;grid-row:3;
 }
 /* 100vh pe iOS include zona de sub bara Safari; 100dvh e înălțimea vizibilă reală (fereastra de alegere categorie nu se mai taie jos). */
 @supports(height:100dvh){.catpick-card{max-height:100dvh}}
+
+/* ===== Conversație: baloane ca pe WhatsApp ===== */
+.cv{gap:8px}
+.cv .thread-head{margin-bottom:2px}
+.cv-log{display:flex;flex-direction:column;padding:4px 0}
+.cv-day{display:flex;justify-content:center;margin:12px 0 4px}
+.cv-day span{font-size:12px;color:var(--muted);background:rgba(0,0,0,.06);padding:3px 11px;border-radius:999px}
+.cv-row{display:flex;margin-top:7px}
+.cv-row.cont{margin-top:2px}
+.cv-row.mine{justify-content:flex-end}
+.cv-bubble{max-width:84%;padding:7px 11px 6px;border-radius:16px;font-size:15px;line-height:1.38;box-shadow:0 1px 1px rgba(0,0,0,.07);min-width:0}
+.cv-bubble::after{content:"";display:block;clear:both}
+.cv-row.mine .cv-bubble{background:#efe1c3;color:#2a2214;border-bottom-right-radius:5px}
+.cv-row.theirs .cv-bubble{background:#fff;color:var(--ink);border:1px solid #e4dfd3;border-bottom-left-radius:5px}
+.cv-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.cv-time{float:right;margin:9px 0 -3px 12px;font-size:11px;line-height:1;opacity:.55}
+.cv-ref{display:block;font-size:12px;margin-bottom:3px}
+.cv-form{display:flex;align-items:flex-end;gap:8px;margin-top:6px;padding:5px;background:#fff;border:1px solid var(--line);border-radius:26px}
+.cv-form textarea{flex:1;min-width:0;border:0;outline:0;box-shadow:none;resize:none;background:transparent;color:inherit;font:inherit;font-size:15px;line-height:1.35;padding:9px 10px;max-height:120px;overflow-y:auto}
+.cv-send{flex:0 0 40px;width:40px;height:40px;border:0;border-radius:50%;background:#b8935a;color:#fff;display:grid;place-items:center;cursor:pointer;padding:0}
+.cv-send:active{filter:brightness(.92)}
+html.dark .cv-day span{background:rgba(255,255,255,.09);color:#aab3c0}
+html.dark .cv-row.mine .cv-bubble{background:#4a3b22;color:#f6ecd8}
+html.dark .cv-row.theirs .cv-bubble{background:#1c232e;color:#e8ecf2;border-color:#2a323f}
+html.dark .cv-form{background:#151a22;border-color:#2a323f}
+
+html.dark .cv-form textarea,.cv-form textarea{background:transparent!important;border:0!important;box-shadow:none!important}
