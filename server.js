@@ -2624,6 +2624,9 @@ app.post('/api/messages',auth,needVerified,requireDb,ah(async(req,res)=>{
   const l=(await pool.query("SELECT id,title FROM listings WHERE id=$1 AND status='approved'",[Number(b.listing_id)])).rows[0];
   if(l){listingId=l.id;refTitle=l.title;}
  }
+ // Protecție la dublă apăsare: același mesaj către aceeași persoană în ultimele 8 secunde nu se mai salvează a doua oară.
+ {const dup=(await pool.query("SELECT id,created_at FROM messages WHERE sender_id=$1 AND recipient_id=$2 AND body=$3 AND created_at>NOW()-INTERVAL '8 seconds' ORDER BY id DESC LIMIT 1",[req.user.id,to,body])).rows[0];
+  if(dup)return res.json({ok:true,id:dup.id,created_at:dup.created_at,duplicate:true});}
  const ins=await pool.query('INSERT INTO messages(sender_id,recipient_id,body,listing_id,ref_title) VALUES($1,$2,$3,$4,$5) RETURNING id,created_at',[req.user.id,to,body,listingId,refTitle]);
  let deliveredNow=false;
  if(sseClients.has(Number(to))&&sseClients.get(Number(to)).size){deliveredNow=true;await pool.query('UPDATE messages SET delivered_at=NOW() WHERE id=$1',[ins.rows[0].id]);}

@@ -3698,7 +3698,26 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('click', e=>{ const b=e.target.closest('[data-remove-sell-image]'); if(b){ state.sellImages.splice(Number(b.dataset.removeSellImage),1); renderSellImages(); return; }
   const m=e.target.closest('[data-move-sell-image]'); if(m){ const i=Number(m.dataset.moveSellImage), k=i+Number(m.dataset.dir), a=state.sellImages; if(k>=0&&k<a.length){ [a[i],a[k]]=[a[k],a[i]]; renderSellImages(); } } });
-document.addEventListener('submit', e=>{ const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault(); safe(async()=>{ await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(f.dataset.to),body:$('#msgBody').value,listing_id:f.dataset.ref?Number(f.dataset.ref):undefined})}); renderAccountTool('messages',f.dataset.to,f.dataset.ref); })(); });
+/* Trimitere mesaj: un singur mesaj chiar dacă apeși de două ori (iPhone/Android). Butonul se blochează până se termină tot. */
+let msgSending=false;
+document.addEventListener('submit', e=>{
+  const f=e.target.closest&&e.target.closest('#msgForm'); if(!f) return; e.preventDefault();
+  if(msgSending) return;
+  const ta=$('#msgBody'), body=(ta.value||'').trim(); if(!body) return;
+  msgSending=true;
+  const btn=f.querySelector('.cv-send'); if(btn) btn.disabled=true; ta.readOnly=true;
+  safe(async()=>{
+    try{
+      await api('/api/messages',{method:'POST',body:JSON.stringify({to:Number(f.dataset.to),body,listing_id:f.dataset.ref?Number(f.dataset.ref):undefined})});
+      ta.value='';
+      await renderAccountTool('messages',f.dataset.to,f.dataset.ref);
+    }finally{
+      msgSending=false;
+      const b2=document.querySelector('#msgForm .cv-send'); if(b2) b2.disabled=false;
+      const t2=document.getElementById('msgBody'); if(t2) t2.readOnly=false;
+    }
+  })();
+});
 document.addEventListener('keydown', e=>{
   if(!$('#imageLightbox')?.classList.contains('hidden')){
     if(e.key==='Escape'){ e.preventDefault(); closeLightbox(); return; }
