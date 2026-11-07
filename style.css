@@ -4760,3 +4760,12 @@ html.no-glass .mdrawer .mi{background:rgba(255,255,255,.08)!important}
 /* ===== Browsere fără „gap” pe flexbox (Chromium < 84): meniul cu 3 linii se vedea ca o singură bară ===== */
 html.no-flex-gap .menu-btn i+i{margin-top:4px}
 @media(max-width:680px){html.no-flex-gap .menu-btn i+i{margin-top:3px}}
+
+/* poze din liste: fără salt de layout, fundal discret cât se încarcă */
+.ar-thumb img{background:var(--ivory,#f7f5f0)}
+
+/* lightbox: zoom la atingere (poza originală, derulabilă) */
+.image-lightbox-stage{overflow:hidden}
+.image-lightbox-stage img{cursor:zoom-in}
+.image-lightbox-stage.zoomed{display:block;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+.image-lightbox-stage.zoomed img{max-width:none;max-height:none;height:auto;margin:0 auto;border-radius:0;cursor:zoom-out}

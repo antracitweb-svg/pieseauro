@@ -593,7 +593,14 @@ async function dbReady(){
   'CREATE INDEX IF NOT EXISTS offers_request_idx ON offers(request_id)',
   'CREATE INDEX IF NOT EXISTS offers_seller_idx ON offers(seller_id,created_at DESC)',
   'CREATE INDEX IF NOT EXISTS messages_recipient_idx ON messages(recipient_id,created_at DESC)',
-  'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)'
+  'CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id,created_at DESC)',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS thumb_ver BIGINT',
+  'ALTER TABLE listings ADD COLUMN IF NOT EXISTS img_n INTEGER',
+  'CREATE TABLE IF NOT EXISTS listing_thumbs (listing_id INTEGER PRIMARY KEY REFERENCES listings(id) ON DELETE CASCADE, data BYTEA NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS listings_thumb_todo_idx ON listings(id) WHERE thumb_ver IS NULL',
+  "CREATE OR REPLACE FUNCTION listings_thumb_reset() RETURNS trigger AS $$ BEGIN NEW.thumb_ver:=NULL; NEW.img_n:=NULL; RETURN NEW; END $$ LANGUAGE plpgsql",
+  'DROP TRIGGER IF EXISTS listings_thumb_reset_trg ON listings',
+  'CREATE TRIGGER listings_thumb_reset_trg BEFORE UPDATE OF images ON listings FOR EACH ROW WHEN (OLD.images IS DISTINCT FROM NEW.images) EXECUTE FUNCTION listings_thumb_reset()'
  );
  for(const q of migrations){ try{ await pool.query(q); }catch(e){ console.error('MIGRARE EȘUATĂ:',String(q).slice(0,160),'->',e.message); } }
  /* coloanele din messages sunt necesare pentru Primite/Trimise/Arhivate: le asigurăm separat, indiferent de alte migrări */
@@ -1234,7 +1241,7 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,ah(async(req,res)=>{
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.discount_percent,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.oem_alt,l.delivery,LEFT(l.description,300) AS description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.power_hp,l.city,l.currency,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
+const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.discount_percent,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.oem_alt,l.delivery,LEFT(l.description,300) AS description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.power_hp,l.city,l.currency,(CASE WHEN l.thumb_ver>0 THEN ARRAY['/api/listings/'||l.id||'/thumb?v='||l.thumb_ver] WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0?w=640'] ELSE l.images[1:1] END) AS images,COALESCE(l.img_n,array_length(l.images,1),0)::int AS image_count";
 // Media calificativelor: ca vânzător (de la cumpărători) și ca cumpărător (de la vânzători).
 const RATE_SQL=(tbl,col,uid,al)=>`(SELECT ROUND(AVG(stars),1)::float FROM ${tbl} WHERE ${col}=${uid}) ${al}_avg,(SELECT COUNT(*)::int FROM ${tbl} WHERE ${col}=${uid}) ${al}_n`;
 const SELLER_RATE=(uid,al)=>RATE_SQL('seller_ratings','seller_id',uid,al);
@@ -1380,19 +1387,74 @@ app.get('/api/listings',requireDb,ah(async(req,res)=>{
 // Pozele vechi sunt base64 (sute de KB fiecare). Puse direct în <img src="data:...">, multe browsere mobile (Brave etc.) nu le afișează.
 // Le înlocuim cu URL-ul scurt /api/listings/:id/img/:n, la fel ca în listele de anunțuri (care se văd corect).
 function shortImgUrls(x){
- if(x&&Array.isArray(x.images))x.images=x.images.map((im,i)=>(typeof im==='string'&&im.startsWith('data:'))?'/api/listings/'+x.id+'/img/'+i:im);
+ if(x&&Array.isArray(x.images))x.images=x.images.map((im,i)=>(typeof im==='string'&&im.startsWith('data:'))?'/api/listings/'+x.id+'/img/'+i+'?w=1280&v='+(Number(x.thumb_ver)>0?Number(x.thumb_ver):0):im);
  return x;
 }
-// Poza unui anunț ca fișier (cache în browser). Pozele vechi sunt base64 în DB; listele trimit doar acest URL scurt.
+// Poza unui anunț ca fișier. Pozele vechi sunt base64 în DB. Cu ?w=640|1280 se trimite o variantă WebP redimensionată (dacă „sharp” e instalat);
+// cu ?v=<thumb_ver> potrivit, browserul o păstrează un an fără să mai întrebe serverul.
+let sharp=null;try{sharp=require('sharp');sharp.cache(false);sharp.concurrency(1);}catch{console.warn('Pachetul „sharp” lipsește: pozele se trimit la dimensiunea originală (fără miniaturi).');}
+let resizeActive=0;const resizeQ=[];
+function resizeSlot(){return new Promise(ok=>{const go=()=>{resizeActive++;ok(()=>{resizeActive--;const nx=resizeQ.shift();if(nx)nx();});};resizeActive<2?go():resizeQ.push(go);});}
+const RESIZE_CACHE=new Map();let RESIZE_BYTES=0;const RESIZE_MAX=32*1024*1024;
+function resizeCacheSet(k,buf){if(buf.length>RESIZE_MAX/4)return;RESIZE_CACHE.set(k,buf);RESIZE_BYTES+=buf.length;while(RESIZE_BYTES>RESIZE_MAX&&RESIZE_CACHE.size){const [k0,v0]=RESIZE_CACHE.entries().next().value;RESIZE_CACHE.delete(k0);RESIZE_BYTES-=v0.length;}}
 app.get('/api/listings/:id/img/:n(\\d{1,2})',requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
- const r=await pool.query("SELECT images[$2::int] img FROM listings WHERE id=$1 AND status NOT IN ('blocked','rejected')",[req.params.id,n+1]);
+ const r=await pool.query("SELECT images[$2::int] img,thumb_ver FROM listings WHERE id=$1 AND status NOT IN ('blocked','rejected')",[req.params.id,n+1]);
  const img=r.rowCount?(r.rows[0].img||''):'';
  if(/^https?:\/\//.test(img)){res.set('Cache-Control','public, max-age=3600');return res.redirect(302,img);}
  const m=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/.exec(img);
  if(!m)return res.status(404).end();
- res.set({'Content-Type':m[1],'Cache-Control':'public, max-age=86400'}).send(Buffer.from(m[2],'base64'));
+ const tv=Number(r.rows[0].thumb_ver)||0,w=[640,1280].includes(Number(req.query.w))?Number(req.query.w):0;
+ const cc=(tv>0&&Number(req.query.v)===tv)?'public, max-age=31536000, immutable':(w?'public, max-age=3600':'public, max-age=86400');
+ if(w&&sharp){
+  const key=req.params.id+':'+n+':'+w+':'+tv;let buf=RESIZE_CACHE.get(key);
+  if(!buf){const done=await resizeSlot();try{buf=await sharp(Buffer.from(m[2],'base64'),{limitInputPixels:40e6}).rotate().resize({width:w,withoutEnlargement:true}).webp({quality:78}).toBuffer();resizeCacheSet(key,buf);}catch(e){buf=null;}finally{done();}}
+  if(buf)return res.set({'Content-Type':'image/webp','Cache-Control':cc,'X-Content-Type-Options':'nosniff'}).send(buf);
+ }
+ res.set({'Content-Type':m[1],'Cache-Control':cc}).send(Buffer.from(m[2],'base64'));
 }));
+// Miniatura din liste (≈15-25 KB, 480px): se citește dintr-un tabel mic, fără să atingă pozele mari din anunț.
+app.get('/api/listings/:id(\\d+)/thumb',requireDb,ah(async(req,res)=>{
+ const r=await pool.query("SELECT t.data FROM listing_thumbs t JOIN listings l ON l.id=t.listing_id WHERE t.listing_id=$1 AND l.status NOT IN ('blocked','rejected')",[req.params.id]);
+ if(!r.rowCount){res.set('Cache-Control','public, max-age=60');return res.redirect(302,'/api/listings/'+Number(req.params.id)+'/img/0?w=640');}
+ res.set({'Content-Type':'image/webp','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff'}).send(r.rows[0].data);
+}));
+const THUMB_W=480;
+async function makeThumbBuffer(img){
+ let buf;const m=/^data:image\/(?:jpeg|png|webp);base64,(.+)$/.exec(img||'');
+ if(m)buf=Buffer.from(m[1],'base64');
+ else if(isStoredUrl(img)){const rr=await fetch(img,{signal:AbortSignal.timeout(12000)});if(!rr.ok)throw new Error('HTTP '+rr.status);const ab=await rr.arrayBuffer();if(ab.byteLength>15e6)throw new Error('prea mare');buf=Buffer.from(ab);}
+ else return null;
+ const done=await resizeSlot();
+ try{return await sharp(buf,{limitInputPixels:40e6}).rotate().resize({width:THUMB_W,withoutEnlargement:true}).webp({quality:72}).toBuffer();}finally{done();}
+}
+async function buildThumb(id){
+ const r=await pool.query('SELECT images[1] img,COALESCE(array_length(images,1),0)::int n FROM listings WHERE id=$1',[id]);
+ if(!r.rowCount)return;
+ const {img,n}=r.rows[0];let buf=null;
+ try{buf=img?await makeThumbBuffer(img):null;}catch(e){console.error('miniatură anunț',id,e.message);}
+ if(buf){
+  await pool.query('INSERT INTO listing_thumbs(listing_id,data) VALUES($1,$2) ON CONFLICT (listing_id) DO UPDATE SET data=EXCLUDED.data',[id,buf]);
+  await pool.query('UPDATE listings SET thumb_ver=$2,img_n=$3 WHERE id=$1',[id,Date.now(),n]);
+ }else{
+  await pool.query('DELETE FROM listing_thumbs WHERE listing_id=$1',[id]);
+  await pool.query('UPDATE listings SET thumb_ver=-1,img_n=$2 WHERE id=$1',[id,n]);
+ }
+}
+// Worker în fundal: anunțurile noi/modificate (thumb_ver NULL) primesc miniatura în câteva secunde; cele vechi se completează treptat, cele mai noi primele.
+let thumbBusy=false;
+async function thumbWorker(){
+ if(!pool||!sharp||thumbBusy)return;thumbBusy=true;let more=false;
+ try{
+  for(let i=0;i<25;i++){
+   const r=await pool.query('SELECT id FROM listings WHERE thumb_ver IS NULL ORDER BY id DESC LIMIT 1');
+   if(!r.rowCount)break;
+   try{await buildThumb(r.rows[0].id);}catch(e){console.error('miniatură',r.rows[0].id,e.message);await pool.query('UPDATE listings SET thumb_ver=-1 WHERE id=$1',[r.rows[0].id]).catch(()=>{});}
+   if(i===24)more=true;
+  }
+ }catch(e){console.error('thumbWorker',e.message);}
+ finally{thumbBusy=false;if(more)setTimeout(thumbWorker,1500).unref();}
+}
 app.get('/api/listings/:id',requireDb,async(req,res)=>{
  const r=await pool.query(`SELECT l.*,${SELLER_COLS},u.show_phone seller_show_phone,${VAC_SQL('u')} seller_vacation,CASE WHEN ${VAC_SQL('u')} THEN u.vacation_until::text END seller_vacation_until FROM listings l LEFT JOIN users u ON u.id=l.user_id WHERE l.id=$1 AND l.status='approved'`,[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
@@ -3300,6 +3362,7 @@ process.on('unhandledRejection',e=>console.error('unhandledRejection',e));
   if(pool)await loadRateState();
   const server=app.listen(PORT,()=>console.log(`AutoParts V26 running on ${PORT}`));
   if(pool){ensureVehicleDb();setInterval(ensureVehicleDb,12*3600*1000).unref();}
+  if(pool&&sharp){setTimeout(thumbWorker,4000).unref();setInterval(thumbWorker,20000).unref();}
   /* anti-adormire: se apeleaza singur pe adresa publica, ca Render sa vada trafic (dezactivare: KEEP_AWAKE=0) */
   const selfUrl=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;
   if(selfUrl&&process.env.KEEP_AWAKE!=='0'&&typeof fetch==='function'){

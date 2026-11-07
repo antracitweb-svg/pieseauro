@@ -4,12 +4,14 @@
    - Navigarea: network-first, cu fallback la index.html din cache când e offline.
    - Shell static (css/js/iconițe): stale-while-revalidate.
 */
-const VERSION = 'autoparts-v55';
+const VERSION = 'autoparts-v57';
+const THUMBS = 'autoparts-thumbs-v1';   /* miniaturile anunțurilor: imuabile (au ?v= în URL), cache-first, plafon 400 */
+const THUMBS_MAX = 400;
 const SHELL = [
   '/',
   '/index.html',
-  '/style.css?v=plus11',
-  '/script.js?v=plus8',
+  '/style.css?v=plus13',
+  '/script.js?v=plus10',
   '/realtime.js?v=4',
   '/theme-init.js',
   '/analytics.js',
@@ -30,7 +32,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== THUMBS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -41,6 +43,18 @@ self.addEventListener('fetch', (e) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  // Miniaturile din liste (/api/listings/<id>/thumb?v=<versiune>) sunt imuabile: cache-first => apar instant la a doua vizită
+  if (/^\/api\/listings\/\d+\/thumb$/.test(url.pathname) && /^\?v=\d+$/.test(url.search)) {
+    e.respondWith(
+      caches.open(THUMBS).then((c) => c.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res && res.ok) {
+          c.put(req, res.clone()).then(() => c.keys()).then((ks) => { if (ks.length > THUMBS_MAX) return Promise.all(ks.slice(0, ks.length - THUMBS_MAX).map((k) => c.delete(k))); }).catch(() => {});
+        }
+        return res;
+      })))
+    );
+    return;
+  }
   // API-urile și tracking-ul nu trec niciodată prin cache
   if (url.pathname.startsWith('/api/')) return;
 

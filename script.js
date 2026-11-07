@@ -1262,7 +1262,7 @@ function adRowHtml(x, eager){
   const isDism = x.type==='dezmembrari' || isCarT(x.type);
   const im = Array.isArray(x.images) && x.images[0] ? x.images[0] : '';
   const nImg = Number(x.image_count)||0;
-  const thumb = im ? `<img src="${esc(im)}" alt="" ${eager?'fetchpriority="high"':'loading="lazy"'} decoding="async">` : phHtml(x);
+  const thumb = im ? `<img src="${esc(im)}" alt="" width="112" height="112" ${eager===true||eager===1?'fetchpriority="high" loading="eager"':(eager?'loading="eager"':'loading="lazy"')} decoding="async">` : phHtml(x);
   const compat = [x.make,x.model,x.year].filter(Boolean).join(' ') + (x.engine?' · '+x.engine:'');
   const meta = [compat || x.category || 'Piesă auto'];
   if(compat && x.category && !isDism) meta.push(x.category);
@@ -1305,7 +1305,7 @@ async function loadHome(attempt=0){
     const list=(r&&r.listings)||[];
     if(!list.length){ wrap.classList.add('hidden'); box.innerHTML=''; return; }
     wrap.classList.remove('hidden');
-    box.innerHTML=list.map((x,i)=>card(x,{eager:i<3})).join(''); box.dataset.loaded='1';
+    box.innerHTML=list.map((x,i)=>card(x,{eager:i<4?1:(i<8?2:0)})).join(''); box.dataset.loaded='1';
     updateFavUI();
   }catch(e){
     if(box.dataset.loaded) return;
@@ -1313,6 +1313,10 @@ async function loadHome(attempt=0){
     /* nu mai ascundem tăcut secțiunea: arătăm motivul, ca să se vadă și pe dispozitive unde nu există consolă */
     box.innerHTML='<p class="empty">Nu am putut încărca anunțurile'+(e&&e.message?' ('+esc(e.message)+')':'')+'. Reîncarcă pagina.</p>';
   }
+}
+const WARMED = new Set();
+function warmImages(list, n){
+  try{ (list||[]).slice(0,n||8).forEach(x=>{ const u = Array.isArray(x.images)&&x.images[0]; if(u && !WARMED.has(u)){ WARMED.add(u); const im = new Image(); im.decoding = 'async'; im.src = u; } }); }catch{}
 }
 function card(x, o={}){
   if(o.mine) return cardMine(x);
@@ -1411,7 +1415,7 @@ async function loadResults(reset){
     const r = await api('/api/listings?'+qs.toString());
     if(token!==state.token) return;
     state.total = r.total; state.loaded = r.listings; state.facets = r.facets||null; state.offset = (state.page-1)*30;
-    renderList();
+    warmImages(r.listings,8); renderList();
     if(reset && window.track) window.track('search',{q:String(state.filters.q||'').slice(0,60),type:String(state.filters.type||'')});
   }catch(e){
     if(token!==state.token) return;
@@ -1475,7 +1479,7 @@ function renderList(){
   renderSellerBanner();
   $('#crumbCurrent').textContent = title;
   $('#resultCount').textContent = state.total===1 ? '1 anunț' : `${state.total} anunțuri`; { const sc=document.querySelector('#sellerBanner .sb-count'); if(sc) sc.textContent=$('#resultCount').textContent; }
-  $('#listingGrid').innerHTML = state.loaded.map(x=>card(x,{mine})).join('');
+  $('#listingGrid').innerHTML = state.loaded.map((x,i)=>card(x,{mine,eager:i<4?1:(i<8?2:0)})).join('');
   $('#noResults').classList.toggle('hidden', state.loaded.length>0);
   renderFacets(); renderRelated(); renderRequestCta();
   renderPagination();
@@ -1542,11 +1546,23 @@ function openLightbox(src, images=[], index=0, alt='Poza anunțului'){
   document.body.classList.add('lightbox-open');
   renderLightbox();
 }
+/* poza originală: scoatem parametrul ?w= (galeria folosește varianta redimensionată, lightbox-ul o vrea pe cea completă) */
+function lightboxFullSrc(src){ return String(src).replace(/([?&])w=\d+&?/,'$1').replace(/[?&]$/,''); }
+function toggleLightboxZoom(){
+  const img=$('#imageLightboxImg'), st=img&&img.parentElement; if(!st) return;
+  if(st.classList.contains('zoomed')){ st.classList.remove('zoomed'); img.style.width=''; st.scrollTo(0,0); return; }
+  const w=Math.min(st.clientWidth*2.6, Math.max(img.naturalWidth||0, st.clientWidth*1.5));
+  st.classList.add('zoomed'); img.style.width=Math.round(w)+'px';
+  st.scrollLeft=(st.scrollWidth-st.clientWidth)/2; st.scrollTop=(st.scrollHeight-st.clientHeight)/2;
+}
 function renderLightbox(){
   const modal=$('#imageLightbox'), counter=$('#imageLightboxCounter');
   if(!modal||!lightboxImages.length) return;
   const image=freshLightboxImg(); if(!image) return;
-  image.src=lightboxImages[lightboxIndex];
+  { const st=image.parentElement; if(st){ st.classList.remove('zoomed'); st.scrollTo&&st.scrollTo(0,0); } }
+  const low=lightboxImages[lightboxIndex], full=lightboxFullSrc(low);
+  image.src=low;
+  if(full!==low){ const pre=new Image(); pre.onload=()=>{ if($('#imageLightboxImg')===image) image.src=full; }; pre.src=full; }
   if(counter) counter.textContent=`${lightboxIndex+1} / ${lightboxImages.length}`;
   const prev=$('#imageLightboxPrev'), next=$('#imageLightboxNext');
   if(prev) prev.disabled=lightboxImages.length<2;
@@ -2478,12 +2494,12 @@ function fileToDataUrl(file){
     if(file.size>20*1024*1024)return reject(new Error('O poză poate avea maximum 20 MB.'));
     const reader=new FileReader(); reader.onload=()=>{
       const img=new Image(); img.onload=()=>{
-        const TARGET=520000;
-        for(const max of [1600,1280,1000,800]){
+        const TARGET=650000;
+        for(const max of [1920,1600,1280,1000,800]){
           const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
           const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(img.naturalWidth*scale)); c.height=Math.max(1,Math.round(img.naturalHeight*scale));
           const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(img,0,0,c.width,c.height);
-          let q=.82, out=c.toDataURL('image/jpeg',q);
+          let q=.86, out=c.toDataURL('image/jpeg',q);
           while(out.length>TARGET && q>.5){q-=.08; out=c.toDataURL('image/jpeg',q);}
           if(out.length<=TARGET)return resolve(out);
         }
@@ -3791,6 +3807,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-saved-open]'))){ const s=getSaved()[Number(el.dataset.savedOpen)]; if(s) navigate('rezultate?'+s.qs); return; }
   if((el=t.closest('[data-saved-del]'))){ const list=getSaved(); list.splice(Number(el.dataset.savedDel),1); writeJSON('autopiese_saved_searches',list); renderSaved(); return; }
   if((el=t.closest('[data-ad-slide]'))){ const g=el.closest('.ad-gal'), sl=g&&g.querySelector('.pic-slider'); if(sl) sl.scrollBy({left:Number(el.dataset.adSlide)*sl.clientWidth,behavior:'smooth'}); return; }
+  if(t.id==='imageLightboxImg'){ toggleLightboxZoom(); return; }
   if((el=t.closest('[data-lightbox-src]'))){
     const src=el.dataset.lightboxSrc;
     let images=[src], index=0;
@@ -4639,7 +4656,7 @@ function bumpUnreadBadge(){
   fillStaticSelects();
   wire();
   /* pornim în paralel: lista de pe prima pagină și catalogul de vehicule, fără să așteptăm /api/me */
-  if(parseHash().name==='home'){ try{ window.__feed0 = api('/api/listings?limit=12&offset=0'); window.__feed0.catch(()=>{}); }catch{} }
+  if(parseHash().name==='home'){ try{ window.__feed0 = api('/api/listings?limit=12&offset=0'); window.__feed0.then(r=>warmImages(r&&r.listings,8)).catch(()=>{}); }catch{} }
   const catP = loadCatalog();
   try{ const r = await api('/api/me'); currentUser = r.user || null; window.__verif = r.verification || null; }catch{ currentUser = null; }
   renderHeader();
