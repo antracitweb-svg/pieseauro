@@ -151,14 +151,14 @@ app.use(cookieParser());
 // Protecție CSRF suplimentară (pe lângă sameSite=lax): cererile care modifică date și vin cu un Origin străin sunt respinse.
 // Cererile fără Origin (scripturi, unele clienți vechi) trec; browserele trimit Origin la orice POST/PUT/PATCH/DELETE.
 app.use((req,res,next)=>{
- if(req.method==='GET'||req.method==='HEAD'||req.method==='OPTIONS')return next();
+ if(req.method==='GET'||req.method==='HEAD'||req.method==='OPTIONS'||req.path==='/api/botcheck')return next();
  const o=req.headers.origin;if(!o)return next();
  try{
   const allowed=new Set([String(req.headers.host||'').toLowerCase()]);
   for(const u of [process.env.APP_URL,process.env.RENDER_EXTERNAL_URL]){try{if(u)allowed.add(new URL(u).host.toLowerCase());}catch{}}
   if(allowed.has(new URL(o).host.toLowerCase()))return next();
  }catch{}
- return res.status(403).json({error:'ORIGIN_INVALID'});
+ console.warn('ORIGIN_INVALID:',o,'host=',req.headers.host);return res.status(403).json({error:'ORIGIN_INVALID'});
 });
 // Cache scurt (10 s) pentru căutările publice; se golește la orice modificare de anunțuri/conturi.
 let SEO_IDX=null;
@@ -168,7 +168,7 @@ app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listin
 /* ===== BOT-GUARD:START — verificare de browser, limitare cereri, blocare scrapere ===== */
 const dns=require('dns').promises;
 const BOT_CHECK=IS_PROD&&String(process.env.BOT_CHECK||'true').toLowerCase()!=='false';
-const BOT_BITS=Math.min(20,Math.max(10,Number(process.env.BOT_DIFFICULTY)||15));
+const BOT_BITS=Math.min(20,Math.max(10,Number(process.env.BOT_DIFFICULTY)||14));
 // BOT_SECRET este obligatoriu în producție (când BOT_CHECK e activ). Nu mai derivăm cheia din DATABASE_URL/ADMIN_PASSWORD.
 if(BOT_CHECK&&!process.env.BOT_SECRET){console.warn('ATENȚIE: BOT_SECRET lipsește. Folosesc o cheie temporară generată la pornire (verificările anti-bot se reiau după fiecare repornire). Setează BOT_SECRET în Render (min. 32 caractere aleatoare).');}
 if(BOT_CHECK&&process.env.BOT_SECRET&&String(process.env.BOT_SECRET).length<32){console.warn('ATENȚIE: BOT_SECRET este prea scurt (recomandat minimum 32 de caractere).');}
@@ -241,28 +241,41 @@ async function loadRateState(){
   console.log('Limitări restaurate din baza de date:',n);
  }catch(e){console.error('rate_state load',e.message);}
 }
-const BOT_JS=`(function(){var el=document.querySelector('script[data-c]');if(!el)return;var chal=el.getAttribute('data-c'),bits=Number(el.getAttribute('data-b'))||15,msg=document.getElementById('bc-msg'),enc=new TextEncoder();
+const BOT_JS=`(function(){var el=document.querySelector('script[data-c]');if(!el)return;var chal=el.getAttribute('data-c'),bits=Number(el.getAttribute('data-b'))||14,msg=document.getElementById('bc-msg'),enc=new TextEncoder();
 function zb(h){var n=0;for(var i=0;i<h.length;i++){if(h[i]===0){n+=8;continue;}n+=Math.clz32(h[i])-24;break;}return n;}
 function fail(t){msg.textContent=t;msg.className='bc-err';}
-(async function(){try{if(!window.crypto||!crypto.subtle)throw new Error('nocrypto');var i=0;for(;;){var h=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(chal+':'+i)));if(zb(h)>=bits)break;i++;}
+async function solve(c,b){var i=0;for(;;){var h=new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(c+':'+i)));if(zb(h)>=b)return i;i++;}}
+(async function(){var last='';try{if(!window.crypto||!crypto.subtle)throw new Error('nocrypto');
+for(var t=0;t<3;t++){var i=await solve(chal,bits);
 var r=await fetch('/api/botcheck',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({chal:chal,counter:i})});
-if(r.ok){location.reload();return;}fail(r.status===429?'Prea multe încercări. Așteaptă câteva minute și reîncarcă pagina.':'Verificarea nu a reușit. Reîncarcă pagina.');}
-catch(e){fail('Browserul nu a putut face verificarea. Folosește un browser actual, cu HTTPS și JavaScript activ.');}})();})();`;
+if(r.ok){location.reload();return;}
+var code='';try{var j=await r.json();code=(j&&j.error)||'';}catch(_){}
+last='(cod: '+r.status+(code?' '+code:'')+')';
+if(r.status===429){fail('Prea multe încercări. Așteaptă câteva minute și reîncarcă pagina.');return;}
+if(r.status!==400)break;
+var n=await fetch('/api/botcheck',{credentials:'same-origin',cache:'no-store'});if(!n.ok)break;var nj=await n.json();if(!nj||!nj.chal)break;chal=nj.chal;bits=Number(nj.b)||bits;}
+fail('Verificarea nu a reușit. Reîncarcă pagina. '+last);}
+catch(e){fail('Browserul nu a putut face verificarea. Folosește un browser actual, cu HTTPS și JavaScript activ. ('+(e&&e.message?e.message:e)+')');}})();})();`;
 function challengePage(req){
  const c=newChallenge(req);
  return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Verificăm browserul… | AutoParts</title><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#0e0f12;color:#e9d3a8;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;text-align:center}.bc{padding:24px;max-width:420px}.bc h1{font-size:22px;margin:18px 0 8px;font-weight:650}.bc p{margin:0;color:#a89c86;font-size:15px;line-height:1.5}.bc .bc-err{color:#f0b4b4}.bc-spin{width:42px;height:42px;margin:0 auto;border-radius:50%;border:3px solid rgba(212,180,131,.25);border-top-color:#d4b483;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.bc-spin{animation-duration:3s}}</style></head><body><main class="bc"><div class="bc-spin" aria-hidden="true"></div><h1>Verificăm browserul…</h1><p id="bc-msg" role="status">Durează câteva secunde. Pagina se reîncarcă automat.</p><noscript><p class="bc-err">Activează JavaScript pentru a continua.</p></noscript></main><script src="/bot-check.js" data-c="${c}" data-b="${BOT_BITS}" defer></script></body></html>`;
 }
 app.get('/bot-check.js',(req,res)=>{res.set('Cache-Control','public, max-age=3600').type('application/javascript').send(BOT_JS);});
+app.get('/api/botcheck',(req,res)=>{
+ if(!throttle(botAttempts,'g:'+clientIp(req),60,10*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
+ res.set('Cache-Control','no-store').json({chal:newChallenge(req),b:BOT_BITS});
+});
 app.post('/api/botcheck',(req,res)=>{
  if(!throttle(botAttempts,clientIp(req),30,10*60*1000))return res.status(429).json({error:'PREA_MULTE_CERERI'});
  const {chal,counter}=req.body||{};
  if(typeof chal!=='string'||chal.length>400||!Number.isInteger(counter)||counter<0||counter>1e9)return res.status(400).json({error:'DATE_INVALIDE'});
  const [p,sig]=chal.split('.');
- if(!p||!sig||!safeEq(sig,botHmac(p)))return res.status(400).json({error:'BOT_CHECK'});
+ if(!p||!sig||!safeEq(sig,botHmac(p))){console.warn('botcheck: semnătură invalidă (BOT_SECRET schimbat / repornire server?)');return res.status(400).json({error:'BOT_CHECK'});}
  let d;try{d=JSON.parse(Buffer.from(p,'base64url').toString());}catch{return res.status(400).json({error:'BOT_CHECK'});}
  const age=Date.now()-Number(d.t);
- if(!(age>=0&&age<5*60*1000)||usedChal.has(d.n))return res.status(400).json({error:'BOT_CHECK'});
- if(zeroBits(crypto.createHash('sha256').update(chal+':'+counter).digest())<Number(d.b))return res.status(400).json({error:'BOT_CHECK'});
+ if(!(age>=0&&age<15*60*1000)){console.warn('botcheck: challenge expirat, vârsta(s)=',Math.round(age/1000));return res.status(400).json({error:'BOT_CHECK'});}
+ if(usedChal.has(d.n)){console.warn('botcheck: challenge refolosit');return res.status(400).json({error:'BOT_CHECK'});}
+ if(zeroBits(crypto.createHash('sha256').update(chal+':'+counter).digest())<Number(d.b)){console.warn('botcheck: dovada de lucru nu corespunde');return res.status(400).json({error:'BOT_CHECK'});}
  usedChal.set(d.n,Date.now()+10*60*1000);markDirty(usedChal,d.n);
  const exp=Date.now()+12*3600*1000,u=uaHash(req);
  res.cookie('bv',exp+'.'+u+'.'+botHmac(exp+'.'+u),safeCookieOptions(12*3600*1000));
