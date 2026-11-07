@@ -4752,5 +4752,11 @@ html.no-glass .mdrawer .mi{background:rgba(255,255,255,.08)!important}
   .ad-gal-empty{height:min(56vw,300px)}
 }
 
-/* Comutatorul grilă/listă stă în colțul din dreapta sus al zonei de titlu: lasă loc și pe ecrane late, ca să nu acopere titlul */
-#page-home .home-center h1{padding-left:76px;padding-right:76px}
+/* Comutatorul grilă/listă: pe ecrane late stă ÎN AFARA zonei de titlu (în dreapta ei), ca să nu acopere „auto”;
+   pe ecrane mai înguste (tabletă) rămâne în colț, iar titlul primește margini laterale. */
+@media(min-width:801px) and (max-width:1199px){#page-home .home-center h1{padding-left:76px;padding-right:76px}}
+@media(min-width:1200px){#page-home .vt-bar-home{right:-108px}}
+
+/* ===== Browsere fără „gap” pe flexbox (Chromium < 84): meniul cu 3 linii se vedea ca o singură bară ===== */
+html.no-flex-gap .menu-btn i+i{margin-top:4px}
+@media(max-width:680px){html.no-flex-gap .menu-btn i+i{margin-top:3px}}

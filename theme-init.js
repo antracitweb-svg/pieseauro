@@ -56,3 +56,23 @@ try{
 
 /* Compatibilitate browsere vechi (TV): Array.prototype.flat lipsește sub Chrome 69 */
 try{ if(!Array.prototype.flat){ Object.defineProperty(Array.prototype,'flat',{configurable:true,writable:true,value:function(d){ d=d===undefined?1:Number(d); var f=function(a,n){ return a.reduce(function(r,x){ return r.concat(Array.isArray(x)&&n>0?f(x,n-1):x); },[]); }; return f(this,d); }}); } }catch(e){}
+
+/* Efectul „liquid glass” rămâne activ peste tot. Dacă pe un dispozitiv e prea greu, ?glass=0 îl oprește (se reține în localStorage), ?glass=1 îl repornește. */
+try{
+  var __gm=/[?&]glass=([01])(&|$|#)/.exec(location.search);
+  if(__gm){ try{ localStorage.setItem('glass',__gm[1]); }catch(e){} }
+  var __gp=null; try{ __gp=localStorage.getItem('glass'); }catch(e){}
+  if(__gp==='0') document.documentElement.classList.add('no-glass');
+}catch(e){}
+
+/* Detectează browserele fără „gap” pe flexbox (Chromium < 84, ex. unele televizoare) și pune clasa no-flex-gap, folosită de CSS pentru alternative cu margini. */
+try{
+  var __fg=document.createElement('div');
+  __fg.style.cssText='display:flex;flex-direction:column;row-gap:1px;position:absolute;visibility:hidden;left:-9999px';
+  var __a=document.createElement('div'),__b=document.createElement('div');
+  __a.style.height='1px'; __b.style.height='1px'; __fg.appendChild(__a); __fg.appendChild(__b);
+  document.documentElement.appendChild(__fg);
+  var __okgap=(__fg.scrollHeight===3);
+  document.documentElement.removeChild(__fg);
+  if(!__okgap) document.documentElement.classList.add('no-flex-gap');
+}catch(e){}
