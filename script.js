@@ -499,7 +499,7 @@ function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
   renderAccountAvatar();
   renderAccountRatings();
-  api('/api/credits').then(r=>{ const el=$('#accCredits'); if(el) el.textContent=r.balance; }).catch(()=>{});
+  api('/api/credits').then(r=>{ const el=$('#accCredits'); if(el) el.textContent=Number(r.balance||0).toLocaleString('ro-RO'); }).catch(()=>{});
   api('/api/account/settings').then(r=>{ if(currentUser&&r.user){ currentUser.has_avatar=!!r.user.has_avatar; renderAccountAvatar(); } }).catch(()=>{});
   renderHeader();
   /* pe telefon pornește cu o singură secțiune deschisă */
@@ -4132,7 +4132,7 @@ async function promoGo(el){
   try{
     const r=await api('/api/listings/'+id+'/promote',{method:'POST',body:JSON.stringify({days})});
     $('#promoModal').classList.add('hidden');
-    const ac=$('#accCredits'); if(ac) ac.textContent=r.balance;
+    const ac=$('#accCredits'); if(ac) ac.textContent=Number(r.balance||0).toLocaleString('ro-RO');
     toast('Anunțul este promovat '+days+' zile.');
     const lst=await api('/api/listings/mine'); mine.items=lst.listings||[]; state.loaded=mine.items; if($('#mineList')) renderMine();
   }catch(e){ el.disabled=false; toast(e.status===402?'Nu ai destule credite.':(e.message||'Nu am putut promova anunțul.')); }

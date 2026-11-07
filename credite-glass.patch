@@ -1,0 +1,115 @@
+--- a/index.html
++++ b/index.html
+@@ -24,7 +24,7 @@
+ <meta name="twitter:description" content="Caută piese auto noi și second-hand după cod OEM, marcă și model. Cere oferte de la dezmembrări și magazine auto din toată România.">
+ <meta name="twitter:image" content="https://pieseauto.ro/assets/og-image.png">
+ <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f12'/%3E%3Cpath d='M16 6 L26 26 H21.5 L16 14 L10.5 26 H6 Z' fill='%23ffb020'/%3E%3C/svg%3E">
+-<link rel="stylesheet" href="style.css?v=plus13">
++<link rel="stylesheet" href="style.css?v=plus14">
+ <script src="theme-init.js"></script>
+ <script src="analytics.js" defer></script>
+ <link rel="manifest" href="/manifest.webmanifest">
+@@ -78,7 +78,7 @@
+ 
+ 
+ 
+-<section class="page" id="page-account"><div class="container narrow"><div class="acc-user"><div class="acc-avatar-wrap"><button type="button" class="acc-avatar" id="avatarBtn" aria-label="Schimbă poza de profil" title="Schimbă poza de profil"><i>👤</i></button><span class="acc-cam" aria-hidden="true">+</span><input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp" hidden></div><div><b id="accountHello"></b><small>Cont standard</small><small>Credite în cont: <b id="accCredits">0</b></small><small class="acc-rating" id="accRating"></small></div><button class="back" data-back>← Înapoi</button><button type="button" class="acc-notif" id="notifBtn" aria-expanded="false" aria-controls="notifSummary"><span class="bell" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 22a2.6 2.6 0 0 0 2.5-2h-5A2.6 2.6 0 0 0 12 22zm7-6.2V11a7 7 0 0 0-5.2-6.8V3.5a1.8 1.8 0 0 0-3.6 0v.7A7 7 0 0 0 5 11v4.8l-1.7 1.7V19h17.4v-1.5L19 15.8z"/></svg></span> Notificări <em class="cnt" data-cnt="total"></em></button></div><div class="notif-summary hidden" id="notifSummary" role="region" aria-label="Rezumat notificări"></div><div class="verify-banner hidden" id="verifyBanner"><span>Adresa ta de email nu este confirmată.</span><button type="button" class="btn ghost small" id="resendVerifyBtn">Retrimite emailul de confirmare</button></div><nav class="acc-quick" aria-label="Scurtături cont"><button type="button" class="facet" data-account="listings">Anunțuri</button><button type="button" class="facet" data-account="requests">Cereri</button><button type="button" class="facet" data-account="offers-received">Oferte primite</button><button type="button" class="facet" data-account="orders">Comenzi</button><button type="button" class="facet" data-account="favorites">Favorite</button><button type="button" class="facet" data-account="saved">Căutări</button><button type="button" class="facet" data-account="messages">Mesaje</button></nav><div class="account-sections"><details open><summary><span class="acc-ico">⇪</span><b>VÂND</b><em class="cnt sec-cnt" data-cnt="sec_seller"></em><span class="acc-caret">⌃</span></summary><button data-account="listings">Anunțurile mele <em class="cnt" data-cnt="expire"></em><i>›</i></button><button data-account="offers">Răspunsuri la cereri <i>›</i></button><button data-account="orders-seller">Vânzări din cereri <em class="cnt" data-cnt="orders_seller"></em><i>›</i></button><button data-account="offer-questions">Întrebări de la cumpărători <i>›</i></button></details><details><summary><span class="acc-ico">⇩</span><b>CUMPĂR</b><em class="cnt sec-cnt" data-cnt="sec_buyer"></em><span class="acc-caret">⌃</span></summary><button data-account="requests">Cererile mele de piese <i>›</i></button><button data-account="offers-received">Ofertele primite <em class="cnt" data-cnt="offers_received"></em><i>›</i></button><button data-account="favorites">Favorite <i>›</i></button><button data-account="orders">Comenzile mele <em class="cnt" data-cnt="orders_buyer"></em><i>›</i></button><button data-account="saved">Căutări salvate <i>›</i></button></details><details><summary><span class="acc-ico">✉</span><b>CONVERSAȚII</b><em class="cnt sec-cnt" data-cnt="sec_msgs"></em><span class="acc-caret">⌃</span></summary><button data-account="messages">Mesaje <em class="cnt" data-cnt="messages"></em><i>›</i></button><button data-account="notifications">Notificări <em class="cnt" data-cnt="notif_all"></em><i>›</i></button></details><details><summary><span class="acc-ico">⚒</span><b>INSTRUMENTE</b><span class="acc-caret">⌃</span></summary><button type="button" data-csv-import>Import CSV <i>›</i></button><button data-account="bulk-price">Actualizare prețuri <i>›</i></button><button data-account="generator">Generator de anunțuri <i>›</i></button><button data-account="stats">Statistici cont <i>›</i></button><button data-account="b2b">B2B <i>›</i></button></details><details><summary><span class="acc-ico">▤</span><b>BANI</b><span class="acc-caret">⌃</span></summary><button data-account="credits">Credite <i>›</i></button><button data-account="transactions">Tranzacții <i>›</i></button><button data-account="invoices">Facturi <i>›</i></button></details><details><summary><span class="acc-ico">★</span><b>CALIFICATIVE</b><span class="acc-caret">⌃</span></summary><button data-account="ratings">Calificativele mele <i>›</i></button></details><details><summary><span class="acc-ico">⚙</span><b>SETĂRI</b><span class="acc-caret">⌃</span></summary><button data-account="settings">Date generale și telefoane <i>›</i></button></details><div class="account-admin-compat hidden" id="accountAdmin"><button data-action="admin">Panou de administrare</button></div><button class="btn danger full" id="logoutBtn">Ieșire din cont</button></div></div></section>
++<section class="page" id="page-account"><div class="container narrow"><div class="acc-user"><div class="acc-avatar-wrap"><button type="button" class="acc-avatar" id="avatarBtn" aria-label="Schimbă poza de profil" title="Schimbă poza de profil"><i>👤</i></button><span class="acc-cam" aria-hidden="true">+</span><input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp" hidden></div><div><b id="accountHello"></b><small>Cont standard</small><small class="acc-rating" id="accRating"></small></div><button class="back" data-back>← Înapoi</button><button type="button" class="acc-notif" id="notifBtn" aria-expanded="false" aria-controls="notifSummary"><span class="bell" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 22a2.6 2.6 0 0 0 2.5-2h-5A2.6 2.6 0 0 0 12 22zm7-6.2V11a7 7 0 0 0-5.2-6.8V3.5a1.8 1.8 0 0 0-3.6 0v.7A7 7 0 0 0 5 11v4.8l-1.7 1.7V19h17.4v-1.5L19 15.8z"/></svg></span> Notificări <em class="cnt" data-cnt="total"></em></button></div><div class="notif-summary hidden" id="notifSummary" role="region" aria-label="Rezumat notificări"></div><div class="verify-banner hidden" id="verifyBanner"><span>Adresa ta de email nu este confirmată.</span><button type="button" class="btn ghost small" id="resendVerifyBtn">Retrimite emailul de confirmare</button></div><div class="cg" role="group" aria-label="Credite în cont"><span class="cg-b cg-b1" aria-hidden="true"></span><span class="cg-b cg-b2" aria-hidden="true"></span><div class="cg-card"><span class="cg-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.6-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.8-2.5 2s1 1.7 2.5 2c1.5.3 2.5.8 2.5 2s-1.1 2-2.5 2c-1 0-1.9-.4-2.5-1.2M12 6.5V8m0 8v1.5"/></svg></span><div class="cg-txt"><small>Credite în cont</small><b id="accCredits">0</b></div><button type="button" class="cg-btn" data-account="credits">Adaugă credite</button></div></div><nav class="acc-quick" aria-label="Scurtături cont"><button type="button" class="facet" data-account="listings">Anunțuri</button><button type="button" class="facet" data-account="requests">Cereri</button><button type="button" class="facet" data-account="offers-received">Oferte primite</button><button type="button" class="facet" data-account="orders">Comenzi</button><button type="button" class="facet" data-account="favorites">Favorite</button><button type="button" class="facet" data-account="saved">Căutări</button><button type="button" class="facet" data-account="messages">Mesaje</button></nav><div class="account-sections"><details open><summary><span class="acc-ico">⇪</span><b>VÂND</b><em class="cnt sec-cnt" data-cnt="sec_seller"></em><span class="acc-caret">⌃</span></summary><button data-account="listings">Anunțurile mele <em class="cnt" data-cnt="expire"></em><i>›</i></button><button data-account="offers">Răspunsuri la cereri <i>›</i></button><button data-account="orders-seller">Vânzări din cereri <em class="cnt" data-cnt="orders_seller"></em><i>›</i></button><button data-account="offer-questions">Întrebări de la cumpărători <i>›</i></button></details><details><summary><span class="acc-ico">⇩</span><b>CUMPĂR</b><em class="cnt sec-cnt" data-cnt="sec_buyer"></em><span class="acc-caret">⌃</span></summary><button data-account="requests">Cererile mele de piese <i>›</i></button><button data-account="offers-received">Ofertele primite <em class="cnt" data-cnt="offers_received"></em><i>›</i></button><button data-account="favorites">Favorite <i>›</i></button><button data-account="orders">Comenzile mele <em class="cnt" data-cnt="orders_buyer"></em><i>›</i></button><button data-account="saved">Căutări salvate <i>›</i></button></details><details><summary><span class="acc-ico">✉</span><b>CONVERSAȚII</b><em class="cnt sec-cnt" data-cnt="sec_msgs"></em><span class="acc-caret">⌃</span></summary><button data-account="messages">Mesaje <em class="cnt" data-cnt="messages"></em><i>›</i></button><button data-account="notifications">Notificări <em class="cnt" data-cnt="notif_all"></em><i>›</i></button></details><details><summary><span class="acc-ico">⚒</span><b>INSTRUMENTE</b><span class="acc-caret">⌃</span></summary><button type="button" data-csv-import>Import CSV <i>›</i></button><button data-account="bulk-price">Actualizare prețuri <i>›</i></button><button data-account="generator">Generator de anunțuri <i>›</i></button><button data-account="stats">Statistici cont <i>›</i></button><button data-account="b2b">B2B <i>›</i></button></details><details><summary><span class="acc-ico">▤</span><b>BANI</b><span class="acc-caret">⌃</span></summary><button data-account="credits">Credite <i>›</i></button><button data-account="transactions">Tranzacții <i>›</i></button><button data-account="invoices">Facturi <i>›</i></button></details><details><summary><span class="acc-ico">★</span><b>CALIFICATIVE</b><span class="acc-caret">⌃</span></summary><button data-account="ratings">Calificativele mele <i>›</i></button></details><details><summary><span class="acc-ico">⚙</span><b>SETĂRI</b><span class="acc-caret">⌃</span></summary><button data-account="settings">Date generale și telefoane <i>›</i></button></details><div class="account-admin-compat hidden" id="accountAdmin"><button data-action="admin">Panou de administrare</button></div><button class="btn danger full" id="logoutBtn">Ieșire din cont</button></div></div></section>
+ 
+ <section class="page" id="page-request-pick"><div class="container narrow"><div class="page-head hd-compact"><button class="back" data-back>← Înapoi</button><div><div class="eyebrow">CERERE</div><h2>Primește oferte piese</h2><p>Tu ceri, vânzătorii îți trimit oferte. Alege mașina.</p></div></div><div class="cp-card"><h3 class="req-sec">Alege mașina ta</h3><div class="cp-list" id="carPickList"></div><div class="cp-or" id="carPickOr">sau</div><button type="button" class="btn ghost full" id="carPickNew">+ Adaugă o cerere pentru altă mașină</button></div></div></section>
+ 
+@@ -339,5 +339,5 @@
+   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
+ </div>
+ <script src="realtime.js?v=4" defer></script>
+-<script src="script.js?v=plus10" defer></script>
++<script src="script.js?v=plus11" defer></script>
+ </body></html>
+--- a/style.css
++++ b/style.css
+@@ -4769,3 +4769,54 @@
+ .image-lightbox-stage img{cursor:zoom-in}
+ .image-lightbox-stage.zoomed{display:block;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+ .image-lightbox-stage.zoomed img{max-width:none;max-height:none;height:auto;margin:0 auto;border-radius:0;cursor:zoom-out}
++
++/* ===== Credite în cont: banner „liquid glass” (zi + dark) =====
++   Între cardul de profil și pastilele Anunțuri/Cereri. Id-ul #accCredits rămâne același, deci JS-ul existent îl umple. */
++#page-account .cg{position:relative;margin:0 0 12px;border-radius:20px;isolation:isolate}
++#page-account .cg-b{position:absolute;border-radius:50%;z-index:-1;filter:blur(4px);pointer-events:none}
++#page-account .cg-b1{width:86px;height:86px;left:10px;top:-4px;background:radial-gradient(circle,#c98f3a,#a8742a 70%);opacity:.65;animation:cgDrift1 6s ease-in-out infinite alternate}
++#page-account .cg-b2{width:108px;height:66px;right:14px;bottom:-4px;background:radial-gradient(circle,#b8935a,#8f6d38 70%);opacity:.6;animation:cgDrift2 7s ease-in-out infinite alternate}
++@keyframes cgDrift1{to{transform:translate(170px,10px)}}
++@keyframes cgDrift2{to{transform:translate(-150px,-8px)}}
++#page-account .cg-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:18px;color:#3b2c10;
++  background:linear-gradient(135deg,rgba(143,109,56,.26),rgba(184,147,90,.14));
++  -webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);
++  border:1px solid rgba(255,248,230,.65);
++  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.7),inset 0 -10px 18px rgba(143,109,56,.18),0 10px 24px rgba(143,109,56,.2)}
++#page-account .cg-card::before{content:"";position:absolute;left:0;right:0;top:0;height:50%;pointer-events:none;
++  background:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0));border-radius:18px 18px 50% 50%/18px 18px 14px 14px}
++#page-account .cg-card>*{position:relative;z-index:1}
++#page-account .cg-ico{display:inline-flex;color:#8f6d38}
++#page-account .cg-txt{display:flex;flex-direction:column;min-width:0}
++#page-account .cg-txt small{font-size:11px;color:#6e5428;line-height:1.3}
++#page-account .cg-txt b{font-size:24px;font-weight:600;color:#4a3410;line-height:1.15}
++#page-account .cg-btn{margin-left:auto;position:relative;overflow:hidden;cursor:pointer;font:inherit;font-size:12px;font-weight:700;
++  padding:9px 14px;border-radius:14px;color:#2f2209!important;
++  background:linear-gradient(180deg,rgba(226,190,115,.7),rgba(143,109,56,.55))!important;
++  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
++  border:1px solid rgba(255,248,230,.75)!important;
++  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.8),inset 0 -6px 10px rgba(90,63,15,.25),0 6px 14px rgba(143,109,56,.28)!important;
++  transition:transform .15s}
++#page-account .cg-btn:active{transform:scale(.96)}
++#page-account .cg-btn::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;pointer-events:none;
++  background:linear-gradient(100deg,transparent,rgba(255,255,255,.65),transparent);transform:skewX(-20deg);animation:cgSheen 3.6s ease-in-out infinite}
++@keyframes cgSheen{0%,55%{left:-60%}100%{left:130%}}
++/* tema întunecată */
++html.dark #page-account .cg-b1{background:radial-gradient(circle,#c9a56a,#8f6d38 70%);opacity:.55}
++html.dark #page-account .cg-b2{background:radial-gradient(circle,#8f6d38,#5a4320 70%);opacity:.6}
++html.dark #page-account .cg-card{color:#f3e7cc;
++  background:linear-gradient(135deg,rgba(59,50,36,.45),rgba(28,30,36,.35));border-color:rgba(201,165,106,.3);
++  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -10px 18px rgba(0,0,0,.4),0 10px 26px rgba(0,0,0,.55)}
++html.dark #page-account .cg-card::before{opacity:.2}
++html.dark #page-account .cg-ico,html.dark #page-account .cg-txt b{color:#e6c887}
++html.dark #page-account .cg-txt small{color:#cdbb92}
++html.dark #page-account .cg-btn{color:#f3e7cc!important;
++  background:linear-gradient(180deg,rgba(201,165,106,.36),rgba(143,109,56,.3))!important;border-color:rgba(201,165,106,.4)!important;
++  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -6px 10px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.5)!important}
++html.dark #page-account .cg-btn::after{background:linear-gradient(100deg,transparent,rgba(255,255,255,.3),transparent)}
++/* browsere fără backdrop-filter: fundal ceva mai plin, ca textul să rămână lizibil */
++@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
++  #page-account .cg-card{background:rgba(236,222,190,.92)}
++  html.dark #page-account .cg-card{background:rgba(40,36,30,.92)}
++}
++@media (prefers-reduced-motion:reduce){#page-account .cg-b,#page-account .cg-btn::after{animation:none}}
+--- a/script.js
++++ b/script.js
+@@ -499,7 +499,7 @@
+   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
+   renderAccountAvatar();
+   renderAccountRatings();
+-  api('/api/credits').then(r=>{ const el=$('#accCredits'); if(el) el.textContent=r.balance; }).catch(()=>{});
++  api('/api/credits').then(r=>{ const el=$('#accCredits'); if(el) el.textContent=Number(r.balance||0).toLocaleString('ro-RO'); }).catch(()=>{});
+   api('/api/account/settings').then(r=>{ if(currentUser&&r.user){ currentUser.has_avatar=!!r.user.has_avatar; renderAccountAvatar(); } }).catch(()=>{});
+   renderHeader();
+   /* pe telefon pornește cu o singură secțiune deschisă */
+@@ -4132,7 +4132,7 @@
+   try{
+     const r=await api('/api/listings/'+id+'/promote',{method:'POST',body:JSON.stringify({days})});
+     $('#promoModal').classList.add('hidden');
+-    const ac=$('#accCredits'); if(ac) ac.textContent=r.balance;
++    const ac=$('#accCredits'); if(ac) ac.textContent=Number(r.balance||0).toLocaleString('ro-RO');
+     toast('Anunțul este promovat '+days+' zile.');
+     const lst=await api('/api/listings/mine'); mine.items=lst.listings||[]; state.loaded=mine.items; if($('#mineList')) renderMine();
+   }catch(e){ el.disabled=false; toast(e.status===402?'Nu ai destule credite.':(e.message||'Nu am putut promova anunțul.')); }
+--- a/sw.js
++++ b/sw.js
+@@ -4,7 +4,7 @@
+    - Navigarea: network-first, cu fallback la index.html din cache când e offline.
+    - Shell static (css/js/iconițe): stale-while-revalidate.
+ */
+-const VERSION = 'autoparts-v57';
++const VERSION = 'autoparts-v58';
+ const THUMBS = 'autoparts-thumbs-v1';   /* miniaturile anunțurilor: imuabile (au ?v= în URL), cache-first, plafon 400 */
+ const THUMBS_MAX = 400;
+ const SHELL = [

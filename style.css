@@ -4769,3 +4769,54 @@ html.no-flex-gap .menu-btn i+i{margin-top:4px}
 .image-lightbox-stage img{cursor:zoom-in}
 .image-lightbox-stage.zoomed{display:block;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
 .image-lightbox-stage.zoomed img{max-width:none;max-height:none;height:auto;margin:0 auto;border-radius:0;cursor:zoom-out}
+
+/* ===== Credite în cont: banner „liquid glass” (zi + dark) =====
+   Între cardul de profil și pastilele Anunțuri/Cereri. Id-ul #accCredits rămâne același, deci JS-ul existent îl umple. */
+#page-account .cg{position:relative;margin:0 0 12px;border-radius:20px;isolation:isolate}
+#page-account .cg-b{position:absolute;border-radius:50%;z-index:-1;filter:blur(4px);pointer-events:none}
+#page-account .cg-b1{width:86px;height:86px;left:10px;top:-4px;background:radial-gradient(circle,#c98f3a,#a8742a 70%);opacity:.65;animation:cgDrift1 6s ease-in-out infinite alternate}
+#page-account .cg-b2{width:108px;height:66px;right:14px;bottom:-4px;background:radial-gradient(circle,#b8935a,#8f6d38 70%);opacity:.6;animation:cgDrift2 7s ease-in-out infinite alternate}
+@keyframes cgDrift1{to{transform:translate(170px,10px)}}
+@keyframes cgDrift2{to{transform:translate(-150px,-8px)}}
+#page-account .cg-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:18px;color:#3b2c10;
+  background:linear-gradient(135deg,rgba(143,109,56,.26),rgba(184,147,90,.14));
+  -webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);
+  border:1px solid rgba(255,248,230,.65);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.7),inset 0 -10px 18px rgba(143,109,56,.18),0 10px 24px rgba(143,109,56,.2)}
+#page-account .cg-card::before{content:"";position:absolute;left:0;right:0;top:0;height:50%;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0));border-radius:18px 18px 50% 50%/18px 18px 14px 14px}
+#page-account .cg-card>*{position:relative;z-index:1}
+#page-account .cg-ico{display:inline-flex;color:#8f6d38}
+#page-account .cg-txt{display:flex;flex-direction:column;min-width:0}
+#page-account .cg-txt small{font-size:11px;color:#6e5428;line-height:1.3}
+#page-account .cg-txt b{font-size:24px;font-weight:600;color:#4a3410;line-height:1.15}
+#page-account .cg-btn{margin-left:auto;position:relative;overflow:hidden;cursor:pointer;font:inherit;font-size:12px;font-weight:700;
+  padding:9px 14px;border-radius:14px;color:#2f2209!important;
+  background:linear-gradient(180deg,rgba(226,190,115,.7),rgba(143,109,56,.55))!important;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,248,230,.75)!important;
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.8),inset 0 -6px 10px rgba(90,63,15,.25),0 6px 14px rgba(143,109,56,.28)!important;
+  transition:transform .15s}
+#page-account .cg-btn:active{transform:scale(.96)}
+#page-account .cg-btn::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.65),transparent);transform:skewX(-20deg);animation:cgSheen 3.6s ease-in-out infinite}
+@keyframes cgSheen{0%,55%{left:-60%}100%{left:130%}}
+/* tema întunecată */
+html.dark #page-account .cg-b1{background:radial-gradient(circle,#c9a56a,#8f6d38 70%);opacity:.55}
+html.dark #page-account .cg-b2{background:radial-gradient(circle,#8f6d38,#5a4320 70%);opacity:.6}
+html.dark #page-account .cg-card{color:#f3e7cc;
+  background:linear-gradient(135deg,rgba(59,50,36,.45),rgba(28,30,36,.35));border-color:rgba(201,165,106,.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -10px 18px rgba(0,0,0,.4),0 10px 26px rgba(0,0,0,.55)}
+html.dark #page-account .cg-card::before{opacity:.2}
+html.dark #page-account .cg-ico,html.dark #page-account .cg-txt b{color:#e6c887}
+html.dark #page-account .cg-txt small{color:#cdbb92}
+html.dark #page-account .cg-btn{color:#f3e7cc!important;
+  background:linear-gradient(180deg,rgba(201,165,106,.36),rgba(143,109,56,.3))!important;border-color:rgba(201,165,106,.4)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -6px 10px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.5)!important}
+html.dark #page-account .cg-btn::after{background:linear-gradient(100deg,transparent,rgba(255,255,255,.3),transparent)}
+/* browsere fără backdrop-filter: fundal ceva mai plin, ca textul să rămână lizibil */
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+  #page-account .cg-card{background:rgba(236,222,190,.92)}
+  html.dark #page-account .cg-card{background:rgba(40,36,30,.92)}
+}
+@media (prefers-reduced-motion:reduce){#page-account .cg-b,#page-account .cg-btn::after{animation:none}}
