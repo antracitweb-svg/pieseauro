@@ -5106,16 +5106,18 @@ function closePlus(){
   function glassSlide(box,sel,opt){
     if(!box) return; opt=opt||{};
     const b=document.createElement('i'); b.className='bn-bubble'; b.setAttribute('aria-hidden','true'); box.prepend(b);
-    let down=null;
+    let down=null, glide=!opt.hold, timer=0;
     const pick=(x,y)=>{ const el=document.elementFromPoint(x,y), t=el&&el.closest?el.closest(sel):null; return t&&box.contains(t)?t:null; };
     const place=btn=>{ const n=box.getBoundingClientRect(), r=btn.getBoundingClientRect(); b.style.left=(r.left-n.left+box.scrollLeft)+'px'; b.style.top=(r.top-n.top+box.scrollTop)+'px'; b.style.width=r.width+'px'; b.style.height=r.height+'px'; };
     const water=(btn,x,y)=>{ const r=btn.getBoundingClientRect(), w=document.createElement('span'); w.className='water'; w.style.left=(x-r.left)+'px'; w.style.top=(y-r.top)+'px'; btn.appendChild(w); setTimeout(()=>w.remove(),700); };
-    box.addEventListener('pointerdown',e=>{ down=pick(e.clientX,e.clientY); if(!down) return; place(down); box.classList.add('pressing'); if(opt.water) water(down,e.clientX,e.clientY); });
-    box.addEventListener('pointermove',e=>{ if(!down) return; const t=pick(e.clientX,e.clientY); if(t) place(t); });
-    const end=e=>{ if(!down) return; const t=pick(e.clientX,e.clientY), d=down; down=null; box.classList.remove('pressing'); if(e.type==='pointerup' && t && t!==d) t.click(); };
+    box.addEventListener('pointerdown',e=>{ down=pick(e.clientX,e.clientY); if(!down) return; place(down); box.classList.add('pressing'); if(opt.water) water(down,e.clientX,e.clientY);
+      if(opt.hold){ glide=false; clearTimeout(timer); timer=setTimeout(()=>{ if(down){ glide=true; try{ navigator.vibrate&&navigator.vibrate(6); }catch(_){} } },opt.hold); } });
+    box.addEventListener('pointermove',e=>{ if(!down||!glide) return; const t=pick(e.clientX,e.clientY); if(t) place(t); });
+    box.addEventListener('touchmove',e=>{ if(opt.hold && down && glide) e.preventDefault(); },{passive:false});
+    const end=e=>{ clearTimeout(timer); if(!down) return; const t=pick(e.clientX,e.clientY), d=down, g=glide; down=null; box.classList.remove('pressing'); if(opt.hold) glide=false; if(e.type==='pointerup' && g && t && t!==d) t.click(); };
     box.addEventListener('pointerup',end); box.addEventListener('pointercancel',end);
   }
   glassSlide(document.getElementById('bottomNav'),'button');
   glassSlide(document.querySelector('.header .nav-actions'),'button.icon-btn,button.garage-btn,button.menu-btn');
-  glassSlide(document.querySelector('#menuDrawer .mdrawer-body'),'.menu-card button',{water:true});
+  glassSlide(document.querySelector('#menuDrawer .mdrawer-body'),'.menu-card button',{water:true,hold:130});
 })();
