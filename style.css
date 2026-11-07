@@ -4864,7 +4864,7 @@ html.dark #page-account .cg-mark{color:rgba(230,200,135,.34);text-shadow:0 1px 0
 /* ===== v16: „Orice piesă auto” (prima pagină) într-un cadru de sticlă cu bule, fără să mute nimic în jur ===== */
 /* Cadrul e un pseudo-element poziționat absolut pe un span care înconjoară textul (iese în afara lui), deci nu schimbă dimensiunile sau poziția altor elemente. */
 .home-wrap .home-center h1 .hg{position:relative;isolation:isolate;display:inline-block;color:inherit;font-style:inherit}
-.home-wrap .home-center h1 .hg::before{content:"";position:absolute;inset:-8px -20px;z-index:-1;pointer-events:none;border-radius:24px;
+.home-wrap .home-center h1 .hg::before{content:"";position:absolute;inset:-2px -14px;z-index:-1;pointer-events:none;border-radius:20px;
   background:
     radial-gradient(circle at center,rgba(201,143,58,.7) 0,rgba(168,116,42,.38) 45%,rgba(168,116,42,0) 72%) 0% 0%/96px 96px no-repeat,
     radial-gradient(circle at center,rgba(184,147,90,.65) 0,rgba(143,109,56,.34) 45%,rgba(143,109,56,0) 72%) 100% 100%/120px 76px no-repeat,
