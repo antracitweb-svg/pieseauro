@@ -49,7 +49,20 @@ async function uploadImage(dataUrl,userId){
 }
 async function storeImages(images,userId){
   if(!STORAGE_ON) return images;
-  return Promise.all(images.map(img=>isDataImg(img)?uploadImage(img,userId):img));
+  const res=await Promise.allSettled(images.map(img=>isDataImg(img)?uploadImage(img,userId):img));
+  const bad=res.find(r=>r.status==='rejected');
+  if(bad){ // dacă o poză a eșuat, le ștergem pe cele deja încărcate în această cerere, ca să nu rămână orfane
+    deleteStoredUrls(res.filter((r,i)=>r.status==='fulfilled'&&isDataImg(images[i])).map(r=>r.value));
+    throw bad.reason;
+  }
+  return res.map(r=>r.value);
+}
+// Șterge din Supabase Storage pozele indicate prin URL (doar cele din bucketul nostru).
+function deleteStoredUrls(urls){
+  if(!STORAGE_ON||!Array.isArray(urls)||!urls.length) return;
+  const keys=urls.filter(isStoredUrl).map(u=>u.slice(STORAGE_PUBLIC.length));
+  if(!keys.length) return;
+  fetch(SUPA_URL+'/storage/v1/object/'+SUPA_BUCKET,{method:'DELETE',headers:{Authorization:'Bearer '+SUPA_KEY,apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({prefixes:keys})}).catch(e=>console.error('Supabase Storage delete (orfane):',e.message));
 }
 // Șterge din Supabase Storage toate pozele încărcate de un utilizator (chei u<id>/...) — apelat la ștergerea contului.
 function deleteStoredImages(userId){
@@ -143,6 +156,48 @@ app.use(helmet({
   baseUri:["'self'"],formAction:["'self'"],frameAncestors:["'none'"]}},
  crossOriginEmbedderPolicy:false}));
 if(compression)app.use(compression());
+/* Creditează o sesiune Stripe Checkout plătită. Folosită de pagina de succes ȘI de webhook, deci creditele ajung chiar dacă clientul închide browserul.
+   Sigură la apeluri repetate/simultane: creditele se adaugă doar dacă INSERT-ul în payments a înregistrat efectiv plata.
+   Întoarce 'added' | 'duplicate' | 'ignored'. */
+async function fulfillCheckoutSession(session){
+  if(!pool||!session||session.payment_status!=='paid') return 'ignored';
+  const uid=Math.floor(Number(session.client_reference_id));
+  const packId=String((session.metadata&&session.metadata.pack)||'');
+  const pack=CREDIT_PACKS[packId];
+  if(!Number.isInteger(uid)||uid<=0||!pack) return 'ignored';
+  // Suma și moneda plătite trebuie să corespundă pachetului (în bani: lei × 100).
+  if(String(session.currency||'').toLowerCase()!=='ron'||Number(session.amount_total)!==Math.round(pack.lei*100)){
+    console.error('PLATA: sumă/monedă neașteptată pentru sesiunea',String(session.id||'').slice(0,60),session.amount_total,session.currency);
+    return 'ignored';
+  }
+  const c=await pool.connect();
+  try{
+    await c.query('BEGIN');
+    const ins=await c.query('INSERT INTO payments(user_id,session_id,pack,credits,amount_lei) VALUES($1,$2,$3,$4,$5) ON CONFLICT (session_id) DO NOTHING RETURNING id',[uid,String(session.id),packId,pack.credits,pack.lei]);
+    let added=false;
+    if(ins.rowCount){
+      const bal=await creditMove(c,uid,pack.credits,'topup',null,'Plată online: '+pack.label,pack.lei);
+      if(bal===null){ await c.query('ROLLBACK'); return 'ignored'; }
+      added=true;
+    }
+    await c.query('COMMIT');
+    if(added) notify(uid,'Plata online a fost procesată: '+pack.credits+' credite au fost adăugate în cont.');
+    return added?'added':'duplicate';
+  }catch(e){ try{await c.query('ROLLBACK');}catch{} throw e; }
+  finally{ c.release(); }
+}
+// Webhook Stripe (setează STRIPE_WEBHOOK_SECRET). Trebuie înregistrat ÎNAINTE de express.json, fiindcă are nevoie de corpul brut pentru semnătură.
+app.post('/api/payments/webhook',express.raw({type:'application/json',limit:'1mb'}),async(req,res)=>{
+  const secret=(process.env.STRIPE_WEBHOOK_SECRET||'').trim();
+  if(!stripe||!secret||!pool) return res.status(503).json({error:'WEBHOOK_INDISPONIBIL'});
+  let ev;
+  try{ ev=stripe.webhooks.constructEvent(req.body,req.get('stripe-signature')||'',secret); }
+  catch(e){ return res.status(400).json({error:'SEMNATURA_INVALIDA'}); }
+  try{
+    if(ev.type==='checkout.session.completed'||ev.type==='checkout.session.async_payment_succeeded') await fulfillCheckoutSession(ev.data.object);
+    res.json({received:true});
+  }catch(e){ console.error('WEBHOOK STRIPE:',e.message); res.status(500).json({error:'EROARE'}); } // Stripe reîncearcă automat
+});
 // Limită mare (6 MB) doar pe rutele care primesc poze/CSV; restul primesc maximum 256 KB.
 const JSON_SMALL=express.json({limit:'256kb'}),JSON_BIG=express.json({limit:'6mb'});
 const BIG_JSON_RE=/^\/api\/(listings(\/(\d+|import))?|requests(\/\d+\/offers)?|offers\/\d+|account\/store|account\/business-verification)\/?$/;
@@ -1793,24 +1848,10 @@ app.get('/api/payments/success',auth,requireDb,ah(async(req,res)=>{
   catch(e){ console.error('PLATA: sesiunea nu a putut fi citită:',e.message); return res.status(502).json({error:'PLATA_ONLINE_INDISPONIBILA'}); }
   if(!session||session.payment_status!=='paid')return res.redirect(302,back+'&pay=cancel');
   if(String(session.client_reference_id||'')!==String(req.user.id))return res.status(403).json({error:'SESIUNE_INVALIDA'});
-  const packId=String((session.metadata&&session.metadata.pack)||'');
-  const pack=CREDIT_PACKS[packId];
-  if(!pack)return res.redirect(302,back);
-  const c=await pool.connect();
-  try{
-    await c.query('BEGIN');
-    /* Creditele se adaugă doar de cererea care a înregistrat efectiv plata (INSERT a întors un rând).
-       Dacă două cereri pentru aceeași sesiune vin simultan, a doua așteaptă prima, nu inserează nimic și nu adaugă credite. */
-    const ins=await c.query('INSERT INTO payments(user_id,session_id,pack,credits,amount_lei) VALUES($1,$2,$3,$4,$5) ON CONFLICT (session_id) DO NOTHING RETURNING id',[req.user.id,sid,packId,pack.credits,pack.lei]);
-    let added=false;
-    if(ins.rowCount){
-      await creditMove(c,req.user.id,pack.credits,'topup',null,'Plată online: '+pack.label,pack.lei);
-      added=true;
-    }
-    await c.query('COMMIT');
-    if(added)notify(req.user.id,'Plata online a fost procesată: '+pack.credits+' credite au fost adăugate în cont.');
-  }catch(e){ try{await c.query('ROLLBACK');}catch{} throw e; }
-  finally{ c.release(); }
+  let outcome;
+  try{ outcome=await fulfillCheckoutSession(session); }
+  catch(e){ console.error('PLATA: creditare eșuată:',e.message); return res.status(500).json({error:'EROARE'}); }
+  if(outcome==='ignored')return res.redirect(302,back);
   res.redirect(302,back+'&pay=ok');
 }));
 app.post('/api/listings/:id/promote',auth,requireDb,ah(async(req,res)=>{
@@ -2106,14 +2147,16 @@ app.post('/api/listings',auth,needVerified,requireDb,async(req,res)=>{
   }
  }
  if(await imageQuotaExceeded(req.user.id,v.images))return res.status(413).json({error:'SPATIU_POZE_DEPASIT'});
- try{v.images=await storeImages(v.images,req.user.id);}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
+ const imgsIn=v.images; let freshImgs=[],listingSaved=false;
+ try{v.images=await storeImages(imgsIn,req.user.id);freshImgs=v.images.filter((u,i)=>isDataImg(imgsIn[i]));}catch{return res.status(502).json({error:'STORAGE_EROARE'});}
    let r,cl=null;
   try{
   if(charge){cl=await pool.connect();await cl.query('BEGIN');if(await creditMove(cl,req.user.id,-LISTING_COST,'listing',null,'Anunț peste limita gratuită: '+String(v.title).slice(0,80))===null){await cl.query('ROLLBACK');return res.status(402).json({error:'CREDITE_INSUFICIENTE'});}}
   r=await (cl||pool).query(`INSERT INTO listings(user_id,type,title,price,condition,make,model,generation,year,engine,fuel,vehicle_id,seller_type,quantity,negotiable,county,category,oem,oem_alt,delivery,description,images,status,subcategory,km,vin,parts_avail,discount_percent,power_hp,engine_cc,body_type,color,doors,gearbox,steering,registered,city,currency) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38) RETURNING *`,
    [req.user.id,v.type,v.title,v.price,v.condition,v.make,v.model,v.generation,v.year,v.engine,v.fuel,v.vehicle_id,v.seller_type,v.quantity||1,v.negotiable,v.county,v.category,v.oem,v.oem_alt,v.delivery,v.description,v.images,NEW_LISTING_STATUS,v.subcategory,v.km,v.vin,v.parts_avail,v.discount_percent,v.power_hp,v.engine_cc,v.body_type,v.color,v.doors,v.gearbox,v.steering,v.registered,v.city,v.currency]);
   if(cl){await cl.query("UPDATE listings SET paid_until=NOW()+INTERVAL '30 days',expires_at=NOW()+INTERVAL '30 days' WHERE id=$1",[r.rows[0].id]);await cl.query('COMMIT');}
-  }catch(e){if(cl){try{await cl.query('ROLLBACK');}catch{}}throw e;}finally{if(cl)cl.release();}
+  listingSaved=true;
+  }catch(e){if(cl){try{await cl.query('ROLLBACK');}catch{}}throw e;}finally{if(cl)cl.release();if(!listingSaved)deleteStoredUrls(freshImgs);}
   if(NEW_LISTING_STATUS==='approved')alertForListings([r.rows[0].id]);
  logEvent(req.user.id,'listing_create','listing',r.rows[0].id,v.title);
  res.status(201).json({listing:r.rows[0]});
