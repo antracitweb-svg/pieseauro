@@ -4888,3 +4888,5 @@ html.dark .home-wrap .home-center h1 .hg::before{
   html.dark .home-wrap .home-center h1 .hg::before{background-color:rgba(40,36,30,.92)}
 }
 @media(prefers-reduced-motion:reduce){.home-wrap .home-center h1 .hg::before{animation:none}}
+/* v18b: pe telefon, cardul „Orice piesă auto” (text + sticlă) puțin mutat spre stânga */
+@media(max-width:800px){.home-wrap .home-center h1 .hg{left:-10px}}
