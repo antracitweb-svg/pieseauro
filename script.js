@@ -488,18 +488,38 @@ function syncBillType(){
 }
 function renderAccountRatings(){
   const el=$('#accRating'); if(!el||!currentUser) return;
-  el.innerHTML='';
-  api('/api/sellers/'+currentUser.id+'/ratings').then(r=>{
+  const uid=Number(currentUser.id), ck='acc_ratings_'+uid;
+  const part=(label,role,p,wait)=>`<button type="button" class="text-btn acc-rate-row" data-reviews="${uid}" data-role="${role}">${label} `+(wait?`<span class="muted">…</span>`:(p&&p.count?`${starsHtml(p.avg)} <b>${esc(String(p.avg).replace('.',','))}</b> (${p.count})`:`<span class="muted">fără calificative</span>`))+`</button>`;
+  const draw=(r,wait)=>{ el.innerHTML=part('Vânzător','seller',r&&r.seller,wait)+part('Cumpărător','buyer',r&&r.buyer,wait); };
+  /* chenarul are de la început cele 2 rânduri (ultimele valori știute sau „…”), deci nu se mai mărește după încărcare */
+  let cached=null; try{ cached=JSON.parse(localStorage.getItem(ck)||'null'); }catch(e){}
+  if(cached) draw(cached,false); else draw(null,true);
+  api('/api/sellers/'+uid+'/ratings').then(r=>{
     if(!currentUser||!el.isConnected) return;
-    const part=(label,role,p)=>`<button type="button" class="text-btn acc-rate-row" data-reviews="${Number(currentUser.id)}" data-role="${role}">${label} `+(p&&p.count?`${starsHtml(p.avg)} <b>${esc(String(p.avg).replace('.',','))}</b> (${p.count})`:`<span class="muted">fără calificative</span>`)+`</button>`;
-    el.innerHTML=part('Vânzător','seller',r.seller)+part('Cumpărător','buyer',r.buyer);
-  }).catch(()=>{});
+    draw(r,false);
+    try{ localStorage.setItem(ck,JSON.stringify({seller:r.seller,buyer:r.buyer})); }catch(e){}
+  }).catch(()=>{ if(!cached&&el.isConnected) draw(null,false); });
+}
+function setCredits(el,to,from){
+  if(!el) return;
+  to=Number(to)||0; from=Number(from)||0;
+  const fmt=n=>Math.round(n).toLocaleString('ro-RO');
+  if(el._raf) cancelAnimationFrame(el._raf);
+  if(from===to||(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)){ el.textContent=fmt(to); el._val=to; return; }
+  const dur=1100, t0=performance.now();
+  const step=now=>{
+    const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
+    el.textContent=fmt(from+(to-from)*e);
+    if(k<1) el._raf=requestAnimationFrame(step); else { el._raf=0; el._val=to; el.textContent=fmt(to); }
+  };
+  el._raf=requestAnimationFrame(step);
 }
 function renderAccount(){
   $('#accountHello').textContent = `Salut, ${currentUser.nickname || currentUser.name || 'utilizator'}!`;
   renderAccountAvatar();
   renderAccountRatings();
-  api('/api/credits').then(r=>{ const el=$('#accCredits'); if(el) el.textContent=Number(r.balance||0).toLocaleString('ro-RO'); }).catch(()=>{});
+  { const el0=$('#accCredits'); if(el0){ if(el0._raf) cancelAnimationFrame(el0._raf); el0.textContent='0'; el0._val=0; } }
+  api('/api/credits').then(r=>{ const el=$('#accCredits'); if(el) setCredits(el,r.balance,0); }).catch(()=>{});
   api('/api/account/settings').then(r=>{ if(currentUser&&r.user){ currentUser.has_avatar=!!r.user.has_avatar; renderAccountAvatar(); } }).catch(()=>{});
   renderHeader();
   /* pe telefon pornește cu o singură secțiune deschisă */
@@ -4132,7 +4152,7 @@ async function promoGo(el){
   try{
     const r=await api('/api/listings/'+id+'/promote',{method:'POST',body:JSON.stringify({days})});
     $('#promoModal').classList.add('hidden');
-    const ac=$('#accCredits'); if(ac) ac.textContent=Number(r.balance||0).toLocaleString('ro-RO');
+    const ac=$('#accCredits'); if(ac) setCredits(ac,r.balance,ac._val!=null?ac._val:Number(String(ac.textContent).replace(/\D/g,''))||0);
     toast('Anunțul este promovat '+days+' zile.');
     const lst=await api('/api/listings/mine'); mine.items=lst.listings||[]; state.loaded=mine.items; if($('#mineList')) renderMine();
   }catch(e){ el.disabled=false; toast(e.status===402?'Nu ai destule credite.':(e.message||'Nu am putut promova anunțul.')); }
