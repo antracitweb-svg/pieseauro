@@ -1310,7 +1310,8 @@ async function loadHome(attempt=0){
   }catch(e){
     if(box.dataset.loaded) return;
     if(attempt<3){ setTimeout(()=>loadHome(attempt+1), 4000); return; }
-    wrap.classList.add('hidden'); box.innerHTML='';
+    /* nu mai ascundem tăcut secțiunea: arătăm motivul, ca să se vadă și pe dispozitive unde nu există consolă */
+    box.innerHTML='<p class="empty">Nu am putut încărca anunțurile'+(e&&e.message?' ('+esc(e.message)+')':'')+'. Reîncarcă pagina.</p>';
   }
 }
 function card(x, o={}){
