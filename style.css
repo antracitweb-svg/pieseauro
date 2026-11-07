@@ -4588,3 +4588,23 @@ html body .plus-sheet .close{background:rgba(255,255,255,.12);color:#fff;border:
 
 /* iPhone/Android: fără selectare de text, lupă sau meniu de ținere lungă pe butoanele cu bulă */
 .mdrawer .menu-card button,.bottom-nav button,.nav-actions button{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+
+/* ---------- admin: contoare pe file, scurtături, reîncărcare ---------- */
+.admin-tabs .btn{position:relative}
+.admin-tabs .adm-bdg{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;margin-left:8px;border-radius:999px;font-size:12px;font-weight:800;line-height:1;font-style:normal;vertical-align:middle}
+html body .admin-tabs .adm-bdg.todo{background:#b3261e!important;color:#fff!important}
+html body .admin-tabs .adm-bdg.new{background:var(--gold,#b8935a)!important;color:#14110c!important}
+html body .admin-tabs .btn.ghost.active .adm-bdg.new{background:var(--gold-pale,#e9d3a8)!important}
+html.dark body .admin-tabs .btn.ghost.active .adm-bdg.new{background:#14110c!important;color:var(--gold-pale,#e9d3a8)!important}
+.adm-refresh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 12px}
+.adm-refresh small{color:var(--muted)}
+.adm-note{margin:4px 2px;font-size:13px}
+.adm-stat-link{font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;transition:border-color .15s,box-shadow .15s}
+.adm-stat-link:hover{border-color:#d4b483;box-shadow:0 8px 22px rgba(60,45,20,.1)}
+.adm-stat-link:focus-visible{outline:2px solid var(--gold,#b8935a);outline-offset:2px}
+.adm-stat-link.hot{border-color:#b3261e}
+.adm-stat-link.hot h3{color:#b3261e}
+html.dark .adm-stat-link{background:var(--card);color:var(--ink);border-color:var(--line)}
+html.dark .adm-stat-link.hot{border-color:#e5645b}
+html.dark .adm-stat-link.hot h3{color:#e5645b}
+html.dark .adm-toolbar input{background:#1c2430;border-color:#2e3a4b;color:var(--ink)}

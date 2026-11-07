@@ -3113,35 +3113,117 @@ async function openAdminListing(id){
     <div class="adm-seller"><small>Vânzător</small><p><b>${esc(x.seller_name||'Fără vânzător')}</b> · ${esc(x.seller_email||'')}${x.seller_phone?' · '+esc(x.seller_phone):''}</p></div>
     <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn ghost small" data-admin="listing-edit" data-id="${x.id}">Editează</button>${currentUser.role==='admin'?`<button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button>`:''}</div>`;
 }
+/* ---- încărcare la cerere, contoare pe file, filtre și căutare ---- */
+const ADM_NEED = {dashboard:[],listings:['listings'],users:['users'],requests:['requests'],offers:['offers'],orders:['orders'],messages:['messages'],credits:['users'],reports:['reports'],events:['events'],features:['feat'],activity:['activity'],vehicles:[],bizver:[]};
+const ADM_FRESH_TABS = ['users','requests','offers','orders','messages'];
+const adminQ = {}, adminSt = {reports:'open'}, adminSort = {};
+let adminSeen = {};
+const ADM_ST_LBL = {open:'Deschise',reviewed:'Verificate',closed:'Închise',matched:'Potrivite',pending:'În așteptare',approved:'Aprobate',rejected:'Respinse',blocked:'Blocate',active:'Active'};
+const admNorm = v => String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const admSeenKey = () => 'autopiese_admin_seen_'+(currentUser?currentUser.id:0);
+function admJobs(){
+  const full = currentUser.role==='admin', none = async()=>[];
+  const get = async (u,k) => { try{ return (await api(u))[k] || []; }catch(e){ console.error('admin',u,e.message); return []; } };
+  return {
+    users: ()=>get('/api/admin/users','users'),
+    listings: ()=>get('/api/admin/listings','listings'),
+    requests: ()=>get('/api/admin/requests','requests'),
+    reports: ()=>get('/api/admin/reports','reports'),
+    activity: ()=>full?get('/api/admin/activity','activity'):none(),
+    offers: ()=>get('/api/admin/offers','offers'),
+    orders: ()=>get('/api/admin/orders','orders'),
+    messages: ()=>full?get('/api/admin/messages','messages'):none(),
+    events: ()=>get('/api/admin/events','events'),
+    feat: ()=>full?api('/api/admin/features').catch(e=>{ console.error('admin features',e.message); return null; }):Promise.resolve(null)
+  };
+}
+async function admOvr(){
+  const qs = ADM_FRESH_TABS.filter(k=>adminSeen[k]).map(k=>'s_'+k+'='+encodeURIComponent(adminSeen[k])).join('&');
+  const o = await api('/api/admin/overview'+(qs?'?'+qs:''));
+  adminData.s = o.stats; adminData.fresh = o.fresh || {}; adminData.recent = o.recent || []; adminData.now = o.now; adminData.at = Date.now();
+}
+async function admEnsure(keys){
+  const jobs = admJobs(), miss = keys.filter(k=>adminData[k]===undefined);
+  if(!miss.length) return;
+  const vals = await Promise.all(miss.map(k=>jobs[k]()));
+  miss.forEach((k,i)=>{ adminData[k]=vals[i]; });
+  if(miss.includes('listings') && adminUserFilter){ try{ const ul=(await api('/api/admin/users/'+adminUserFilter.id+'/listings')).listings||[]; const seen=new Set(adminData.listings.map(x=>x.id)); ul.forEach(x=>{ if(!seen.has(x.id)) adminData.listings.push(x); }); }catch(e){ console.error('admin user listings',e.message); } }
+}
+function admMarkSeen(tab){
+  if(!ADM_FRESH_TABS.includes(tab) || !adminData || !adminData.now) return;
+  adminSeen[tab] = adminData.now; writeJSON(admSeenKey(), adminSeen);
+  if(adminData.fresh) adminData.fresh[tab] = 0;
+}
 async function loadAdmin(only){
   if(!currentUser || (currentUser.role!=='admin' && currentUser.role!=='moderator')){ navigate('home'); toast('Zona de administrare este disponibilă doar administratorilor și moderatorilor.'); return; }
-  const partial = !!(only && adminData);
-  if(!partial){ const box=$('#adminContent'); if(box) box.innerHTML='<p class="muted">Se încarcă…</p>'; }
+  const partial = !!(only && adminData && adminData.s);
+  const box = $('#adminContent');
+  if(!partial){ adminData = {}; adminSeen = readJSON(admSeenKey(),{}); if(box) box.innerHTML='<p class="muted">Se încarcă…</p>'; }
+  else only.forEach(k=>{ if(k!=='ovr') delete adminData[k]; });
   try{
-    const full = currentUser.role==='admin', none = async()=>[];
-    const get = async (u,k) => { try{ return (await api(u))[k] || []; }catch(e){ console.error('admin',u,e.message); return []; } };
-    const jobs = {
-      ovr: ()=>api('/api/admin/overview'),
-      users: ()=>get('/api/admin/users','users'),
-      listings: ()=>get('/api/admin/listings','listings'),
-      requests: ()=>get('/api/admin/requests','requests'),
-      reports: ()=>get('/api/admin/reports','reports'),
-      activity: ()=>full?get('/api/admin/activity','activity'):none(),
-      offers: ()=>get('/api/admin/offers','offers'),
-      orders: ()=>get('/api/admin/orders','orders'),
-      messages: ()=>full?get('/api/admin/messages','messages'):none(),
-      events: ()=>get('/api/admin/events','events'),
-      feat: ()=>full?api('/api/admin/features').catch(e=>{ console.error('admin features',e.message); return null; }):Promise.resolve(null)
-    };
-    const keys = Object.keys(jobs).filter(k=>!partial || only.includes(k));
-    const vals = await Promise.all(keys.map(k=>jobs[k]()));
-    const got = {}; keys.forEach((k,i)=>{ got[k]=vals[i]; });
-    if(got.listings && adminUserFilter){ try{ const ul=(await api('/api/admin/users/'+adminUserFilter.id+'/listings')).listings||[]; const seen=new Set(got.listings.map(x=>x.id)); ul.forEach(x=>{ if(!seen.has(x.id)) got.listings.push(x); }); }catch(e){ console.error('admin user listings',e.message); } }
-    const ovr = got.ovr; delete got.ovr;
-    adminData = Object.assign({}, partial ? adminData : {}, got);
-    if(ovr) adminData.s = ovr.stats;
+    const tasks = [admEnsure(ADM_NEED[adminTab]||[])];
+    if(!partial || only.includes('ovr')) tasks.push(admOvr());
+    await Promise.all(tasks);
+    admMarkSeen(adminTab);
     renderAdmin();
-  }catch(e){ $('#adminContent').innerHTML = `<p>${esc(e.message)}</p>`; }
+  }catch(e){ if(box) box.innerHTML = `<p>${esc(e.message)}</p>`; }
+}
+async function adminGoTab(tab){
+  adminTab = tab; if(tab==='listings') adminUserFilter = null;
+  const need = (ADM_NEED[tab]||[]).filter(k=>adminData[k]===undefined);
+  if(need.length){ renderAdmin(true); try{ await admEnsure(need); }catch(e){ console.error('admin tab',e.message); } }
+  if(adminTab!==tab) return;
+  admMarkSeen(tab); renderAdmin();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+const ADM_LISTS = {
+  requests:{ph:'Caută cerere după titlu, ID, utilizator, email, marcă, model…',f:['id','title','user_name','user_email','make','model','year'],fixed:['open','matched','closed'],limit:500,empty:'Nu există cereri.',
+    row:x=>`<article class="info-card"><b><button type="button" class="adm-link" data-adm-detail="request" data-id="${x.id}">#${x.id} · ${esc(x.title)}</button></b><p>${esc(x.user_name||'—')} · ${esc(ADM_ST_LBL[x.status]||x.status)} · ${fmtDate(x.created_at)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`},
+  offers:{ph:'Caută ofertă după cerere, ID, vânzător, cumpărător…',f:['id','request_title','seller_name','buyer_name'],limit:300,empty:'Nu există oferte.',
+    row:x=>`<article class="info-card adm-click" data-adm-detail="offer" data-id="${x.id}"><b>#${x.id} · ${esc(x.request_title)}</b><p>${money(x.price,x.currency)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small><div class="admin-actions"><button class="btn primary small" data-adm-detail="offer" data-id="${x.id}">Deschide oferta</button>${currentUser.role==='admin'?`<button class="btn danger small" data-admin="offer-del" data-id="${x.id}">Șterge oferta</button>`:''}</div></article>`},
+  orders:{ph:'Caută comandă după titlu, ID, vânzător, cumpărător…',f:['id','title','seller_name','buyer_name'],limit:300,empty:'Nu există comenzi.',
+    row:x=>`<article class="info-card adm-click" data-adm-detail="order" data-id="${x.id}"><b><button type="button" class="adm-link" data-adm-detail="order" data-id="${x.id}">#${x.id} · ${esc(x.title||'Comandă')}</button></b><p>${money(x.price,x.currency)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small><div class="admin-actions"><button class="btn primary small" data-adm-detail="order" data-id="${x.id}">Deschide comanda</button>${currentUser.role==='admin'?`<button class="btn danger small" data-admin="order-del" data-id="${x.id}">Șterge comanda</button>`:''}</div></article>`},
+  messages:{ph:'Caută în mesaje după text, nume, email, ID…',f:['id','sender_name','sender_email','recipient_name','body'],status:false,limit:200,empty:'Nu există mesaje.',
+    row:x=>`<article class="info-card adm-click" data-adm-detail="thread" data-a="${x.sender_id}" data-b="${x.recipient_id}"><b>#${x.id} · ${esc(x.sender_name||'—')} → ${esc(x.recipient_name||'—')}</b><p class="muted">${esc(x.sender_email||'')} · ${evWhen(x.created_at)}</p><p>${esc(String(x.body||'').slice(0,300))}</p><div class="admin-actions"><button class="btn primary small" data-adm-detail="thread" data-a="${x.sender_id}" data-b="${x.recipient_id}">Vezi conversația</button><button class="btn danger small" data-admin="msg-del" data-id="${x.id}">Șterge mesajul</button></div></article>`},
+  reports:{ph:'Caută raportare după motiv, anunț, ID, cine a raportat…',f:['id','reason','details','listing_title','reporter_name'],fixed:['open','reviewed','closed'],limit:500,empty:'Nu există raportări.',
+    row:x=>`<article class="info-card adm-click" data-adm-detail="report" data-id="${x.id}"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${x.reporter_id?`<button type="button" class="adm-link" data-adm-user-profile="${x.reporter_id}">${esc(x.reporter_name||'—')}</button>`:esc(x.reporter_name||'—')} · ${esc(ADM_ST_LBL[x.status]||x.status)} · ${fmtDate(x.created_at)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions"><button class="btn primary small" data-adm-detail="report" data-id="${x.id}">Deschide raportarea</button>${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`},
+  credits:{key:'users',ph:'Caută utilizator după nume, email, ID…',f:['id','name','email'],status:false,sort:false,empty:'Nu există utilizatori.',
+    pre:a=>a.slice().sort((x,y)=>(Number(y.credits)||0)-(Number(x.credits)||0)),
+    head:'<div class="info-card"><b>Credite în conturi</b><p class="muted">Adaugă credite unui utilizator (cu număr negativ le retragi). Utilizatorul le folosește la promovarea anunțurilor.</p></div>',
+    row:x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · <b>${Number(x.credits)||0}</b> credite</p><div class="admin-actions"><button class="btn primary small" data-admin="user-credits" data-id="${x.id}">+ Credite</button></div></article>`},
+  activity:{ph:'Caută în jurnal după acțiune, admin, țintă, detalii…',f:['action','admin_name','target_type','target_id','details'],status:false,empty:'Nu există activitate.',
+    row:x=>`<article class="info-card"><b>${esc(x.action)}</b><p>${esc(x.admin_name||'Admin')} · ${new Date(x.created_at).toLocaleString('ro-RO')}</p><small>${esc(x.target_type||'')} #${x.target_id||''} · ${esc(x.details||'')}</small></article>`}
+};
+function admListRows(tab){
+  const c = ADM_LISTS[tab]; let all = adminData[c.key||tab] || []; if(c.pre) all = c.pre(all);
+  const q = admNorm(adminQ[tab]||'').trim(), st = adminSt[tab]||'all', dir = adminSort[tab]||'new', t = x=>Date.parse(x.created_at)||0;
+  let L = all.filter(x=>(st==='all'||x.status===st) && (!q || admNorm(c.f.map(k=>x[k]).join(' ')).includes(q)));
+  if(c.sort!==false) L = L.slice().sort((a,b)=>dir==='old'?t(a)-t(b):t(b)-t(a));
+  const info = (q||st!=='all') ? `<p class="muted adm-note">${L.length} din ${all.length}</p>` : '';
+  const lim = c.limit && all.length>=c.limit ? `<p class="muted adm-note">Se afișează ultimele ${c.limit}. Ce e mai vechi nu apare aici.</p>` : '';
+  return info + (L.map(c.row).join('') || `<p>${c.empty}</p>`) + lim;
+}
+function admToolbar(tab){
+  const c = ADM_LISTS[tab], all = adminData[c.key||tab] || [], st = adminSt[tab]||'all', dir = adminSort[tab]||'new';
+  let chips = '';
+  if(c.status!==false){
+    const order = ['open','pending','reviewed','matched','approved','active','closed','rejected','blocked'];
+    const present = [...new Set([...(c.fixed||[]), ...all.map(x=>x.status).filter(Boolean)])].sort((a,b)=>{ const ia=order.indexOf(a), ib=order.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib) || String(a).localeCompare(String(b)); });
+    chips = [['all','Toate',all.length]].concat(present.map(k=>[k,ADM_ST_LBL[k]||k,all.filter(x=>x.status===k).length])).map(([k,l,n])=>`<button type="button" class="adm-chip${st===k?' on':''}" data-adm-st="${tab}:${esc(k)}">${esc(l)} <i>${n}</i></button>`).join('');
+  }
+  const sortChip = c.sort===false ? '' : `<button type="button" class="adm-chip" data-adm-sort="${tab}" aria-label="Schimbă sortarea">${dir==='old'?'Cele mai vechi ↑':'Cele mai noi ↓'}</button>`;
+  return `<div class="adm-toolbar"><input type="search" data-adm-q="${tab}" placeholder="${esc(c.ph)}" value="${esc(adminQ[tab]||'')}">${(chips||sortChip)?`<div class="adm-chips">${chips}${sortChip}</div>`:''}</div>`;
+}
+function admListHtml(tab){ const c = ADM_LISTS[tab]; return `${c.head||''}${admToolbar(tab)}<div class="admin-list" id="admBox">${admListRows(tab)}</div>`; }
+function admDashHtml(){
+  const d = adminData, s = d.s || {};
+  const todo = [['listings','Anunțuri în așteptare',s.pending],['reports','Raportări deschise',s.reports],['bizver','Verificări firme',s.bizPending]];
+  const hot = todo.map(([k,l,n])=>`<button type="button" class="stat adm-stat-link${n?' hot':''}" data-admin-tab="${k}"><b>${l}</b><h3>${n||0}</h3><small>${n?'Deschide →':'Totul la zi ✓'}</small></button>`).join('');
+  const rec = (d.recent||[]).map(x=>`<article class="info-card adm-click" data-admin-open="${x.id}"><b>#${x.id} · ${esc(x.title)}</b><p>${money(x.price)} · ${esc(ADM_ST_LBL[x.status]||x.status)} · ${esc(x.seller_name||'—')} · ${evWhen(x.created_at)}</p></article>`).join('');
+  return `<h3 class="ad-h">De rezolvat</h3><div class="stat-grid">${hot}</div>
+    <h3 class="ad-h">Cifre generale</h3><div class="stat-grid"><div class="stat"><b>Utilizatori</b><h3>${s.users}</h3><small>${s.activeUsers} activi</small></div><div class="stat"><b>Anunțuri</b><h3>${s.listings}</h3><small>${s.approved} aprobate · ${s.pending} în așteptare · ${s.rejected} respinse</small></div><div class="stat"><b>Cereri deschise</b><h3>${s.requests}</h3></div></div>
+    <div class="stat-grid" style="margin-top:12px"><div class="stat"><b>Oferte</b><h3>${s.offers||0}</h3></div><div class="stat"><b>Comenzi</b><h3>${s.orders||0}</h3></div><div class="stat"><b>Mesaje trimise</b><h3>${s.messages||0}</h3><small>doar numărul, conținutul e privat</small></div></div>
+    ${rec?`<h3 class="ad-h">Ultimele anunțuri</h3><div class="admin-list">${rec}</div>`:''}`;
 }
 function admParts(kind){
   const L=['listings','ovr','activity','events'];
@@ -3183,29 +3265,32 @@ function adminUsersRows(){
       return `<article class="info-card adm-click" data-adm-user-listings="${x.id}"><b><button type="button" class="adm-link" data-adm-user-listings="${x.id}">#${x.id} · ${esc(x.name||'—')}</button></b><p>${esc(x.email)} · ${esc(ROLE_LBL[x.role]||x.role)} · ${esc(x.status)}${x.status==='blocked'?(x.blocked_until?' până la '+fmtDate(x.blocked_until):' definitiv'):''}${x.warns?` · ⚠ ${x.warns} ${x.warns===1?'avertisment':'avertismente'}`:''}</p>${x.status==='blocked'&&x.block_reason?`<p class="muted">Motiv: ${esc(x.block_reason)}</p>`:''}${(x.req_posted||x.offers_sent)?`<p class="muted">${x.req_posted?`Cumpărător: ${x.req_posted} cereri · ${x.req_resolved||0} rezolvate · ${x.req_cancelled||0} anulate · ${x.req_expired||0} expirate`:''}${x.req_posted&&x.offers_sent?' | ':''}${x.offers_sent?`Vânzător: ${x.offers_sent} oferte · ${x.offers_won||0} câștigate`:''}</p>`:''}<div class="admin-actions"><button class="btn primary small" data-adm-user-listings="${x.id}">Anunțurile lui</button>${canAct&&!self?`<button class="btn ghost small" data-admin="user-warn" data-id="${x.id}">Avertizează</button>`:''}${isAd?`<button class="btn ghost small" data-admin="user-credits" data-id="${x.id}">Credite: ${Number(x.credits)||0}</button>`:''}${canAct?adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked'],...(x.has_logo?[['Șterge logo','remove_logo']]:[])]):''}${roleBtns}${isAd&&x.role!=='admin'?`<button class="btn danger small" data-admin="user-del" data-id="${x.id}">Șterge contul</button>`:''}</div></article>`;
     }).join('')||'<p class="muted">Nu există utilizatori.</p>'}`;
 }
-function renderAdmin(){
-  const d = adminData, s = d.s;
-  const tabs = [['dashboard','Dashboard'],['listings',`Anunțuri${s.pending?` (${s.pending})`:''}`],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['messages','Mesaje'],['credits','Credite'],['reports',`Raportări${s.reports?` (${s.reports})`:''}`],['events','Evenimente'],['features','Funcții noi'],['activity','Activitate'],['vehicles','Mașini'],['bizver','Verificări firme']].filter(t=>currentUser.role==='admin'||['dashboard','listings','users','requests','reports','offers','orders','events','bizver'].includes(t[0]));
-  if(!tabs.some(t=>t[0]===adminTab)) adminTab='dashboard';
+function renderAdmin(loading){
+  const d = adminData, s = d.s || {}, f = d.fresh || {};
+  const ALL = [['dashboard','Dashboard'],['listings','Anunțuri'],['users','Utilizatori'],['requests','Cereri piese'],['offers','Oferte'],['orders','Comenzi'],['messages','Mesaje'],['credits','Credite'],['reports','Raportări'],['events','Evenimente'],['features','Funcții noi'],['activity','Activitate'],['vehicles','Mașini'],['bizver','Verificări firme']];
+  const tabs = ALL.filter(t=>currentUser.role==='admin'||['dashboard','listings','users','requests','reports','offers','orders','events','bizver'].includes(t[0]));
+  if(!tabs.some(t=>t[0]===adminTab)) adminTab = 'dashboard';
+  const num = n => n>99 ? '99+' : String(n);
+  const badge = k => {
+    const todo = {listings:s.pending,reports:s.reports,bizver:s.bizPending}[k];
+    if(todo) return {html:`<b class="adm-bdg todo">${num(todo)}</b>`,label:`${todo} de rezolvat`};
+    const n = Number(f[k])||0;
+    return n ? {html:`<b class="adm-bdg new">${num(n)}</b>`,label:`${n} noi`} : {html:'',label:''};
+  };
   let body = '';
-  if(adminTab==='dashboard') body = `<div class="stat-grid"><div class="stat"><b>Utilizatori</b><h3>${s.users}</h3><small>${s.activeUsers} activi</small></div><div class="stat"><b>Anunțuri</b><h3>${s.listings}</h3><small>${s.approved} aprobate · ${s.pending} în așteptare · ${s.rejected} respinse</small></div><div class="stat"><b>Raportări deschise</b><h3>${s.reports}</h3></div><div class="stat"><b>Cereri deschise</b><h3>${s.requests}</h3></div></div>`;
-  if(adminTab==='dashboard') body += `<div class="stat-grid" style="margin-top:12px"><div class="stat"><b>Oferte</b><h3>${s.offers||0}</h3></div><div class="stat"><b>Comenzi</b><h3>${s.orders||0}</h3></div><div class="stat"><b>Mesaje trimise</b><h3>${s.messages||0}</h3><small>doar numărul, conținutul e privat</small></div></div>`;
-  if(adminTab==='offers') body = `<div class="admin-list">${d.offers.map(x=>`<article class="info-card adm-click" data-adm-detail="offer" data-id="${x.id}"><b>#${x.id} · ${esc(x.request_title)}</b><p>${money(x.price,x.currency)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small><div class="admin-actions"><button class="btn primary small" data-adm-detail="offer" data-id="${x.id}">Deschide oferta</button>${currentUser.role==='admin'?`<button class="btn danger small" data-admin="offer-del" data-id="${x.id}">Șterge oferta</button>`:''}</div></article>`).join('')||'<p>Nu există oferte.</p>'}</div>`;
-  if(adminTab==='orders') body = `<div class="admin-list">${d.orders.map(x=>`<article class="info-card adm-click" data-adm-detail="order" data-id="${x.id}"><b><button type="button" class="adm-link" data-adm-detail="order" data-id="${x.id}">#${x.id} · ${esc(x.title||'Comandă')}</button></b><p>${money(x.price,x.currency)} · ${esc(x.status)} · ${fmtDate(x.created_at)}</p><small>Vânzător: ${esc(x.seller_name||'—')} · Cumpărător: ${esc(x.buyer_name||'—')}</small><div class="admin-actions"><button class="btn primary small" data-adm-detail="order" data-id="${x.id}">Deschide comanda</button>${currentUser.role==='admin'?`<button class="btn danger small" data-admin="order-del" data-id="${x.id}">Șterge comanda</button>`:''}</div></article>`).join('')||'<p>Nu există comenzi.</p>'}</div>`;
-  if(adminTab==='listings') body = adminListingsHtml();
-  if(adminTab==='messages') body = `<div class="admin-list"><div class="info-card"><b>Moderare mesaje</b><p class="muted">Ultimele 200 de mesaje. Caută după text sau email. Ștergerea unui mesaj e definitivă și rămâne în jurnal.</p></div>${(adminData.messages||[]).map(x=>`<article class="info-card adm-click" data-adm-detail="thread" data-a="${x.sender_id}" data-b="${x.recipient_id}"><b>#${x.id} · ${esc(x.sender_name||'—')} → ${esc(x.recipient_name||'—')}</b><p class="muted">${esc(x.sender_email||'')} · ${evWhen(x.created_at)}</p><p>${esc(String(x.body||'').slice(0,300))}</p><div class="admin-actions"><button class="btn primary small" data-adm-detail="thread" data-a="${x.sender_id}" data-b="${x.recipient_id}">Vezi conversația</button><button class="btn danger small" data-admin="msg-del" data-id="${x.id}">Șterge mesajul</button></div></article>`).join('')||'<p>Nu există mesaje.</p>'}</div>`;
-  if(adminTab==='credits') body = `<div class="admin-list"><div class="info-card"><b>Credite în conturi</b><p class="muted">Adaugă credite unui utilizator (cu număr negativ le retragi). Utilizatorul le folosește la promovarea anunțurilor.</p></div>${d.users.slice().sort((a,b)=>(Number(b.credits)||0)-(Number(a.credits)||0)).map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · <b>${Number(x.credits)||0}</b> credite</p><div class="admin-actions"><button class="btn primary small" data-admin="user-credits" data-id="${x.id}">+ Credite</button></div></article>`).join('')}</div>`;
-  if(adminTab==='users') body = `<div class="adm-toolbar"><input id="adminUserSearch" type="search" placeholder="Caută utilizator după nume, email, ID…" value="${esc(adminUserQuery)}"></div><div class="admin-list" id="adminUsersBox">${adminUsersRows()}</div>`;
-  if(adminTab==='requests') body = `<div class="admin-list">${d.requests.map(x=>`<article class="info-card"><b><button type="button" class="adm-link" data-adm-detail="request" data-id="${x.id}">#${x.id} · ${esc(x.title)}</button></b><p>${esc(x.user_name||'—')} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`).join('')||'<p>Nu există cereri.</p>'}</div>`;
-  if(adminTab==='reports') body = `<div class="admin-list">${d.reports.map(x=>`<article class="info-card adm-click" data-adm-detail="report" data-id="${x.id}"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${x.reporter_id?`<button type="button" class="adm-link" data-adm-user-profile="${x.reporter_id}">${esc(x.reporter_name||'—')}</button>`:esc(x.reporter_name||'—')} · ${esc(x.status)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions"><button class="btn primary small" data-adm-detail="report" data-id="${x.id}">Deschide raportarea</button>${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`).join('')||'<p>Nu există raportări.</p>'}</div>`;
-  if(adminTab==='activity') body = `<div class="admin-list">${d.activity.map(x=>`<article class="info-card"><b>${esc(x.action)}</b><p>${esc(x.admin_name||'Admin')} · ${new Date(x.created_at).toLocaleString('ro-RO')}</p><small>${esc(x.target_type||'')} #${x.target_id||''} · ${esc(x.details||'')}</small></article>`).join('')||'<p>Nu există activitate.</p>'}</div>`;
-  if(adminTab==='events') body = adminEventsHtml();
-  if(adminTab==='features') body = adminFeaturesHtml();
-  if(adminTab==='vehicles') body = '<div id="vehAdmin"><p>Se încarcă baza de vehicule…</p></div>';
-  if(adminTab==='bizver') body = '<div id="bizAdmin"><p>Se încarcă cererile…</p></div>';
-  $('#adminContent').innerHTML = `<div class="admin-tabs">${tabs.map(([k,l])=>`<button class="btn ghost ${k===adminTab?'active':''}" data-admin-tab="${k}">${l}</button>`).join('')}</div>${body}`;
-  if(adminTab==='vehicles') safe(loadAdminVehicles)();
-  if(adminTab==='bizver') safe(loadAdminBiz)();
+  if(loading) body = '<p class="muted">Se încarcă…</p>';
+  else if(adminTab==='dashboard') body = admDashHtml();
+  else if(ADM_LISTS[adminTab]) body = admListHtml(adminTab);
+  else if(adminTab==='listings') body = adminListingsHtml();
+  else if(adminTab==='users') body = `<div class="adm-toolbar"><input id="adminUserSearch" type="search" placeholder="Caută utilizator după nume, email, ID…" value="${esc(adminUserQuery)}"></div><div class="admin-list" id="adminUsersBox">${adminUsersRows()}</div>`;
+  else if(adminTab==='events') body = adminEventsHtml();
+  else if(adminTab==='features') body = adminFeaturesHtml();
+  else if(adminTab==='vehicles') body = '<div id="vehAdmin"><p>Se încarcă baza de vehicule…</p></div>';
+  else if(adminTab==='bizver') body = '<div id="bizAdmin"><p>Se încarcă cererile…</p></div>';
+  const at = d.at ? new Date(d.at).toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}) : '';
+  $('#adminContent').innerHTML = `<div class="admin-tabs">${tabs.map(([k,l])=>{ const bd=badge(k); return `<button class="btn ghost ${k===adminTab?'active':''}" data-admin-tab="${k}"${bd.label?` aria-label="${l}, ${bd.label}"`:''}>${l}${bd.html}</button>`; }).join('')}</div><div class="adm-refresh"><small>${at?'Actualizat la '+at:''}</small><button type="button" class="adm-chip" data-adm-refresh>↻ Reîncarcă</button></div>${body}`;
+  if(!loading && adminTab==='vehicles') safe(loadAdminVehicles)();
+  if(!loading && adminTab==='bizver') safe(loadAdminBiz)();
 }
 async function loadAdminBiz(){
   const box=$('#bizAdmin'); if(!box) return;
@@ -3222,7 +3307,7 @@ async function bizAction(el){
   if(approve){ if(!confirm('Aprobi această firmă? Primește insigna „Firmă verificată”, iar documentele se șterg.')) return; }
   else{ reason=(prompt('Motivul respingerii / retragerii (îl vede și utilizatorul):')||'').trim(); if(reason.length<3) return; }
   await api('/api/admin/business-verifications/'+el.dataset.id+'/decision',{method:'POST',body:JSON.stringify({approve,reason})});
-  toast(approve?'Firmă verificată.':'Cererea a fost respinsă.'); await loadAdminBiz();
+  toast(approve?'Firmă verificată.':'Cererea a fost respinsă.'); await loadAdmin(['ovr']);
 }
 let vehQuery = '';
 const KIND_LABEL = {car:'Autoturism',van:'Utilitară',motorcycle:'Motocicletă',moped:'Moped',truck:'Camion',bus:'Autobuz'};
@@ -3280,12 +3365,13 @@ function admGallery(base,n){
 }
 async function adminUserListings(id){
   closeAdminModal();
+  await admEnsure(['listings']);
   const r = await api('/api/admin/users/'+id+'/listings');
   const seen = new Set(adminData.listings.map(x=>x.id));
   (r.listings||[]).forEach(x=>{ if(!seen.has(x.id)) adminData.listings.push(x); });
   adminUserFilter = {id:Number(id), name:r.user.name, email:r.user.email};
   adminTab = 'listings'; adminFilter = 'all'; adminQuery = '';
-  renderAdmin();
+  admMarkSeen('listings'); renderAdmin();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function admUserHtml(id){
@@ -3308,6 +3394,7 @@ async function openAdminDetail(kind,id,extra){
   adminOpenId = null; adminDetail = {kind,id,extra};
   if(modal.classList.contains('hidden')){ box.innerHTML = '<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden'); }
   try{
+    if(kind==='user') await admEnsure(['users']);
     const fn = {offer:admOfferHtml,order:admOrderHtml,request:admRequestHtml,report:admReportHtml,thread:admThreadHtml,user:admUserHtml}[kind];
     box.innerHTML = fn ? await fn(id,extra) : '<p>Tip necunoscut.</p>';
   }catch(e){ box.innerHTML = `<p>${esc(e.message)}</p>`; }
@@ -3718,7 +3805,10 @@ document.addEventListener('click', e=>{
   if((el=t.closest('[data-send-report]'))){ safe(sendReport)(Number(el.dataset.sendReport)); return; }
   if((el=t.closest('[data-wa-phone]'))){ const id=Number(el.dataset.waPhone); const row=(state.phones||[]).find(p=>p.id===id); if(row) safe(async()=>{ await api('/api/account/phones/'+id,{method:'PATCH',body:JSON.stringify({is_whatsapp:!row.is_whatsapp})}); await loadSettings(); })(); return; }
   if((el=t.closest('[data-del-phone]'))){ const id=el.dataset.delPhone; if(confirm('Ștergi acest număr?')) safe(async()=>{ await api('/api/account/phones/'+id,{method:'DELETE'}); await loadSettings(); })(); return; }
-  if((el=t.closest('[data-admin-tab]'))){ adminTab=el.dataset.adminTab; if(adminTab==='listings') adminUserFilter=null; renderAdmin(); return; }
+  if((el=t.closest('[data-admin-tab]'))){ safe(adminGoTab)(el.dataset.adminTab); return; }
+  if((el=t.closest('[data-adm-st]'))){ const [tb,...rest]=el.dataset.admSt.split(':'); adminSt[tb]=rest.join(':'); renderAdmin(); return; }
+  if((el=t.closest('[data-adm-sort]'))){ const tb=el.dataset.admSort; adminSort[tb]=(adminSort[tb]==='old')?'new':'old'; renderAdmin(); return; }
+  if((el=t.closest('[data-adm-refresh]'))){ safe(loadAdmin)(); return; }
   if((el=t.closest('[data-veh]'))){ safe(vehAction)(el); return; }
   if((el=t.closest('[data-biz]'))){ safe(bizAction)(el); return; }
   if((el=t.closest('[data-admin]'))){ safe(adminAction)(el); return; }
@@ -4566,6 +4656,7 @@ document.addEventListener('touchstart',()=>{},{passive:true});
 
 document.addEventListener('change', e=>{ if(e.target&&e.target.id==='aeCat'){ const sub=$('#aeSub'); if(sub) sub.innerHTML=admSubOptions(e.target.value,''); } });
 document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminUserSearch'){ adminUserQuery=e.target.value; const b=$('#adminUsersBox'); if(b) b.innerHTML=adminUsersRows(); } });
+document.addEventListener('input', e=>{ const t=e.target; if(t&&t.dataset&&t.dataset.admQ){ const tb=t.dataset.admQ; adminQ[tb]=t.value; const b=$('#admBox'); if(b) b.innerHTML=admListRows(tb); } });
 document.addEventListener('input', e=>{ if(e.target&&e.target.id==='adminSearch'){ adminQuery=e.target.value; const b=$('#adminListBox'); if(b) b.innerHTML=adminListRows(); } });
 
 /* ---------- ferestre: o singură fereastră deschisă + butonul Înapoi le închide ---------- */
