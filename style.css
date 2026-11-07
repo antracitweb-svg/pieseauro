@@ -4822,3 +4822,41 @@ html.dark #page-account .cg-btn::after{background:linear-gradient(100deg,transpa
 /* ecrane late (laptop, desktop, TV): bannerul rămâne compact, aliniat la stânga cu cardul, nu se întinde pe toată lățimea */
 @media (min-width:900px){#page-account .cg{max-width:620px}}
 @media (prefers-reduced-motion:reduce){#page-account .cg-b,#page-account .cg-btn::after{animation:none}}
+
+/* ===== v15: bule în interiorul sticlei, NCH, iconiță nouă, sclipiri (+ jos, Postează un anunț) ===== */
+/* Bulele rămân strict în chenarul bannerului (clip), pe orice lățime: telefon, laptop, TV */
+#page-account .cg-bw{position:absolute;inset:0;border-radius:18px;overflow:hidden;z-index:-1;pointer-events:none}
+#page-account .cg-bw .cg-b{z-index:0;filter:blur(3px)}
+#page-account .cg-b1{width:70px;height:70px;left:4%;top:-14px;animation:cgDriftA 7s ease-in-out infinite alternate}
+#page-account .cg-b2{width:84px;height:54px;left:auto;right:auto;bottom:-14px;top:auto;left:calc(96% - 84px);animation:cgDriftB 8s ease-in-out infinite alternate}
+@keyframes cgDriftA{from{left:3%}to{left:calc(97% - 70px)}}
+@keyframes cgDriftB{from{left:calc(97% - 84px)}to{left:3%}}
+/* NCH, discret, la mijlocul bannerului */
+#page-account .cg-mark{position:absolute!important;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0!important;pointer-events:none;user-select:none;
+  font-size:15px;font-weight:800;letter-spacing:.42em;text-indent:.42em;color:rgba(111,84,40,.34);text-shadow:0 1px 0 rgba(255,255,255,.55)}
+html.dark #page-account .cg-mark{color:rgba(230,200,135,.34);text-shadow:0 1px 0 rgba(0,0,0,.5)}
+@media(max-width:360px){#page-account .cg-mark{display:none}}
+/* iconiță: diamant auriu cu scânteie */
+#page-account .cg-ico{filter:drop-shadow(0 2px 5px rgba(168,116,42,.45))}
+#page-account .cg-gem{transform-origin:12px 14px;animation:cgGem 3.4s ease-in-out infinite}
+#page-account .cg-sp{transform-origin:23px 4px;animation:cgSpark 2.4s ease-in-out infinite}
+@keyframes cgGem{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes cgSpark{0%,100%{opacity:.25;transform:scale(.6) rotate(0)}50%{opacity:1;transform:scale(1.15) rotate(45deg)}}
+/* sclipire pe butonul „+” din meniul de jos (la fel ca la „Adaugă credite”) */
+.bottom-nav .bn-sell span.bn-plus{position:relative;overflow:hidden}
+.bottom-nav .bn-sell span.bn-plus::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.8),transparent);transform:skewX(-20deg);animation:cgSheen 3.6s ease-in-out infinite}
+/* „Postează un anunț” din meniul lateral: sticlă aurie, iconiță lucioasă, sclipire + puls de lumină */
+.mdrawer .menu-post{position:relative;overflow:hidden;animation:mpGlow 3.2s ease-in-out infinite;
+  background:linear-gradient(135deg,#f7e6b8 0%,#d9b46a 55%,#b8935a 100%)!important}
+.mdrawer .menu-post::before{content:"";position:absolute;left:0;right:0;top:0;height:50%;pointer-events:none;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.45),rgba(255,255,255,0))}
+.mdrawer .menu-post::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);transform:skewX(-20deg);animation:cgSheen 3.6s ease-in-out infinite}
+.mdrawer .menu-post>button{position:relative;z-index:1}
+.mdrawer .menu-post .mi{background:linear-gradient(160deg,#2f2412,#14110c)!important;border:1px solid rgba(255,236,180,.55)!important;color:#f2d58f!important;
+  border-radius:50%!important;box-shadow:0 4px 10px rgba(20,17,12,.35),inset 0 1px 0 rgba(255,255,255,.35)!important;text-shadow:0 0 8px rgba(242,213,143,.7);animation:mpPlus 3.2s ease-in-out infinite}
+@keyframes mpGlow{0%,100%{box-shadow:0 10px 24px rgba(184,147,90,.38),inset 0 1px 0 rgba(255,255,255,.7)}50%{box-shadow:0 12px 30px rgba(224,180,90,.6),inset 0 1px 0 rgba(255,255,255,.8)}}
+@keyframes mpPlus{0%,100%{transform:rotate(0) scale(1)}50%{transform:rotate(90deg) scale(1.08)}}
+@media(prefers-reduced-motion:reduce){
+  #page-account .cg-b,#page-account .cg-gem,#page-account .cg-sp,.bottom-nav .bn-sell span.bn-plus::after,.mdrawer .menu-post,.mdrawer .menu-post::after,.mdrawer .menu-post .mi{animation:none!important}
+}
