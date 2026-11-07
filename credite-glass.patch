@@ -27,7 +27,7 @@
  </body></html>
 --- a/style.css
 +++ b/style.css
-@@ -4769,3 +4769,54 @@
+@@ -4769,3 +4769,56 @@
  .image-lightbox-stage img{cursor:zoom-in}
  .image-lightbox-stage.zoomed{display:block;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
  .image-lightbox-stage.zoomed img{max-width:none;max-height:none;height:auto;margin:0 auto;border-radius:0;cursor:zoom-out}
@@ -36,8 +36,8 @@
 +   Între cardul de profil și pastilele Anunțuri/Cereri. Id-ul #accCredits rămâne același, deci JS-ul existent îl umple. */
 +#page-account .cg{position:relative;margin:0 0 12px;border-radius:20px;isolation:isolate}
 +#page-account .cg-b{position:absolute;border-radius:50%;z-index:-1;filter:blur(4px);pointer-events:none}
-+#page-account .cg-b1{width:86px;height:86px;left:10px;top:-4px;background:radial-gradient(circle,#c98f3a,#a8742a 70%);opacity:.65;animation:cgDrift1 6s ease-in-out infinite alternate}
-+#page-account .cg-b2{width:108px;height:66px;right:14px;bottom:-4px;background:radial-gradient(circle,#b8935a,#8f6d38 70%);opacity:.6;animation:cgDrift2 7s ease-in-out infinite alternate}
++#page-account .cg-b1{width:86px;height:86px;left:10px;top:0;background:radial-gradient(circle,#c98f3a,#a8742a 70%);opacity:.65;animation:cgDrift1 6s ease-in-out infinite alternate}
++#page-account .cg-b2{width:108px;height:66px;right:14px;bottom:0;background:radial-gradient(circle,#b8935a,#8f6d38 70%);opacity:.6;animation:cgDrift2 7s ease-in-out infinite alternate}
 +@keyframes cgDrift1{to{transform:translate(170px,10px)}}
 +@keyframes cgDrift2{to{transform:translate(-150px,-8px)}}
 +#page-account .cg-card{position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:18px;color:#3b2c10;
@@ -81,6 +81,8 @@
 +  #page-account .cg-card{background:rgba(236,222,190,.92)}
 +  html.dark #page-account .cg-card{background:rgba(40,36,30,.92)}
 +}
++/* ecrane late (laptop, desktop, TV): bannerul rămâne compact, aliniat la stânga cu cardul, nu se întinde pe toată lățimea */
++@media (min-width:900px){#page-account .cg{max-width:620px}}
 +@media (prefers-reduced-motion:reduce){#page-account .cg-b,#page-account .cg-btn::after{animation:none}}
 --- a/script.js
 +++ b/script.js
