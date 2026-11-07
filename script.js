@@ -5115,6 +5115,7 @@ function closePlus(){
     box.addEventListener('pointermove',e=>{ if(!down||!glide) return; const t=pick(e.clientX,e.clientY); if(t) place(t); });
     box.addEventListener('touchmove',e=>{ if(opt.hold && down && glide) e.preventDefault(); },{passive:false});
     const end=e=>{ clearTimeout(timer); if(!down) return; const t=pick(e.clientX,e.clientY), d=down, g=glide; down=null; box.classList.remove('pressing'); if(opt.hold) glide=false; if(e.type==='pointerup' && g && t && t!==d) t.click(); };
+    box.addEventListener('contextmenu',e=>{ if(down) e.preventDefault(); });
     box.addEventListener('pointerup',end); box.addEventListener('pointercancel',end);
   }
   glassSlide(document.getElementById('bottomNav'),'button');
