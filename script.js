@@ -3113,19 +3113,39 @@ async function openAdminListing(id){
     <div class="adm-seller"><small>Vânzător</small><p><b>${esc(x.seller_name||'Fără vânzător')}</b> · ${esc(x.seller_email||'')}${x.seller_phone?' · '+esc(x.seller_phone):''}</p></div>
     <div class="admin-actions">${adminBtns('listing',x.id,[['Aprobă','approved'],['Respinge','rejected'],['Blochează','blocked']])}<button class="btn ghost small" data-admin="listing-edit" data-id="${x.id}">Editează</button>${currentUser.role==='admin'?`<button class="btn danger small" data-admin="listing-del" data-id="${x.id}">Șterge</button>`:''}</div>`;
 }
-async function loadAdmin(){
+async function loadAdmin(only){
   if(!currentUser || (currentUser.role!=='admin' && currentUser.role!=='moderator')){ navigate('home'); toast('Zona de administrare este disponibilă doar administratorilor și moderatorilor.'); return; }
+  const partial = !!(only && adminData);
+  if(!partial){ const box=$('#adminContent'); if(box) box.innerHTML='<p class="muted">Se încarcă…</p>'; }
   try{
-    const get = async (u,k) => { try{ return (await api(u))[k] || []; }catch(e){ console.error('admin',u,e.message); return []; } };
-    const ovr = await api('/api/admin/overview');
     const full = currentUser.role==='admin', none = async()=>[];
-    const [users,listings,requests,reports,activity,offers,orders,messages] = await Promise.all([get('/api/admin/users','users'),get('/api/admin/listings','listings'),get('/api/admin/requests','requests'),get('/api/admin/reports','reports'),full?get('/api/admin/activity','activity'):none(),get('/api/admin/offers','offers'),get('/api/admin/orders','orders'),full?get('/api/admin/messages','messages'):none()]);
-    const events = await get('/api/admin/events','events');
-    let feat = null; if(full){ try{ feat = await api('/api/admin/features'); }catch(e){ console.error('admin features',e.message); } }
-    if(adminUserFilter){ try{ const ul=(await api('/api/admin/users/'+adminUserFilter.id+'/listings')).listings||[]; const seen=new Set(listings.map(x=>x.id)); ul.forEach(x=>{ if(!seen.has(x.id)) listings.push(x); }); }catch(e){ console.error('admin user listings',e.message); } }
-    adminData = {s:ovr.stats,users,listings,requests,reports,activity,offers,orders,messages,events,feat};
+    const get = async (u,k) => { try{ return (await api(u))[k] || []; }catch(e){ console.error('admin',u,e.message); return []; } };
+    const jobs = {
+      ovr: ()=>api('/api/admin/overview'),
+      users: ()=>get('/api/admin/users','users'),
+      listings: ()=>get('/api/admin/listings','listings'),
+      requests: ()=>get('/api/admin/requests','requests'),
+      reports: ()=>get('/api/admin/reports','reports'),
+      activity: ()=>full?get('/api/admin/activity','activity'):none(),
+      offers: ()=>get('/api/admin/offers','offers'),
+      orders: ()=>get('/api/admin/orders','orders'),
+      messages: ()=>full?get('/api/admin/messages','messages'):none(),
+      events: ()=>get('/api/admin/events','events'),
+      feat: ()=>full?api('/api/admin/features').catch(e=>{ console.error('admin features',e.message); return null; }):Promise.resolve(null)
+    };
+    const keys = Object.keys(jobs).filter(k=>!partial || only.includes(k));
+    const vals = await Promise.all(keys.map(k=>jobs[k]()));
+    const got = {}; keys.forEach((k,i)=>{ got[k]=vals[i]; });
+    if(got.listings && adminUserFilter){ try{ const ul=(await api('/api/admin/users/'+adminUserFilter.id+'/listings')).listings||[]; const seen=new Set(got.listings.map(x=>x.id)); ul.forEach(x=>{ if(!seen.has(x.id)) got.listings.push(x); }); }catch(e){ console.error('admin user listings',e.message); } }
+    const ovr = got.ovr; delete got.ovr;
+    adminData = Object.assign({}, partial ? adminData : {}, got);
+    if(ovr) adminData.s = ovr.stats;
     renderAdmin();
   }catch(e){ $('#adminContent').innerHTML = `<p>${esc(e.message)}</p>`; }
+}
+function admParts(kind){
+  const L=['listings','ovr','activity','events'];
+  return {listing:L,'approve-all':L,'listing-del':L,'user-credits':['users','ovr','activity'],user:['users','listings','ovr','activity','events'],'user-role':['users','activity'],'user-warn':['users','activity'],'msg-del':['messages','activity'],'offer-del':['offers','ovr','activity'],'order-del':['orders','ovr','activity','events'],request:['requests','ovr','activity'],report:['reports','ovr','activity'],'rating-del':['orders','events','activity','ovr'],'rating-del-ev':['orders','events','activity','ovr']}[kind];
 }
 function adminBtns(kind, id, items){ const cls={approved:'primary',active:'primary',rejected:'danger',blocked:'danger'}; return items.map(([label,status])=>`<button type="button" class="btn ${cls[status]||'ghost'} small" data-admin="${kind}" data-id="${id}" data-status="${status}">${label}</button>`).join(''); }
 const EV_LABEL = {listing_create:['📝','Anunț nou'],listing_edit:['✏️','Anunț editat'],listing_sold:['✅','Marcat vândut'],listing_resale:['♻️','Repus la vânzare'],import:['📥','Import CSV'],price_bulk:['💰','Prețuri actualizate'],vacation_on:['🌴','Vacanță pornită'],vacation_off:['🏠','Vacanță oprită'],block:['🚫','Utilizator blocat'],unblock:['↩️','Blocare ridicată'],rating:['⭐','Calificativ nou'],rating_edit:['⭐','Calificativ modificat'],account_delete:['🗑️','Cont șters']};
@@ -3177,7 +3197,7 @@ function renderAdmin(){
   if(adminTab==='credits') body = `<div class="admin-list"><div class="info-card"><b>Credite în conturi</b><p class="muted">Adaugă credite unui utilizator (cu număr negativ le retragi). Utilizatorul le folosește la promovarea anunțurilor.</p></div>${d.users.slice().sort((a,b)=>(Number(b.credits)||0)-(Number(a.credits)||0)).map(x=>`<article class="info-card"><b>#${x.id} · ${esc(x.name||'—')}</b><p>${esc(x.email)} · <b>${Number(x.credits)||0}</b> credite</p><div class="admin-actions"><button class="btn primary small" data-admin="user-credits" data-id="${x.id}">+ Credite</button></div></article>`).join('')}</div>`;
   if(adminTab==='users') body = `<div class="adm-toolbar"><input id="adminUserSearch" type="search" placeholder="Caută utilizator după nume, email, ID…" value="${esc(adminUserQuery)}"></div><div class="admin-list" id="adminUsersBox">${adminUsersRows()}</div>`;
   if(adminTab==='requests') body = `<div class="admin-list">${d.requests.map(x=>`<article class="info-card"><b><button type="button" class="adm-link" data-adm-detail="request" data-id="${x.id}">#${x.id} · ${esc(x.title)}</button></b><p>${esc(x.user_name||'—')} · ${esc(x.status)}</p><div class="admin-actions">${adminBtns('request',x.id,[['Deschisă','open'],['Potrivită','matched'],['Închisă','closed']])}</div></article>`).join('')||'<p>Nu există cereri.</p>'}</div>`;
-  if(adminTab==='reports') body = `<div class="admin-list">${d.reports.map(x=>`<article class="info-card adm-click" data-adm-detail="report" data-id="${x.id}"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${esc(x.reporter_name||'—')} · ${esc(x.status)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions"><button class="btn primary small" data-adm-detail="report" data-id="${x.id}">Deschide raportarea</button>${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`).join('')||'<p>Nu există raportări.</p>'}</div>`;
+  if(adminTab==='reports') body = `<div class="admin-list">${d.reports.map(x=>`<article class="info-card adm-click" data-adm-detail="report" data-id="${x.id}"><b>#${x.id} · ${esc(x.reason)}</b><p>${esc(x.listing_title||'Anunț')} · ${x.reporter_id?`<button type="button" class="adm-link" data-adm-user-profile="${x.reporter_id}">${esc(x.reporter_name||'—')}</button>`:esc(x.reporter_name||'—')} · ${esc(x.status)}</p>${x.details?`<p>${esc(x.details)}</p>`:''}<div class="admin-actions"><button class="btn primary small" data-adm-detail="report" data-id="${x.id}">Deschide raportarea</button>${adminBtns('report',x.id,[['Marchează verificată','reviewed'],['Închide','closed']])}</div></article>`).join('')||'<p>Nu există raportări.</p>'}</div>`;
   if(adminTab==='activity') body = `<div class="admin-list">${d.activity.map(x=>`<article class="info-card"><b>${esc(x.action)}</b><p>${esc(x.admin_name||'Admin')} · ${new Date(x.created_at).toLocaleString('ro-RO')}</p><small>${esc(x.target_type||'')} #${x.target_id||''} · ${esc(x.details||'')}</small></article>`).join('')||'<p>Nu există activitate.</p>'}</div>`;
   if(adminTab==='events') body = adminEventsHtml();
   if(adminTab==='features') body = adminFeaturesHtml();
@@ -3247,7 +3267,12 @@ async function vehAction(el){
 function closeAdminModal(){ adminOpenId = null; adminDetail = null; closeModal($('#adminListingModal')); }
 const admRow = (l,v) => (v||v===0) ? `<div><small>${l}</small><b>${esc(v)}</b></div>` : '';
 const admBadge = s => `<span class="badge">${esc(s||'—')}</span>`;
-const admUserBlock = (label,id,name,email,phone) => (id||name) ? `<div class="adm-seller"><small>${label}</small><p><b>${esc(name||'Cont șters')}</b>${email?' · '+esc(email):''}${phone?' · '+esc(phone):''}${id?` · <button type="button" class="adm-link" data-adm-user-listings="${Number(id)}">Anunțurile lui</button>`:''}</p></div>` : '';
+function admUserBlock(label,id,name,email,phone){
+  if(!(id||name)) return '';
+  if(id && !phone){ const u=((adminData&&adminData.users)||[]).find(z=>Number(z.id)===Number(id)); if(u){ phone=u.phone||''; email=email||u.email||''; } }
+  const nm = id ? `<button type="button" class="adm-link" data-adm-user-profile="${Number(id)}"><b>${esc(name||'Cont șters')}</b></button>` : `<b>${esc(name||'Cont șters')}</b>`;
+  return `<div class="adm-seller"><small>${label}</small><p>${nm}${email?' · '+esc(email):''}${phone?' · '+esc(phone):''}${id?` · <button type="button" class="adm-link" data-adm-user-profile="${Number(id)}">Date și contact</button> · <button type="button" class="adm-link" data-adm-user-listings="${Number(id)}">Anunțurile lui</button>`:''}</p></div>`;
+}
 const admText = (label,t) => t ? `<div class="adm-desc"><small>${label}</small><p>${esc(t).replace(/\n/g,'<br>')}</p></div>` : '';
 function admGallery(base,n){
   if(!n) return '';
@@ -3263,12 +3288,27 @@ async function adminUserListings(id){
   renderAdmin();
   window.scrollTo({top:0,behavior:'smooth'});
 }
+function admUserHtml(id){
+  const x = ((adminData&&adminData.users)||[]).find(u=>Number(u.id)===Number(id));
+  if(!x) return '<p class="muted">Contul nu mai există sau nu se află în lista încărcată.</p>';
+  const isAd = currentUser.role==='admin', self = Number(x.id)===Number(currentUser.id), canAct = (isAd||x.role==='user') && !self;
+  const ROLE = {admin:'administrator',moderator:'moderator',user:'utilizator'};
+  const tel = String(x.phone||'').replace(/[^\d+]/g,''), wa = tel.replace(/^\+/,'').replace(/^00/,'').replace(/^0/,'40');
+  const blk = x.status==='blocked' ? ' · blocat '+(x.blocked_until?'până la '+fmtDate(x.blocked_until):'definitiv') : '';
+  const stats = (x.req_posted||x.offers_sent) ? `<div class="adm-desc"><small>Activitate</small><p>${x.req_posted?`Cumpărător: ${x.req_posted} cereri · ${x.req_resolved||0} rezolvate · ${x.req_cancelled||0} anulate · ${x.req_expired||0} expirate`:''}${x.req_posted&&x.offers_sent?'<br>':''}${x.offers_sent?`Vânzător: ${x.offers_sent} oferte · ${x.offers_won||0} câștigate`:''}</p></div>` : '';
+  return `<h3 class="adm-title">#${x.id} · ${esc(x.name||'—')}</h3>
+    <p>${admBadge(x.status)} · ${esc(ROLE[x.role]||x.role)}${blk}</p>
+    <div class="adm-desc"><small>Contact</small><p>${x.email?`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`:'—'}${x.phone?` · <a href="tel:${esc(tel)}">${esc(x.phone)}</a>`:' · <span class="muted">fără telefon</span>'}</p></div>
+    <div class="adm-desc"><small>Cont</small><p>Creat: ${evWhen(x.created_at)}${x.warns?` · ⚠ ${x.warns} ${x.warns===1?'avertisment':'avertismente'}`:''}${isAd&&x.credits!=null?` · Credite: ${Number(x.credits)||0}`:''}</p></div>
+    ${stats}${x.status==='blocked'&&x.block_reason?admText('Motivul blocării',x.block_reason):''}
+    <div class="admin-actions">${x.phone?`<a class="btn primary small" href="tel:${esc(tel)}">Sună</a><a class="btn ghost small" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>`:''}${x.email?`<a class="btn ghost small" href="mailto:${esc(x.email)}">Email</a>`:''}<button type="button" class="btn ghost small" data-adm-user-listings="${x.id}">Anunțurile lui</button>${canAct?`<button type="button" class="btn ghost small" data-admin="user-warn" data-id="${x.id}">Avertizează</button>${adminBtns('user',x.id,[['Activează','active'],['Blochează','blocked']])}`:''}${isAd?`<button type="button" class="btn ghost small" data-admin="user-credits" data-id="${x.id}">Credite</button>`:''}</div>`;
+}
 async function openAdminDetail(kind,id,extra){
   const modal = $('#adminListingModal'), box = $('#adminListingBody');
   adminOpenId = null; adminDetail = {kind,id,extra};
   if(modal.classList.contains('hidden')){ box.innerHTML = '<p class="muted">Se încarcă…</p>'; modal.classList.remove('hidden'); }
   try{
-    const fn = {offer:admOfferHtml,order:admOrderHtml,request:admRequestHtml,report:admReportHtml,thread:admThreadHtml}[kind];
+    const fn = {offer:admOfferHtml,order:admOrderHtml,request:admRequestHtml,report:admReportHtml,thread:admThreadHtml,user:admUserHtml}[kind];
     box.innerHTML = fn ? await fn(id,extra) : '<p>Tip necunoscut.</p>';
   }catch(e){ box.innerHTML = `<p>${esc(e.message)}</p>`; }
 }
@@ -3374,7 +3414,7 @@ async function saveListingEdit(id){
     if(btn){ btn.disabled = false; btn.textContent = label; }
     throw e;
   }
-  try{ await loadAdmin(); }catch{}
+  try{ await loadAdmin(['listings','ovr','activity']); }catch{}
   await openAdminListing(id);
 }
 async function adminAction(el){
@@ -3382,7 +3422,7 @@ async function adminAction(el){
   if(kind==='listing'){ let note=''; if(status==='rejected'||status==='blocked'){ const n=prompt('Motivul (opțional, îl vede vânzătorul în notificări):',''); if(n===null) return; note=n.trim(); } await api(`/api/admin/listings/${id}`,{method:'PATCH',body:JSON.stringify({status,note})}); }
   else if(kind==='approve-all'){ if(!confirm('Aprobi toate anunțurile aflate în așteptare?')) return; const r=await api('/api/admin/listings/approve-all',{method:'POST'}); toast(`Aprobate: ${r.approved}.`); }
   else if(kind==='listing-del'){ if(!confirm('Ștergi definitiv anunțul?')) return; await api(`/api/admin/listings/${id}`,{method:'DELETE'}); if(String(adminOpenId)===String(id)){ adminOpenId=null; closeModal($('#adminListingModal')); } }
-  else if(kind==='user-credits'){ const v=prompt('Câte credite adaugi? (număr negativ ca să retragi)','10'); if(v===null) return; const n=Math.trunc(Number(String(v).replace(',','.'))); if(!n){ toast('Număr invalid.'); return; } const note=prompt('Notă (opțional)','')||''; await api(`/api/admin/users/${id}/credits`,{method:'POST',body:JSON.stringify({amount:n,note})}); toast('Creditele au fost actualizate.'); }
+  else if(kind==='user-credits'){ const v=prompt('Câte credite adaugi? (număr negativ ca să retragi)','10'); if(v===null) return; const n=Math.trunc(Number(String(v).replace(',','.'))); if(!n){ toast('Număr invalid.'); return; } const note=prompt('Notă (opțional)','')||''; toast('Se actualizează creditele…'); await api(`/api/admin/users/${id}/credits`,{method:'POST',body:JSON.stringify({amount:n,note})}); toast('Creditele au fost actualizate.'); }
   else if(kind==='user'){
     if(status==='blocked'){
       const reason=prompt('Motivul blocării (obligatoriu, îl vede utilizatorul):','');
@@ -3404,7 +3444,7 @@ async function adminAction(el){
   }
   else if(kind==='user-del'){ if(!confirm('Ștergi DEFINITIV acest cont? Se șterg și anunțurile, mesajele și ofertele lui. Acțiunea nu poate fi anulată.')) return; if(prompt('Scrie ȘTERGE pentru confirmare:','')!=='ȘTERGE'){ toast('Anulat.'); return; } await api(`/api/admin/users/${id}`,{method:'DELETE'}); toast('Contul a fost șters.'); }
   else if(kind==='listing-edit'){ await openListingEdit(id); return; }
-  else if(kind==='user-warn'){ const t=prompt('Mesaj pentru utilizator (îl vede în notificări):',''); if(t===null) return; if(!t.trim()){ toast('Scrie un mesaj.'); return; } await api(`/api/admin/users/${id}/warn`,{method:'POST',body:JSON.stringify({text:t.trim()})}); toast('Mesajul a fost trimis.'); return; }
+  else if(kind==='user-warn'){ const t=prompt('Mesaj pentru utilizator (îl vede în notificări):',''); if(t===null) return; if(!t.trim()){ toast('Scrie un mesaj.'); return; } toast('Se trimite mesajul…'); await api(`/api/admin/users/${id}/warn`,{method:'POST',body:JSON.stringify({text:t.trim()})}); toast('Mesajul a fost trimis.'); return; }
   else if(kind==='rating-del-ev'){ const o=await api('/api/admin/orders/'+id); const r=(o.ratings||{})[el.dataset.rkind]; if(!r){ toast('Calificativul nu mai există (a fost șters deja).'); return; } if(!confirm('Ștergi calificativul de '+r.stars+'/5'+(r.comment?' („'+String(r.comment).slice(0,80)+'”)':'')+'? Acțiunea rămâne în jurnalul de activitate.')) return; await api(`/api/admin/ratings/${el.dataset.rkind}/${r.id}`,{method:'DELETE'}); toast('Calificativul a fost șters.'); }
   else if(kind==='rating-edit'){
     const stars=prompt('Note (1-5):',String(el.dataset.stars||'')); if(stars===null) return;
@@ -3420,7 +3460,7 @@ async function adminAction(el){
   else if(kind==='request') await api(`/api/admin/requests/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   else if(kind==='report') await api(`/api/admin/reports/${id}`,{method:'PATCH',body:JSON.stringify({status})});
   else if(kind==='rating-del'){ if(!confirm('Ștergi acest calificativ? Acțiunea rămâne în jurnalul de activitate.')) return; await api(`/api/admin/ratings/${el.dataset.rkind}/${id}`,{method:'DELETE'}); }
-  await loadAdmin();
+  await loadAdmin(admParts(kind));
   if(adminOpenId && !$('#adminListingModal').classList.contains('hidden')) await openAdminListing(adminOpenId);
   else if(adminDetail && !$('#adminListingModal').classList.contains('hidden')) await openAdminDetail(adminDetail.kind,adminDetail.id,adminDetail.extra);
 }
@@ -3688,6 +3728,7 @@ document.addEventListener('click', e=>{
   if((el=t.closest('#notifBtn'))){ toggleNotifSummary(); return; }
   if((el=t.closest('[data-notif-go]'))){ const b=$('#notifSummary'); if(b) b.classList.add('hidden'); const nb=$('#notifBtn'); if(nb) nb.setAttribute('aria-expanded','false'); accountAction(el.dataset.notifGo); return; }
   if((el=t.closest('[data-admin-open]'))){ safe(openAdminListing)(el.dataset.adminOpen); return; }
+  if((el=t.closest('[data-adm-user-profile]'))){ safe(openAdminDetail)('user', el.dataset.admUserProfile); return; }
   if((el=t.closest('[data-adm-detail]'))){ safe(openAdminDetail)(el.dataset.admDetail, el.dataset.id||el.dataset.a, el.dataset.b); return; }
   if((el=t.closest('[data-adm-user-listings]'))){ safe(adminUserListings)(el.dataset.admUserListings); return; }
   if((el=t.closest('[data-adm-user-clear]'))){ adminUserFilter=null; renderAdmin(); return; }
