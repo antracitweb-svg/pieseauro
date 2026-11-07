@@ -18,10 +18,6 @@ services:
         sync: false
       - key: APP_URL
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: RESEND_FROM
-        sync: false
       - key: REQUIRE_VERIFIED_EMAIL
         value: "false"
       - key: BOT_CHECK

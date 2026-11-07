@@ -162,7 +162,7 @@ app.use((req,res,next)=>{
 });
 // Cache scurt (10 s) pentru căutările publice; se golește la orice modificare de anunțuri/conturi.
 let SEO_IDX=null;
-const LIST_CACHE=new Map(),LIST_CACHE_TTL=10000,LIST_CACHE_MAX=300;
+const LIST_CACHE=new Map(),LIST_CACHE_TTL=30000,LIST_CACHE_MAX=300;
 app.use((req,res,next)=>{if(req.method!=='GET'&&/^\/api\/(listings|admin\/listings|admin\/users|account|orders)/.test(req.path))res.on('finish',()=>{LIST_CACHE.clear();SEO_IDX=null;});next();});
 // Doar aceste fișiere (și folderul assets/) sunt publice; server.js, package.json etc. NU sunt servite.
 /* ===== BOT-GUARD:START — verificare de browser, limitare cereri, blocare scrapere ===== */
@@ -302,7 +302,20 @@ function sendIndexHtml(req,res){
   res.set('Cache-Control','no-cache');res.type('html').send(html);
  }catch(e){res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,'index.html'));}
 }
-for(const f of PUBLIC_FILES) app.get('/'+f,f==='index.html'?sendIndexHtml:(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,f));});
+/* Versiuni minificate (style.min.css / script.min.js, generate cu `node build.js`).
+   Se folosesc DOAR dacă prima linie conține hash-ul sursei curente; dacă ai modificat style.css/script.js fără rebuild, se servește automat sursa. */
+const SERVED_FILE={};
+for(const [src,min] of [['style.css','style.min.css'],['script.js','script.min.js']]){
+  SERVED_FILE[src]=src;
+  try{
+    const mp=path.join(__dirname,min);
+    if(fs.existsSync(mp)){
+      const h=crypto.createHash('sha1').update(fs.readFileSync(path.join(__dirname,src))).digest('hex').slice(0,16);
+      if(fs.readFileSync(mp,'utf8').slice(0,60).includes('src:'+h+'*/'))SERVED_FILE[src]=min;
+    }
+  }catch{}
+}
+for(const f of PUBLIC_FILES) app.get('/'+f,f==='index.html'?sendIndexHtml:(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(path.join(__dirname,SERVED_FILE[f]||f));});
 app.use('/assets',express.static(ASSETS_DIR,{index:false,dotfiles:'ignore',maxAge:'7d'}));
 
 const VEHICLE_SCHEMA=[
@@ -1208,7 +1221,7 @@ app.delete('/api/auth/sessions/:id',auth,requireDb,ah(async(req,res)=>{
 app.patch('/api/me',auth,requireDb,async(req,res)=>{try{const {phone,show_phone}=req.body||{};if(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim()))return res.status(400).json({error:'PHONE_INVALID'});const r=await pool.query('UPDATE users SET phone=$1, show_phone=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,role,status',[clip(phone,30),!!show_phone,req.user.id]);res.json({user:r.rows[0]});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 app.patch('/api/account/privacy',requireDb,auth,async(req,res)=>{try{const r=await pool.query('UPDATE users SET show_phone=$1 WHERE id=$2 RETURNING show_phone',[!!(req.body||{}).show_phone,req.user.id]);res.json({show_phone:r.rows[0].show_phone});}catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}});
 
-const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.discount_percent,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.oem_alt,l.delivery,l.description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.power_hp,l.city,l.currency,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
+const LIST_COLS="(COALESCE(l.promoted_until,'epoch'::timestamptz)>NOW()) AS promoted,l.promoted_until,l.discount_percent,l.id,l.user_id,l.type,l.title,l.price,l.condition,l.make,l.model,l.generation,l.year,l.engine,l.fuel,l.vehicle_id,l.seller_type,l.quantity,l.negotiable,l.county,l.category,l.subcategory,l.oem,l.oem_alt,l.delivery,LEFT(l.description,300) AS description,l.status,l.created_at,l.views,l.km,l.parts_avail,l.power_hp,l.city,l.currency,(CASE WHEN l.images[1] LIKE 'data:%' THEN ARRAY['/api/listings/'||l.id||'/img/0'] ELSE l.images[1:1] END) AS images,COALESCE(array_length(l.images,1),0)::int AS image_count";
 // Media calificativelor: ca vânzător (de la cumpărători) și ca cumpărător (de la vânzători).
 const RATE_SQL=(tbl,col,uid,al)=>`(SELECT ROUND(AVG(stars),1)::float FROM ${tbl} WHERE ${col}=${uid}) ${al}_avg,(SELECT COUNT(*)::int FROM ${tbl} WHERE ${col}=${uid}) ${al}_n`;
 const SELLER_RATE=(uid,al)=>RATE_SQL('seller_ratings','seller_id',uid,al);
@@ -1362,7 +1375,7 @@ app.get('/api/listings/:id/img/:n(\\d{1,2})',requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
  const r=await pool.query("SELECT images[$2::int] img FROM listings WHERE id=$1 AND status NOT IN ('blocked','rejected')",[req.params.id,n+1]);
  const img=r.rowCount?(r.rows[0].img||''):'';
- if(/^https?:\/\//.test(img)){res.set('Cache-Control','public, max-age=600');return res.redirect(302,img);}
+ if(/^https?:\/\//.test(img)){res.set('Cache-Control','public, max-age=3600');return res.redirect(302,img);}
  const m=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/.exec(img);
  if(!m)return res.status(404).end();
  res.set({'Content-Type':m[1],'Cache-Control':'public, max-age=86400'}).send(Buffer.from(m[2],'base64'));

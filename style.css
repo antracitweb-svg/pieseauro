@@ -4698,3 +4698,10 @@ html.dark #page-admin .adm-hero .rv-hero-desc{color:var(--muted)!important}
   .bottom-nav .bn-sell span.bn-plus{width:30px;height:30px;margin-top:-6px;box-shadow:0 4px 10px rgba(184,147,90,.4),0 0 0 3px rgba(14,15,18,.9)}
   .bottom-nav .bn-sell span.bn-plus svg{width:16px;height:16px}
 }
+
+/* ===== v15 (viteză, doar telefon): fără blur pe elemente care se repetă sau acoperă tot ecranul (cardurile cu inimioară, ferestre) ===== */
+@media(max-width:899px){
+  .listing-fav,.image-zoom-hint,.modal:not(#plusModal){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  .listing-fav{background:rgba(255,255,255,.9)}
+  html.dark .listing-fav{background:rgba(22,28,38,.9)}
+}

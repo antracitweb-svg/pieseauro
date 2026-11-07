@@ -1300,7 +1300,8 @@ async function loadHome(attempt=0){
   const box=$('#homeFeed'), wrap=$('#homeFeedWrap'); if(!box||!wrap) return;
   if(!box.dataset.loaded){ wrap.classList.remove('hidden'); box.innerHTML=SKEL; }
   try{
-    const r=await api('/api/listings?limit=12&offset=0');
+    const pf=window.__feed0; window.__feed0=null;
+    const r = pf ? await pf.catch(()=>api('/api/listings?limit=12&offset=0')) : await api('/api/listings?limit=12&offset=0');
     const list=(r&&r.listings)||[];
     if(!list.length){ wrap.classList.add('hidden'); box.innerHTML=''; return; }
     wrap.classList.remove('hidden');
@@ -4636,13 +4637,16 @@ function bumpUnreadBadge(){
   initFormValidation();
   fillStaticSelects();
   wire();
+  /* pornim în paralel: lista de pe prima pagină și catalogul de vehicule, fără să așteptăm /api/me */
+  if(parseHash().name==='home'){ try{ window.__feed0 = api('/api/listings?limit=12&offset=0'); window.__feed0.catch(()=>{}); }catch{} }
+  const catP = loadCatalog();
   try{ const r = await api('/api/me'); currentUser = r.user || null; window.__verif = r.verification || null; }catch{ currentUser = null; }
   renderHeader();
   initLive();
   syncFavorites();
   route();
   loadFooterLogos();
-  loadCatalog().then(()=>{ if(parseHash().name==='rezultate') applyFiltersToUI(); });
+  catP.then(()=>{ if(parseHash().name==='rezultate') applyFiltersToUI(); });
 })();
 
 /* meniul de jos: rămâne vizibil; se retrage doar cât timp meniul lateral e deschis (html.menu-open în CSS) */
