@@ -5254,3 +5254,10 @@ function closePlus(){
   glassSlide(document.querySelector('.header .nav-actions'),'button.icon-btn,button.garage-btn,button.menu-btn');
   glassSlide(document.querySelector('#menuDrawer .mdrawer-body'),'.menu-card button',{water:true,hold:130});
 })();
+
+/* v14: vibrație ușoară la atingerea butoanelor din Contul meu (doar unde e suportat) */
+document.addEventListener('click',e=>{
+  if(e.target.closest && e.target.closest('#page-account .account-sections summary, #page-account .account-sections details>button')){
+    try{ if(navigator.vibrate) navigator.vibrate(8); }catch(_){}
+  }
+},{passive:true});
