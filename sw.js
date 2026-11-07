@@ -4,11 +4,11 @@
    - Navigarea: network-first, cu fallback la index.html din cache când e offline.
    - Shell static (css/js/iconițe): stale-while-revalidate.
 */
-const VERSION = 'autoparts-v52';
+const VERSION = 'autoparts-v54';
 const SHELL = [
   '/',
   '/index.html',
-  '/style.css?v=plus8',
+  '/style.css?v=plus10',
   '/script.js?v=plus8',
   '/realtime.js?v=4',
   '/theme-init.js',
