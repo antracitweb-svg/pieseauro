@@ -1799,13 +1799,16 @@ app.get('/api/payments/success',auth,requireDb,ah(async(req,res)=>{
   const c=await pool.connect();
   try{
     await c.query('BEGIN');
-    const ex=await c.query('SELECT id FROM payments WHERE session_id=$1 FOR UPDATE',[sid]);
-    if(!ex.rowCount){
-      await c.query('INSERT INTO payments(user_id,session_id,pack,credits,amount_lei) VALUES($1,$2,$3,$4,$5) ON CONFLICT (session_id) DO NOTHING',[req.user.id,sid,packId,pack.credits,pack.lei]);
+    /* Creditele se adaugă doar de cererea care a înregistrat efectiv plata (INSERT a întors un rând).
+       Dacă două cereri pentru aceeași sesiune vin simultan, a doua așteaptă prima, nu inserează nimic și nu adaugă credite. */
+    const ins=await c.query('INSERT INTO payments(user_id,session_id,pack,credits,amount_lei) VALUES($1,$2,$3,$4,$5) ON CONFLICT (session_id) DO NOTHING RETURNING id',[req.user.id,sid,packId,pack.credits,pack.lei]);
+    let added=false;
+    if(ins.rowCount){
       await creditMove(c,req.user.id,pack.credits,'topup',null,'Plată online: '+pack.label,pack.lei);
-      notify(req.user.id,'Plata online a fost procesată: '+pack.credits+' credite au fost adăugate în cont.');
+      added=true;
     }
     await c.query('COMMIT');
+    if(added)notify(req.user.id,'Plata online a fost procesată: '+pack.credits+' credite au fost adăugate în cont.');
   }catch(e){ try{await c.query('ROLLBACK');}catch{} throw e; }
   finally{ c.release(); }
   res.redirect(302,back+'&pay=ok');
