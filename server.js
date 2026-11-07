@@ -1884,7 +1884,7 @@ app.post('/api/admin/users/:id/credits',auth,admin,requireDb,ah(async(req,res)=>
   res.json({ok:true,balance:bal});
 }));
 app.get('/api/sellers',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified ORDER BY n DESC LIMIT 100");
+ const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,MAX(u.ship_city) city,(SELECT COALESCE(ARRAY_AGG(DISTINCT x.make),'{}') FROM listings x WHERE x.user_id=u.id AND x.status='approved' AND x.type='dezmembrari' AND COALESCE(x.make,'')<>'') makes,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified ORDER BY n DESC LIMIT 300");
  res.json({sellers:r.rows});
 });
 /* ===== Notificări email, export date, ștergere cont ===== */

@@ -4890,3 +4890,58 @@ html.dark .home-wrap .home-center h1 .hg::before{
 @media(prefers-reduced-motion:reduce){.home-wrap .home-center h1 .hg::before{animation:none}}
 /* v18b: pe telefon, cardul „Orice piesă auto” (text + sticlă) puțin mutat spre stânga */
 @media(max-width:800px){.home-wrap .home-center h1 .hg{left:-10px}}
+
+/* ===== v20: Magazine verificate: filtrare + carduri compacte în stilul site-ului ===== */
+.sv-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0 10px}
+.sv-pill{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 15px;border-radius:999px;border:1px solid rgba(184,147,90,.55);background:linear-gradient(180deg,#fffdf8,#f6ecd6);color:#6f5428;font:inherit;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(143,109,56,.12);transition:transform .12s,box-shadow .12s,background .12s}
+.sv-pill:active{transform:scale(.97)}
+.sv-pill.on{background:linear-gradient(135deg,#d9b46a,#b8935a);color:#fff;border-color:#a8742a}
+.sv-sort{padding-right:12px;max-width:100%}
+.sv-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#6f5428;color:#fff;font-size:12px;font-weight:800}
+.sv-pill.on .sv-count{background:#fff;color:#8f6d38}
+.sv-found{margin-left:auto;font-size:13.5px;color:var(--muted);font-weight:600}
+.sv-panel{margin:0 0 12px;padding:14px;border-radius:18px;border:1px solid rgba(184,147,90,.4);background:linear-gradient(145deg,rgba(255,253,248,.96),rgba(246,236,214,.9));box-shadow:0 10px 24px rgba(143,109,56,.12),inset 0 1.5px 0 rgba(255,255,255,.8)}
+.sv-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.sv-fields label{display:grid;gap:4px;font-size:12.5px;font-weight:700;color:#6f5428;letter-spacing:.2px}
+.sv-fields select,.sv-fields input[type=search]{width:100%;min-height:40px;border-radius:12px;border:1px solid rgba(184,147,90,.45);background:#fffdf8;color:var(--ink);font:inherit;font-weight:500;padding:0 10px}
+.sv-wide{grid-column:1/-1}
+.sv-fields .sv-check{display:flex;align-items:center;gap:8px;grid-column:1/-1;font-size:14px;font-weight:700;color:var(--ink)}
+.sv-check input{width:18px;height:18px;accent-color:#b8935a}
+.sv-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.sv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:6px}
+.sv-card{position:relative;display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:18px;border:1px solid rgba(184,147,90,.38);background:linear-gradient(145deg,#fffdf8 0%,#f7eed9 100%);box-shadow:0 8px 20px rgba(143,109,56,.13),inset 0 1.5px 0 rgba(255,255,255,.85);overflow:hidden;transition:transform .16s,box-shadow .16s}
+.sv-card::before{content:"";position:absolute;inset:0 0 auto 0;height:42%;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0));pointer-events:none}
+.sv-card:hover{transform:translateY(-2px);box-shadow:0 14px 28px rgba(143,109,56,.2),inset 0 1.5px 0 rgba(255,255,255,.9)}
+.sv-main{position:relative;display:flex;align-items:center;gap:11px;width:100%;padding:0;border:0;background:none;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.sv-main .seller-avatar{flex:0 0 52px;width:52px;height:52px;border-radius:50%;border:2px solid rgba(184,147,90,.7);box-shadow:0 4px 10px rgba(143,109,56,.25)}
+.sv-title{display:grid;gap:3px;min-width:0}
+.sv-name{font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:18px;line-height:1.15;color:var(--ink);overflow-wrap:anywhere}
+.sv-tag{justify-self:start;font-size:10.5px;font-weight:800;letter-spacing:.8px;color:#8f6d38;background:rgba(184,147,90,.18);border-radius:999px;padding:2px 8px}
+.sv-ver{justify-self:start;font-size:11.5px;font-weight:800;color:#fff;background:linear-gradient(135deg,#d9b46a,#a8742a);border-radius:999px;padding:2px 9px;box-shadow:0 2px 6px rgba(168,116,42,.4)}
+.sv-rate,.sv-meta{position:relative;margin:0;font-size:13.5px}
+.sv-meta{color:var(--muted);font-weight:600}
+.sv-chips{position:relative;display:flex;flex-wrap:wrap;gap:5px}
+.sv-chip{font-size:11.5px;font-weight:700;color:#6f5428;border:1px solid rgba(184,147,90,.5);background:rgba(255,253,248,.8);border-radius:999px;padding:2px 9px}
+.sv-more{background:rgba(184,147,90,.2)}
+.sv-go{position:relative;margin-top:auto;align-self:flex-start;border-color:rgba(184,147,90,.7)!important;color:#6f5428!important;font-weight:800;background:linear-gradient(180deg,#fffdf8,#f4e7c6)!important;overflow:hidden}
+.sv-go::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;pointer-events:none;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-20deg);animation:cgSheen 4.2s ease-in-out infinite}
+@media(max-width:560px){
+  .sv-grid{grid-template-columns:1fr;gap:10px}
+  .sv-card{padding:12px;gap:5px}
+  .sv-main .seller-avatar{flex-basis:46px;width:46px;height:46px}
+  .sv-name{font-size:17px}
+  .sv-found{width:100%;margin-left:2px}
+}
+@media(min-width:1500px){.sv-grid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}}
+html.dark .sv-pill{background:linear-gradient(180deg,#2a2519,#1f1b13);color:#e6c987;border-color:rgba(201,165,106,.45);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+html.dark .sv-pill.on{background:linear-gradient(135deg,#b8935a,#8f6d38);color:#fff}
+html.dark .sv-count{background:#e6c987;color:#2a2519}
+html.dark .sv-panel{background:linear-gradient(145deg,rgba(40,35,26,.96),rgba(28,25,19,.96));border-color:rgba(201,165,106,.3);box-shadow:0 10px 24px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}
+html.dark .sv-fields label{color:#e6c987}
+html.dark .sv-fields select,html.dark .sv-fields input[type=search]{background:#161c26;border-color:rgba(201,165,106,.35);color:#e9e7e2}
+html.dark .sv-card{background:linear-gradient(145deg,#2a251b 0%,#1d1a14 100%);border-color:rgba(201,165,106,.3);box-shadow:0 8px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}
+html.dark .sv-card::before{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0))}
+html.dark .sv-tag{color:#e6c987;background:rgba(201,165,106,.18)}
+html.dark .sv-chip{color:#e6c987;background:rgba(40,35,26,.8);border-color:rgba(201,165,106,.35)}
+html.dark .sv-go{background:linear-gradient(180deg,#2a251b,#1f1b13)!important;color:#e6c987!important;border-color:rgba(201,165,106,.5)!important}
+@media(prefers-reduced-motion:reduce){.sv-go::after{animation:none}.sv-card,.sv-pill{transition:none}}

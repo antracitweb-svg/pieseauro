@@ -2129,16 +2129,74 @@ async function requestContact(id, btn){
   slot.innerHTML = contactHtml(r.phones,'Cumpărătorul');
   if(inModal){ const cb=btn.closest('.ad-callbar'); if(cb) cb.querySelectorAll('[data-req-contact]').forEach(b=>b.remove()); slot.scrollIntoView({block:'center',behavior:'smooth'}); }
 }
+/* ---------- Magazine / firme de dezmembrări: listă + filtrare ---------- */
+const stState={all:[],county:'',city:'',make:'',ver:false,min:0,q:'',sort:'rating',bound:false};
+const stNorm=v=>String(v||'').trim().toLowerCase();
+function stFiltered(){
+  const S=stState, q=stNorm(S.q);
+  const list=S.all.filter(s=>
+    (!S.county||stNorm(s.county)===stNorm(S.county)) &&
+    (!S.city||stNorm(s.city)===stNorm(S.city)) &&
+    (!S.make||(s.makes||[]).some(m=>stNorm(m)===stNorm(S.make))) &&
+    (!S.ver||s.vb) &&
+    (!S.min||(s.rating_n>0&&Number(s.rating_avg)>=S.min)) &&
+    (!q||stNorm(s.name).includes(q)));
+  const by={rating:(x,y)=>(Number(y.rating_avg)||0)-(Number(x.rating_avg)||0)||(y.rating_n||0)-(x.rating_n||0)||y.n-x.n,
+            ads:(x,y)=>y.n-x.n, name:(x,y)=>String(x.name).localeCompare(String(y.name),'ro')};
+  return list.sort(by[S.sort]||by.rating);
+}
+function stFillSelects(){
+  const S=stState, uniq=a=>[...new Map(a.filter(Boolean).map(v=>[stNorm(v),String(v).trim()])).values()].sort((x,y)=>x.localeCompare(y,'ro'));
+  const fill=(id,vals,ph,cur)=>{ const el=$('#'+id); if(!el)return; el.innerHTML=`<option value="">${ph}</option>`+vals.map(v=>`<option value="${esc(v)}"${stNorm(v)===stNorm(cur)?' selected':''}>${esc(v)}</option>`).join(''); };
+  fill('stCounty',uniq(S.all.map(s=>s.county)),'Toate județele',S.county);
+  const inCounty=S.county?S.all.filter(s=>stNorm(s.county)===stNorm(S.county)):S.all;
+  const cities=uniq(inCounty.map(s=>s.city));
+  if(S.city&&!cities.some(c=>stNorm(c)===stNorm(S.city))) S.city='';
+  fill('stCity',cities,'Toate orașele',S.city);
+  fill('stMake',uniq(S.all.flatMap(s=>s.makes||[])),'Toate mărcile',S.make);
+}
+function stCardHtml(s){
+  const mk=(s.makes||[]), chips=mk.slice(0,4).map(m=>`<span class="sv-chip">${esc(m)}</span>`).join('')+(mk.length>4?`<span class="sv-chip sv-more">+${mk.length-4}</span>`:'');
+  const where=[s.city,s.county].filter(Boolean).map(esc).join(', ');
+  return `<article class="sv-card">
+    <button type="button" class="sv-main" data-seller-profile="${s.id}" aria-label="Profilul firmei ${esc(s.name)}">${avatarSpan(s.id,s.name,'seller-avatar')}<span class="sv-title"><span class="sv-name">${esc(s.name)}</span>${s.vb?'<span class="sv-ver" title="Documentele firmei au fost verificate">✔ Verificat</span>':'<span class="sv-tag">DEZMEMBRĂRI</span>'}</span></button>
+    <p class="rate-line sv-rate">${ratingLine({avg:s.rating_avg,count:s.rating_n},s.id,'seller')}</p>
+    <p class="sv-meta">${s.n} ${s.n===1?'anunț':'anunțuri'}${where?' · '+where:''}</p>
+    ${chips?`<div class="sv-chips">${chips}</div>`:''}
+    <button type="button" class="btn ghost small sv-go" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`;
+}
+function stRender(){
+  const S=stState, list=stFiltered(), grid=$('#storesGrid'); if(!grid)return;
+  grid.innerHTML=list.map(stCardHtml).join('');
+  $('#storesEmpty').classList.toggle('hidden',list.length>0);
+  const f=$('#stFound'); if(f) f.textContent=S.all.length?`${list.length} ${list.length===1?'firmă':'firme'}`:'';
+  const n=(S.county?1:0)+(S.city?1:0)+(S.make?1:0)+(S.ver?1:0)+(S.min?1:0)+(S.q.trim()?1:0), badge=$('#stFilterN');
+  if(badge){ badge.textContent=n; badge.classList.toggle('hidden',!n); }
+}
+function stBind(){
+  if(stState.bound) return; stState.bound=true;
+  const S=stState, panel=$('#stPanel'), btn=$('#stFilterBtn');
+  btn.addEventListener('click',()=>{ const open=panel.classList.toggle('hidden')===false; btn.setAttribute('aria-expanded',open?'true':'false'); btn.classList.toggle('on',open); });
+  $('#stDone').addEventListener('click',()=>{ panel.classList.add('hidden'); btn.setAttribute('aria-expanded','false'); btn.classList.remove('on'); });
+  $('#stSort').addEventListener('change',e=>{ S.sort=e.target.value; stRender(); });
+  $('#stCounty').addEventListener('change',e=>{ S.county=e.target.value; S.city=''; stFillSelects(); stRender(); });
+  $('#stCity').addEventListener('change',e=>{ S.city=e.target.value; stRender(); });
+  $('#stMake').addEventListener('change',e=>{ S.make=e.target.value; stRender(); });
+  $('#stMin').addEventListener('change',e=>{ S.min=Number(e.target.value)||0; stRender(); });
+  $('#stVer').addEventListener('change',e=>{ S.ver=e.target.checked; stRender(); });
+  $('#stQ').addEventListener('input',e=>{ S.q=e.target.value; stRender(); });
+  $('#stReset').addEventListener('click',()=>{ Object.assign(S,{county:'',city:'',make:'',ver:false,min:0,q:''}); $('#stMin').value='0'; $('#stVer').checked=false; $('#stQ').value=''; stFillSelects(); stRender(); });
+}
 async function loadStores(parks){
   const grid = $('#storesGrid'); $('#storesEmpty').classList.add('hidden');
   const title = parks ? 'Parcuri partenere' : 'Magazine verificate';
   $('#storesTitle').textContent = title; $('#storesCrumb').textContent = title;
+  stBind();
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
   try{
-    let list = (await api('/api/sellers')).sellers || [];
-    if(parks) list = list.filter(s=>s.dism);
-    grid.innerHTML = list.map(s=>`<article class="info-card"><div class="seller-head">${avatarSpan(s.id,s.name,'seller-avatar')}<div><span class="badge">${s.dism?'DEZMEMBRĂRI':'VÂNZĂTOR'}</span>${s.vb?' <span class="badge new">✔ Verificat</span>':''}<h3>${esc(s.name)}</h3></div></div><p class="rate-line">${ratingLine({avg:s.rating_avg,count:s.rating_n},s.id,'seller')}</p><p>${s.n} ${s.n===1?'anunț':'anunțuri'}${s.county?' · '+esc(s.county):''}</p><button class="btn ghost small" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`).join('');
-    $('#storesEmpty').classList.toggle('hidden', list.length>0);
+    /* doar firme de dezmembrări */
+    stState.all = ((await api('/api/sellers')).sellers || []).filter(s=>s.dism);
+    stFillSelects(); stRender();
   }catch(e){ grid.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
