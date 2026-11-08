@@ -55,7 +55,7 @@ try{
 }catch(e){}
 
 /* Compatibilitate browsere vechi (TV): Array.prototype.flat lipsește sub Chrome 69 */
-try{ if(!Array.prototype.flat){ Object.defineProperty(Array.prototype,'flat',{configurable:true,writable:true,value:function(d){ d=d===undefined?1:Number(d); var f=function(a,n){ return a.reduce(function(r,x){ return r.concat(Array.isArray(x)&&n>0?f(x,n-1):x); },[]); }; return f(this,d); }}); } }catch(e){}
+try{ if(!Array.prototype.flat){ Object.defineProperty(Array.prototype,'flat',{configurable:true,writable:true,value:function(d){ d=d===undefined?1:Number(d); var fl=function(a,n){ var out=[],i,x; for(i=0;i<a.length;i++){ if(!(i in a)) continue; x=a[i]; if(Array.isArray(x)&&n>0){ out.push.apply(out,fl(x,n-1)); } else { out.push(x); } } return out; }; return fl(this,d); }}); } }catch(e){}
 
 /* Efectul „liquid glass” rămâne activ peste tot. Dacă pe un dispozitiv e prea greu, ?glass=0 îl oprește (se reține în localStorage), ?glass=1 îl repornește. */
 try{
@@ -75,4 +75,26 @@ try{
   var __okgap=(__fg.scrollHeight===3);
   document.documentElement.removeChild(__fg);
   if(!__okgap) document.documentElement.classList.add('no-flex-gap');
+}catch(e){}
+
+/* Compatibilitate browsere vechi (ex. televizor cu Chromium < 69): funcții JavaScript lipsă.
+   Fără ele apăreau erori de tip „flatMap is not a function” și paginile rămâneau goale. */
+try{
+  if(!Array.prototype.flatMap){
+    Object.defineProperty(Array.prototype,'flatMap',{configurable:true,writable:true,value:function(cb,thisArg){
+      var out=[],i,r; for(i=0;i<this.length;i++){ if(!(i in this)) continue; r=cb.call(thisArg,this[i],i,this); if(Array.isArray(r)){ out.push.apply(out,r); } else { out.push(r); } } return out; }});
+  }
+  if(!Object.fromEntries){
+    Object.fromEntries=function(it){ var o={},e,i; var arr=Array.isArray(it)?it:Array.prototype.slice.call(it); for(i=0;i<arr.length;i++){ e=arr[i]; o[e[0]]=e[1]; } return o; };
+  }
+  if(!String.prototype.trimStart){ String.prototype.trimStart=function(){ return this.replace(/^\s+/,''); }; }
+  if(!String.prototype.trimEnd){ String.prototype.trimEnd=function(){ return this.replace(/\s+$/,''); }; }
+  if(typeof Promise!=='undefined'){
+    if(!Promise.prototype['finally']){
+      Promise.prototype['finally']=function(f){ var P=this.constructor||Promise; return this.then(function(v){ return P.resolve(f()).then(function(){ return v; }); },function(e){ return P.resolve(f()).then(function(){ throw e; }); }); };
+    }
+    if(!Promise.allSettled){
+      Promise.allSettled=function(list){ var arr=Array.prototype.slice.call(list); return Promise.all(arr.map(function(p){ return Promise.resolve(p).then(function(v){ return {status:'fulfilled',value:v}; },function(r){ return {status:'rejected',reason:r}; }); })); };
+    }
+  }
 }catch(e){}
