@@ -5061,3 +5061,8 @@ html .mdrawer .mi.mi-ask,html .mdrawer .mi.mi-send{background:linear-gradient(16
 #reqAiMic[aria-pressed="true"]{background:#fde8e6;border-color:#d92d20;color:#a3322b}
 html.dark .ai-card{background:var(--card);border-color:var(--gold,#b8935a)}
 html.dark #reqAiMic[aria-pressed="true"]{background:#3a1d1b;color:#ffb4ab}
+
+
+/* ===== V50: semnul „Se potrivește” pe carduri (modul luminos și cel întunecat; fără să atingă sticla existentă) ===== */
+.lchip-fit{background:#ecf9f1;border:1px solid #bfe7cd;color:#14532d;font-weight:600}
+html.dark .lchip-fit{background:#12291c;border-color:#2a5a3c;color:#6fcf97}

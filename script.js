@@ -1278,6 +1278,15 @@ function phKind(x){
 }
 function phIcon(x){ return PH_ICONS[phKind(x)]||PH_ICONS.car; }
 function phHtml(x){ return `<span class="ar-ph">${phIcon(x)}<small>Fără poză</small></span>`; }
+/* Semn pe card: piesa se potrivește mașinii active din „Garajul meu” (aceeași marcă și același model). Fără mașină activă nu apare nimic. */
+function fitChipHtml(x){
+  try{
+    const g = garageActive(); if(!g || !x || !x.make || x.type==='dezmembrari' || isCarT(x.type)) return '';
+    const noModel = !x.model || /^alt model$/i.test(x.model);
+    if(noModel || x.make!==g.make || x.model!==g.model) return '';
+    return '<span class="lchip lchip-fit" title="Aceeași marcă și model ca mașina ta activă">✓ Se potrivește</span>';
+  }catch{ return ''; }
+}
 function adRowHtml(x, eager){
   const fav = favorites.includes(x.id);
   const isDism = x.type==='dezmembrari' || isCarT(x.type);
@@ -1291,6 +1300,7 @@ function adRowHtml(x, eager){
   if(isCarT(x.type) && x.power_hp) meta.push(x.power_hp+' CP');
   if(isCarT(x.type) && x.fuel) meta.push(x.fuel);
   const chips = [
+    fitChipHtml(x),
     x.condition ? `<span class="badge ${x.condition==='Nouă'?'new':''}">${esc(x.condition)}</span>` : '',
     x.discount_percent && Number(x.discount_percent)>0 ? `<span class="badge discount">-${Number(x.discount_percent)}%</span>` : '',
     x.oem ? `<span class="lchip lchip-oem" title="Cod OEM">OEM ${esc(x.oem)}</span>` : '',
@@ -3788,6 +3798,8 @@ function updateGarageUI(){
   $('#garageBtn').classList.toggle('on', !!c);
   syncGarageSearch();
   const hm = $('#homeMake'); if(c && hm && !hm.value){ hm.value = c.make; loadModels(c.make,'homeModel').then(()=>{ $('#homeModel').value = c.model; }); }
+  const hb = $('#homeVehicleBtn'); if(hb) hb.textContent = c ? 'Piese pentru ' + garageName(c) : 'Piese pentru mașina mea';
+  try{ if(typeof renderList==='function' && state && Array.isArray(state.loaded) && state.loaded.length) renderList(); }catch{}
 }
 function syncGarageSearch(){
   const a = garageActive(), f = $('#garageSearchForm'), n = $('#garageSearchNote');
