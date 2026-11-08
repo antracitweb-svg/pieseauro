@@ -2108,7 +2108,7 @@ document.addEventListener('change',e=>{
 });
 async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
-  $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Ofertează piesele';
+  $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Cereri de la cumpărători';
   $('#requestsCrumb').textContent = $('#requestsTitle').textContent;
   { const pg=$('#page-requests'), pc=pg&&pg.querySelector('.container'); if(pg) pg.classList.toggle('req-mine',!!mine); if(pc) pc.classList.toggle('narrow',!!mine); }
   { const ph=$('#page-requests .page-head'); if(ph) ph.classList.add('hd-compact'); const mb=$('#rqMineBar'); if(mb) mb.classList.toggle('hidden',!mine); grid.classList.toggle('rq-list',!!mine); const pb=$('#rqPubBar'); if(pb) pb.classList.toggle('hidden',!!mine); const ab=$('#rqAddBtn'); if(ab) ab.classList.toggle('hidden',!!mine); grid.classList.toggle('rq-pub-list',!mine); }
@@ -2664,6 +2664,7 @@ function ensureOption(el, val){
 }
 function setReqMode(editId){
   const form=$('#requestForm'); form.dataset.editId=editId||'';
+  const aiCard=$('#reqAiCard'); if(aiCard) aiCard.classList.toggle('hidden',!!editId);   /* completarea cu AI doar la cereri noi */
   const h=document.querySelector('#page-request h2'); if(h) h.textContent=editId?'Modifică cererea':'Cere oferte piese';
   const b=form.querySelector('button[type="submit"]'); if(b) b.textContent=editId?'Salvează modificările':'Trimite cererea';
 }
@@ -2684,6 +2685,7 @@ async function fillRequestEdit(id){
 }
 async function enterRequestForm(fromId, editId){
   const form = $('#requestForm'); form.reset(); resetCarAutoFor('req'); $('#reqExtra').innerHTML = ''; setMsg($('#requestMessage'),''); state.reqImages=[]; renderImgBox('reqImages');
+  { const am=$('#reqAiMsg'); if(am){ am.classList.add('hidden'); am.textContent=''; } }
   setReqMode('');
   if(editId){ await loadModels('','reqModel'); await fillRequestEdit(editId); return; }
   api('/api/account/settings').then(r=>{ const u=r.user||{}; if(!$('#reqCounty').value&&u.ship_county) $('#reqCounty').value=u.ship_county; if(!$('#reqCity').value) $('#reqCity').value=u.ship_city||''; if(!$('#reqAddress').value) $('#reqAddress').value=u.ship_details||''; }).catch(()=>{});
@@ -2711,6 +2713,89 @@ function addReqPart(){
   const d=document.createElement('div'); d.className='req-part';
   d.innerHTML='<label>Piesă suplimentară<input class="rp-title" maxlength="150" placeholder="Denumire piesă"></label><label>Cod sau detalii<textarea class="rp-details" rows="2" maxlength="500"></textarea></label><button type="button" class="btn ghost rp-del">Șterge piesa</button>';
   box.appendChild(d);
+}
+/* ---------- cerere cu AI: un singur mesaj → câmpurile formularului ----------
+   Serverul (/api/ai/parse) întoarce doar valori validate (marcă, model și județ din catalog). Aici le punem în câmpuri,
+   iar omul le verifică. Dacă AI-ul nu e disponibil, folosim detectarea locală (marcă, model, an din text). */
+function hasOption(sel, val){ return !!val && !!sel && [...sel.options].some(o=>o.value===val); }
+async function applyRequestParsed(d, rawText){
+  const parts = Array.isArray(d.parts) ? d.parts : [];
+  $('#reqExtra').innerHTML = '';
+  if(parts.length){
+    $('#reqTitle').value = parts[0].title;
+    if(parts[0].details) $('#reqDescription').value = parts[0].details;
+    parts.slice(1, 10).forEach(p=>{ addReqPart(); const el = $('#reqExtra').lastElementChild; el.querySelector('.rp-title').value = p.title; el.querySelector('.rp-details').value = p.details || ''; });
+  }else if(!$('#reqTitle').value.trim()){
+    $('#reqTitle').value = rawText.slice(0,150);
+  }
+  const okMake = hasOption($('#reqMake'), d.make), okModel = okMake && !!d.model, okYear = /^\d{4}$/.test(d.year || '');
+  resetCarAutoFor('req', { make:okMake, model:okModel, year:okYear });
+  if(okMake){
+    $('#reqMake').value = d.make;
+    await loadModels(d.make, 'reqModel');
+    if(okModel) ensureOption($('#reqModel'), d.model);
+    loadYears(d.make, $('#reqModel').value);
+  }
+  if(okYear) $('#reqYear').value = d.year;
+  if(d.variant) $('#reqVariant').value = d.variant;
+  if(d.engine) $('#reqEngine').value = d.engine;
+  if(d.vin) $('#reqVin').value = d.vin;
+  if(d.kind) $('#reqKind').value = d.kind; else if(!$('#reqKind').value) $('#reqKind').value = 'ambele';
+  if(hasOption($('#reqCounty'), d.county)){
+    if($('#reqCounty').value !== d.county) $('#reqCity').value = '';
+    $('#reqCounty').value = d.county;
+    if(d.city) $('#reqCity').value = d.city;
+  }else if(d.city && !$('#reqCity').value.trim()){
+    $('#reqCity').value = d.city;
+  }
+  const bits = [];
+  if(parts.length) bits.push((parts.length > 1 ? parts.length + ' piese: ' : '') + parts.map(p=>p.title).join(', '));
+  const car = [okMake && d.make, okModel && d.model, okYear && d.year, d.engine].filter(Boolean).join(' ');
+  if(car) bits.push(car);
+  if(d.county) bits.push([d.city, d.county].filter(Boolean).join(', '));
+  const missing = [];
+  if(!okMake) missing.push('marca și modelul'); else if(!okModel) missing.push('modelul');
+  if(!okYear) missing.push('anul');
+  const msg = $('#reqAiMsg');
+  msg.textContent = '✨ Am completat: ' + (bits.join(' · ') || 'ce am înțeles') + '. Verifică mai jos.' + (missing.length ? ' Încă lipsesc: ' + missing.join(', ') + '.' : '');
+  msg.classList.remove('hidden');
+  $('#reqTitle').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+async function aiFillRequest(){
+  const ta = $('#reqAiText'), msg = $('#reqAiMsg'), btn = $('#reqAiBtn'), text = ta.value.trim();
+  if(text.length < 5){ toast('Scrie ce piesă cauți și pentru ce mașină.'); ta.focus(); return; }
+  btn.disabled = true; const old = btn.textContent; btn.textContent = 'Se analizează…';
+  let d = null, note = '';
+  try{ d = (await api('/api/ai/parse', { method:'POST', body:JSON.stringify({ text }) })).data; }
+  catch(e){ if(e.code === 'AI_LIMITA' || e.code === 'AI_LIMITA_ZILNICA') note = 'Ai folosit completarea automată de prea multe ori acum. '; }
+  finally{ btn.disabled = false; btn.textContent = old; }
+  if(!d){
+    $('#reqTitle').value = text.slice(0,150);
+    if(text.length > 150) $('#reqDescription').value = text;
+    resetCarAutoFor('req'); scheduleDetectFor('req');
+    if(!$('#reqKind').value) $('#reqKind').value = 'ambele';
+    msg.textContent = (note || 'Completarea cu AI nu e disponibilă acum. ') + 'Am pus textul la titlu și am recunoscut ce am putut. Completează restul mai jos.';
+    msg.classList.remove('hidden');
+    return;
+  }
+  await applyRequestParsed(d, text);
+}
+function initReqAiMic(){
+  const btn = $('#reqAiMic'), SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!btn || !SR) return;
+  btn.classList.remove('hidden');
+  let rec = null, on = false;
+  const stop = ()=>{ on = false; btn.setAttribute('aria-pressed','false'); btn.textContent = '🎤 Dictează'; };
+  btn.addEventListener('click', ()=>{
+    if(on && rec){ try{ rec.stop(); }catch{} return; }
+    try{
+      rec = new SR(); rec.lang = 'ro-RO'; rec.interimResults = false; rec.continuous = false;
+      rec.onresult = e=>{ const t = [...e.results].map(r=>r[0].transcript).join(' ').trim(); if(t){ const ta = $('#reqAiText'); ta.value = (ta.value.trim() + ' ' + t).trim().slice(0,600); } };
+      rec.onerror = ev=>{ stop(); if(ev && ev.error === 'not-allowed') toast('Permite accesul la microfon ca să poți dicta.'); };
+      rec.onend = stop;
+      rec.start(); on = true; btn.setAttribute('aria-pressed','true'); btn.textContent = '⏹ Oprește';
+    }catch{ stop(); toast('Dictarea nu merge pe acest dispozitiv.'); }
+  });
 }
 async function submitRequest(e){
   e.preventDefault(); const msg = $('#requestMessage'); setMsg(msg,'');
@@ -4215,6 +4300,8 @@ function wire(){
   $('#carPickList').addEventListener('click', e=>{ const b=e.target.closest('[data-car-from]'); if(b) navigate('cerere-noua?from='+b.dataset.carFrom); });
   $('#carPickNew').addEventListener('click', ()=>navigate('cerere-noua'));
   $('#reqAddPart').addEventListener('click', addReqPart);
+  $('#reqAiBtn').addEventListener('click', ()=>safe(aiFillRequest)());
+  initReqAiMic();
   $('#reqExtra').addEventListener('click', e=>{ const b=e.target.closest('.rp-del'); if(b) b.closest('.req-part').remove(); });
   $('#registerForm').addEventListener('submit', e=>{ if($('#registerStep2').classList.contains('hidden')){ e.preventDefault(); e.stopImmediatePropagation(); registerStep1(); } }, true);
   $('#orderForm').addEventListener('submit', e=>{ e.preventDefault(); safe(submitOrder)(); });
@@ -5169,7 +5256,7 @@ function addSwipe(el, onSwipe){
       L('Marcă, model, an, motor','Alege mașina. Datele se completează și automat, pe măsură ce scrii.'),
       L('Piesa căutată','Ex: far dreapta sau turbocompresor.'),
       L('Caută piese compatibile','Îți arată doar anunțurile care se potrivesc mașinii alese.')]},
-    'page-requests':{title:'Ofertează piesele',intro:'Cereri publicate de cumpărători. Dacă ai piesa, trimiți o ofertă.',items:[
+    'page-requests':{title:'Cereri de la cumpărători',intro:'Cereri publicate de cumpărători. Dacă ai piesa, trimiți o ofertă.',items:[
       L('Starea cererilor','Lista de sus (de exemplu „Nu am ofertat încă”) alege ce cereri vezi: toate, cele la care ai ofertat, cele amânate sau cele ignorate.'),
       L('Filtrează','Restrânge cererile după marcă, model, tip de piese, județ, număr de oferte sau cuvinte cheie.'),
       L('Deschide o cerere','Apasă pe ea ca să vezi detaliile și pozele cumpărătorului.'),
