@@ -3771,9 +3771,10 @@ html.dark .req-lock-note{background:#2a2416;border-color:#5a4a24;color:#d8bd8d}
 html.dark .mine-tool{background:var(--card);border-color:var(--line);color:#d8bd8d}
 
 /* Reguli mai specifice / cu !important în CSS-ul vechi: le depășim explicit în dark */
-html.dark body .page-head>div:has(>h2)>h2,
 html.dark .hs-card h2,
 html.dark .ar-price,html.dark #homeFeed .ar-price,html.dark #listingGrid .ar-price,html.dark .similar-grid .ar-price{color:var(--ink)!important}
+/* separat: televizoarele vechi nu înțeleg :has() și ar ignora toată regula de mai sus */
+html.dark body .page-head>div:has(>h2)>h2{color:var(--ink)!important}
 html.dark #homeRequestBtn,html.dark .home-request-btn{background:var(--card)!important;border-color:var(--line)!important;color:#d8bd8d!important}
 html.dark #page-mine .mine-tool,html.dark #page-mine .mine-bar .mine-tools .mine-tool,html.dark .mine-tools .mine-tool,html.dark .mine-tool{background:var(--card)!important;border-color:#8f6d38!important;color:#d8bd8d!important}
 html.dark .set-btn{color:#d8bd8d!important}
@@ -5039,3 +5040,12 @@ html .mdrawer .mi.mi-ask,html .mdrawer .mi.mi-send{background:linear-gradient(16
 .mdrawer .mdrawer-body{padding-bottom:0}
 .mdrawer .mdrawer-body>.menu-card{margin-bottom:0}
 .mdrawer .mdrawer-body>.menu-card~.menu-card{margin-top:12px}
+
+/* ===== Televizor / ecrane mari: site-ul se întinde dintr-un capat în altul ===== */
+@media(min-width:1600px){
+  html:not(#_) .container,html:not(#_) .narrow,html:not(#_) .header .container.nav,html:not(#_) .site-footer .container{width:calc(100% - 96px)!important;max-width:none!important}
+  html:not(#_) .home-bottom{max-width:none!important;width:100%!important}
+}
+@media(min-width:1800px) and (max-width:2199px){
+  html{zoom:1.25}
+}
