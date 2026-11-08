@@ -296,6 +296,7 @@ function renderCounts(){
   const nbtn = document.getElementById('notifBtn'); if(nbtn) nbtn.classList.toggle('has-activity', Number(c.total)>0);   /* clopoțelul din Contul meu își schimbă culoarea când există activitate */
   document.querySelectorAll('[data-cnt]').forEach(el=>{ el.textContent = badgeText(map[el.dataset.cnt]); });
   renderNotifSummary();
+  renderAcxTodo();
 }
 async function refreshCounts(){
   if(!currentUser){ counts = null; renderCounts(); return; }
@@ -523,11 +524,57 @@ function renderAccount(){
   api('/api/credits').then(r=>{ const el=$('#accCredits'); if(el) setCredits(el,r.balance,0); }).catch(()=>{});
   api('/api/account/settings').then(r=>{ if(currentUser&&r.user){ currentUser.has_avatar=!!r.user.has_avatar; renderAccountAvatar(); } }).catch(()=>{});
   renderHeader();
-  /* pe telefon pornește cu o singură secțiune deschisă */
-  if(window.matchMedia('(max-width:800px)').matches){
-    $$('#page-account .account-sections details[open]').forEach((d,i)=>{ if(i>0) d.removeAttribute('open'); });
-  }
+  closeAcxSheet(); setAcxSeg(acxSavedSeg()); renderAcxTodo();
 }
+
+/* ---------- Cont: panou de sticlă (De rezolvat azi, Vând | Cumpăr, foi care urcă) ---------- */
+const ACX_SHEETS = {
+  money:{ t:'Bani', items:[['credits','Credite'],['transactions','Tranzacții'],['invoices','Facturi']] },
+  tools:{ t:'Instrumente', items:[['csv','Import CSV'],['bulk-price','Actualizare prețuri'],['generator','Generator de anunțuri'],['stats','Statistici cont'],['b2b','B2B']] }
+};
+function acxSavedSeg(){ try{ return localStorage.getItem('acxSeg')==='buy' ? 'buy' : 'sell'; }catch(_){ return 'sell'; } }
+function setAcxSeg(seg){
+  seg = seg==='buy' ? 'buy' : 'sell';
+  const sell=$('#acxSell'), buy=$('#acxBuy'); if(!sell||!buy) return;
+  sell.hidden = seg!=='sell'; buy.hidden = seg!=='buy';
+  $('#acxTabSell').setAttribute('aria-selected', String(seg==='sell'));
+  $('#acxTabBuy').setAttribute('aria-selected', String(seg==='buy'));
+  try{ localStorage.setItem('acxSeg', seg); }catch(_){}
+}
+function openAcxSheet(key){
+  const cfg=ACX_SHEETS[key], sh=$('#acxSheet'); if(!cfg||!sh) return;
+  $('#acxSheetT').textContent = cfg.t;
+  $('#acxSheetBody').innerHTML = cfg.items.map(it => it[0]==='csv'
+    ? '<button type="button" class="acx-sheet-item" data-csv-import>'+it[1]+'<i>›</i></button>'
+    : '<button type="button" class="acx-sheet-item" data-account="'+it[0]+'">'+it[1]+'<i>›</i></button>').join('');
+  sh.classList.remove('hidden');
+  const first=sh.querySelector('.acx-sheet-item'); if(first) first.focus({preventScroll:true});
+}
+function closeAcxSheet(){ const sh=$('#acxSheet'); if(sh) sh.classList.add('hidden'); }
+function renderAcxTodo(){
+  const box=$('#acxTodo'); if(!box) return;
+  const c=counts||{};
+  const ro=(n,one,many)=> n===1 ? one : ((n%100===0||n%100>=20) ? 'de ' : '')+many;
+  const rows=[
+    ['orders_seller','orders-seller','comandă nouă de confirmat','comenzi noi de confirmat','Confirmă'],
+    ['offers_received','offers-received','ofertă nouă la cererile tale','oferte noi la cererile tale','Vezi'],
+    ['messages','messages','mesaj necitit','mesaje necitite','Răspunde'],
+    ['expire','listings-expire','anunț expiră în 7 zile','anunțuri expiră în 7 zile','Reînnoiește'],
+    ['orders_buyer','orders','comandă actualizată','comenzi actualizate','Urmărește'],
+    ['alerts','saved','alertă din căutările salvate','alerte din căutările salvate','Vezi']
+  ].filter(r=>Number(c[r[0]])>0);
+  if(!rows.length){ box.innerHTML='<p class="acx-todo-empty">Nimic de făcut acum. Comenzile, ofertele și mesajele noi apar aici.</p>'; return; }
+  box.innerHTML = rows.map(r=>{ const n=Number(c[r[0]]); return '<button type="button" class="acx-todo-row" data-account="'+r[1]+'"><span class="n">'+(n>99?'99+':n)+'</span><span>'+ro(n,r[2],r[3])+'</span><span class="go">'+r[4]+'</span></button>'; }).join('');
+}
+document.addEventListener('click',e=>{
+  const t=e.target; if(!t.closest) return; let el;
+  if((el=t.closest('[data-acx-seg]'))){ setAcxSeg(el.dataset.acxSeg); return; }
+  if((el=t.closest('[data-acx-sheet]'))){ openAcxSheet(el.dataset.acxSheet); return; }
+  if(t.closest('[data-acx-close]')){ closeAcxSheet(); return; }
+  if(t.closest('#acxSheet [data-account],#acxSheet [data-csv-import]')) closeAcxSheet();
+  if(t.closest('#page-account .acx-tile,#page-account .acx-todo-row,#page-account .acx-q,#page-account .acx-chip')){ try{ if(navigator.vibrate) navigator.vibrate(8); }catch(_){} }
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeAcxSheet(); });
 
 function renderAccountTool(view, withId, refId){
   const data = {
@@ -1305,7 +1352,7 @@ function adRowHtml(x, eager){
   const isPromo = !!x.promoted;
   const disc = Number(x.discount_percent||0);
   return `<article class="ar-row${isPromo?' is-promoted':''}${disc>0?' discounted':''}" data-open="${x.id}" tabindex="0" role="link" aria-label="${esc(x.title)}${isPromo?' (anunț promovat)':''}${disc>0?' (reducere '+disc+'%)':''}">
-    <div class="ar-thumb">${thumb}${isPromo?`<span class="promo-badge" title="Anunț promovat până pe ${esc(promoUntilTxt(x))}"><span aria-hidden="true">⭐</span> Promovat</span>`:''}${disc>0?`<span class="discount-badge" title="Reducere ${disc}%">-${disc}%</span>`:''}${carBadge(x.type)}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
+    <div class="ar-thumb">${thumb}<span class="ar-ptag" aria-hidden="true">${disc>0&&hasPrice?esc(money(Math.round(Number(x.price)*(1-disc/100)),x.currency)):esc(money(x.price,x.currency))}</span>${isPromo?`<span class="promo-badge" title="Anunț promovat până pe ${esc(promoUntilTxt(x))}"><span aria-hidden="true">⭐</span> Promovat</span>`:''}${disc>0?`<span class="discount-badge" title="Reducere ${disc}%">-${disc}%</span>`:''}${carBadge(x.type)}${nImg>1?`<span class="photo-count" aria-label="${nImg} poze">📷 ${nImg}</span>`:''}</div>
     <div class="ar-main">
       <h3 class="ar-title">${esc(x.title)}</h3>
       <div class="ar-meta">${meta.map(esc).join(' · ')}</div>
@@ -5517,3 +5564,26 @@ document.addEventListener('click',e=>{
     try{ if(navigator.vibrate) navigator.vibrate(8); }catch(_){}
   }
 },{passive:true});
+
+
+/* ---------- Pagina principală: pastile de căutare + categorii ---------- */
+(function(){
+  const POP=['Frâne','Piese motoare','Suspensie','Filtre auto','Faruri stopuri lumini','Caroserie','Transmisie','Climatizare'];
+  function renderCats(){
+    const box=document.getElementById('hxCats'); if(!box||box.dataset.done) return;
+    const byName=new Map(CATEGORY_TREE.map(c=>[c[0],c]));
+    box.innerHTML=POP.filter(n=>byName.has(n)).map(n=>{ const c=byName.get(n); return '<button type="button" class="hx-cat" data-hx-cat="'+n.replace(/"/g,'&quot;')+'"><span class="hx-cat-ico" aria-hidden="true">'+c[1]+'</span><b>'+n+'</b></button>'; }).join('');
+    box.dataset.done='1';
+  }
+  function setMode(m){
+    const f=document.getElementById('homeSearchForm'), v=document.querySelector('#page-home .hero-vehicle-compat'); if(!f||!v) return;
+    f.classList.toggle('hx-off',m==='car'); v.classList.toggle('hx-off',m!=='car');
+    document.querySelectorAll('#page-home [data-hx-mode]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.hxMode===m)));
+  }
+  document.addEventListener('click',e=>{
+    const t=e.target; if(!t.closest) return; let el;
+    if((el=t.closest('[data-hx-mode]'))){ setMode(el.dataset.hxMode); return; }
+    if((el=t.closest('[data-hx-cat]'))){ openSearch({category:el.dataset.hxCat}); return; }
+  });
+  renderCats(); setMode('name');
+})();
