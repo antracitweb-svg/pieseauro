@@ -5034,3 +5034,8 @@ html .mdrawer .mi.mi-ask,html .mdrawer .mi.mi-send{background:linear-gradient(16
 .mf-txt{position:relative;z-index:1;font-size:10px;line-height:1.5;letter-spacing:.06em;white-space:nowrap;color:var(--gl-accent-soft,#e9d3a8);opacity:.88}
 @keyframes mfSheen{0%,45%{left:-40%}100%{left:130%}}
 @media(prefers-reduced-motion:reduce){.mf-light{animation:none;display:none}}
+
+/* Lista se oprește la 6px deasupra pastilei, ca la o linie imaginară */
+.mdrawer .mdrawer-body{padding-bottom:0}
+.mdrawer .mdrawer-body>.menu-card{margin-bottom:0}
+.mdrawer .mdrawer-body>.menu-card~.menu-card{margin-top:12px}
