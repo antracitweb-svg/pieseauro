@@ -3254,14 +3254,14 @@ async function openAdminListing(id){
 /* ---- încărcare la cerere, contoare pe file, filtre și căutare ---- */
 const ADM_NEED = {dashboard:[],listings:['listings'],users:['users'],requests:['requests'],offers:['offers'],orders:['orders'],messages:['messages'],credits:['users'],reports:['reports'],events:['events'],features:['feat'],activity:['activity'],vehicles:[],bizver:[]};
 const ADM_FRESH_TABS = ['users','requests','offers','orders','messages'];
-const adminQ = {}, adminSt = {reports:'open'}, adminSort = {};
+const adminQ = {}, adminSt = {reports:'open'}, adminSort = {}, adminErr = {};
 let adminSeen = {};
 const ADM_ST_LBL = {open:'Deschise',reviewed:'Verificate',closed:'Închise',matched:'Potrivite',pending:'În așteptare',approved:'Aprobate',rejected:'Respinse',blocked:'Blocate',active:'Active'};
 const admNorm = v => String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const admSeenKey = () => 'autopiese_admin_seen_'+(currentUser?currentUser.id:0);
 function admJobs(){
   const full = currentUser.role==='admin', none = async()=>[];
-  const get = async (u,k) => { try{ return (await api(u))[k] || []; }catch(e){ console.error('admin',u,e.message); return []; } };
+  const get = async (u,k) => { try{ const r=(await api(u))[k] || []; delete adminErr[k]; return r; }catch(e){ console.error('admin',u,e.message); adminErr[k]=e.message||'Eroare necunoscută'; return []; } };
   return {
     users: ()=>get('/api/admin/users','users'),
     listings: ()=>get('/api/admin/listings','listings'),
@@ -3272,7 +3272,7 @@ function admJobs(){
     orders: ()=>get('/api/admin/orders','orders'),
     messages: ()=>full?get('/api/admin/messages','messages'):none(),
     events: ()=>get('/api/admin/events','events'),
-    feat: ()=>full?api('/api/admin/features').catch(e=>{ console.error('admin features',e.message); return null; }):Promise.resolve(null)
+    feat: ()=>full?api('/api/admin/features').then(r=>{ delete adminErr.feat; return r; }).catch(e=>{ console.error('admin features',e.message); adminErr.feat=e.message||'Eroare necunoscută'; return null; }):Promise.resolve(null)
   };
 }
 async function admOvr(){
@@ -3426,7 +3426,9 @@ function renderAdmin(loading){
   else if(adminTab==='vehicles') body = '<div id="vehAdmin"><p>Se încarcă baza de vehicule…</p></div>';
   else if(adminTab==='bizver') body = '<div id="bizAdmin"><p>Se încarcă cererile…</p></div>';
   const at = d.at ? new Date(d.at).toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'}) : '';
-  $('#adminContent').innerHTML = `<div class="admin-tabs">${tabs.map(([k,l])=>{ const bd=badge(k); return `<button class="btn ghost ${k===adminTab?'active':''}" data-admin-tab="${k}"${bd.label?` aria-label="${l}, ${bd.label}"`:''}>${l}${bd.html}</button>`; }).join('')}</div><div class="adm-refresh"><small>${at?'Actualizat la '+at:''}</small><button type="button" class="adm-chip" data-adm-refresh>↻ Reîncarcă</button></div>${body}`;
+    const errKeys = (ADM_NEED[adminTab]||[]).filter(k=>adminErr[k]);
+  const errBox = (!loading && errKeys.length) ? `<div class="info-card" role="alert"><b>Nu s-au putut încărca datele acestei secțiuni.</b><p class="muted">${esc(errKeys.map(k=>adminErr[k]).join(' · '))}</p><button type="button" class="adm-chip" data-adm-refresh>↻ Încearcă din nou</button></div>` : '';
+  $('#adminContent').innerHTML = `<div class="admin-tabs">${tabs.map(([k,l])=>{ const bd=badge(k); return `<button class="btn ghost ${k===adminTab?'active':''}" data-admin-tab="${k}"${bd.label?` aria-label="${l}, ${bd.label}"`:''}>${l}${bd.html}</button>`; }).join('')}</div><div class="adm-refresh"><small>${at?'Actualizat la '+at:''}</small><button type="button" class="adm-chip" data-adm-refresh>↻ Reîncarcă</button></div>${errBox}${body}`;
   if(!loading && adminTab==='vehicles') safe(loadAdminVehicles)();
   if(!loading && adminTab==='bizver') safe(loadAdminBiz)();
 }

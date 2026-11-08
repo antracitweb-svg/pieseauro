@@ -1473,15 +1473,23 @@ let resizeActive=0;const resizeQ=[];
 function resizeSlot(){return new Promise(ok=>{const go=()=>{resizeActive++;ok(()=>{resizeActive--;const nx=resizeQ.shift();if(nx)nx();});};resizeActive<2?go():resizeQ.push(go);});}
 const RESIZE_CACHE=new Map();let RESIZE_BYTES=0;const RESIZE_MAX=32*1024*1024;
 function resizeCacheSet(k,buf){if(buf.length>RESIZE_MAX/4)return;RESIZE_CACHE.set(k,buf);RESIZE_BYTES+=buf.length;while(RESIZE_BYTES>RESIZE_MAX&&RESIZE_CACHE.size){const [k0,v0]=RESIZE_CACHE.entries().next().value;RESIZE_CACHE.delete(k0);RESIZE_BYTES-=v0.length;}}
+// Pozele anunțurilor respinse/blocate: le văd doar proprietarul și echipa de administrare (nu publicul).
+async function hiddenImgAllowed(req,ownerId){
+ try{const me=await optUserId(req);if(!me)return false;if(me===ownerId)return true;
+  const u=await pool.query('SELECT role FROM users WHERE id=$1',[me]);return !!u.rowCount&&(u.rows[0].role==='admin'||u.rows[0].role==='moderator');}
+ catch{return false;}
+}
 app.get('/api/listings/:id/img/:n(\\d{1,2})',requireDb,ah(async(req,res)=>{
  const n=Math.max(0,Math.floor(Number(req.params.n))||0);
- const r=await pool.query("SELECT images[$2::int] img,thumb_ver FROM listings WHERE id=$1 AND status NOT IN ('blocked','rejected')",[req.params.id,n+1]);
+ const r=await pool.query("SELECT images[$2::int] img,thumb_ver,status,user_id FROM listings WHERE id=$1",[req.params.id,n+1]);
+ let hidden=false;
+ if(r.rowCount&&['blocked','rejected'].includes(r.rows[0].status)){ if(!(await hiddenImgAllowed(req,r.rows[0].user_id)))return res.status(404).end(); hidden=true; }
  const img=r.rowCount?(r.rows[0].img||''):'';
- if(/^https?:\/\//.test(img)){res.set('Cache-Control','public, max-age=3600');return res.redirect(302,img);}
+ if(/^https?:\/\//.test(img)){res.set('Cache-Control',hidden?'private, max-age=300':'public, max-age=3600');return res.redirect(302,img);}
  const m=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/=]+)$/.exec(img);
  if(!m)return res.status(404).end();
  const tv=Number(r.rows[0].thumb_ver)||0,w=[640,1280].includes(Number(req.query.w))?Number(req.query.w):0;
- const cc=(tv>0&&Number(req.query.v)===tv)?'public, max-age=31536000, immutable':(w?'public, max-age=3600':'public, max-age=86400');
+ const cc=hidden?'private, max-age=300':((tv>0&&Number(req.query.v)===tv)?'public, max-age=31536000, immutable':(w?'public, max-age=3600':'public, max-age=86400'));
  if(w&&sharp){
   const key=req.params.id+':'+n+':'+w+':'+tv;let buf=RESIZE_CACHE.get(key);
   if(!buf){const done=await resizeSlot();try{buf=await sharp(Buffer.from(m[2],'base64'),{limitInputPixels:40e6}).rotate().resize({width:w,withoutEnlargement:true}).webp({quality:78}).toBuffer();resizeCacheSet(key,buf);}catch(e){buf=null;}finally{done();}}
@@ -1491,9 +1499,11 @@ app.get('/api/listings/:id/img/:n(\\d{1,2})',requireDb,ah(async(req,res)=>{
 }));
 // Miniatura din liste (≈15-25 KB, 480px): se citește dintr-un tabel mic, fără să atingă pozele mari din anunț.
 app.get('/api/listings/:id(\\d+)/thumb',requireDb,ah(async(req,res)=>{
- const r=await pool.query("SELECT t.data FROM listing_thumbs t JOIN listings l ON l.id=t.listing_id WHERE t.listing_id=$1 AND l.status NOT IN ('blocked','rejected')",[req.params.id]);
+ const r=await pool.query("SELECT t.data,l.status,l.user_id FROM listing_thumbs t JOIN listings l ON l.id=t.listing_id WHERE t.listing_id=$1",[req.params.id]);
+ let hidden=false;
+ if(r.rowCount&&['blocked','rejected'].includes(r.rows[0].status)){ if(!(await hiddenImgAllowed(req,r.rows[0].user_id)))return res.status(404).end(); hidden=true; }
  if(!r.rowCount){res.set('Cache-Control','public, max-age=60');return res.redirect(302,'/api/listings/'+Number(req.params.id)+'/img/0?w=640');}
- res.set({'Content-Type':'image/webp','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff'}).send(r.rows[0].data);
+ res.set({'Content-Type':'image/webp','Cache-Control':hidden?'private, max-age=300':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff'}).send(r.rows[0].data);
 }));
 const THUMB_W=640;
 async function makeThumbBuffer(img){
