@@ -5014,3 +5014,14 @@ html.tv[data-view="grid"] #dismGrid.ar-list,html.tv[data-view="grid"] #avarGrid.
 .sv-logo i{display:none}
 .sv-logo.no-img i{display:grid;place-items:center;width:64px;height:48px;line-height:1}
 @media(max-width:800px){.sv-logo img{max-width:108px;max-height:66px}.sv-logo.no-img i{width:52px;height:40px}}
+
+/* ===== Iconițe meniu: „Cere oferte piese” (megafon) și „Trimite oferte piese” (avion de hârtie) ===== */
+.mi .ico{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+html .mdrawer .mi.mi-ask,html .mdrawer .mi.mi-send{background:linear-gradient(160deg,#2f2412,#14110c)!important;border:1px solid rgba(255,236,180,.5)!important;color:#f2d58f!important;border-radius:12px!important;box-shadow:0 4px 12px rgba(20,17,12,.35),0 0 14px rgba(242,213,143,.22),inset 0 1px 0 rgba(255,255,255,.3)!important}
+.mi-ask .w1{animation:miWave 2.4s ease-in-out infinite}
+.mi-ask .w2{animation:miWave 2.4s ease-in-out .35s infinite}
+.mi-send .ico{animation:miFly 2.8s ease-in-out infinite}
+.mi-send .tr{animation:miWave 2.8s ease-in-out infinite}
+@keyframes miWave{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes miFly{0%,100%{transform:translate(0,0)}50%{transform:translate(2px,-2px)}}
+@media(prefers-reduced-motion:reduce){.mi-ask .w1,.mi-ask .w2,.mi-send .ico,.mi-send .tr{animation:none}}

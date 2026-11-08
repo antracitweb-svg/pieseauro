@@ -2108,7 +2108,7 @@ document.addEventListener('change',e=>{
 });
 async function loadRequests(mine){
   const grid = $('#requestGrid'); $('#requestsEmpty').classList.add('hidden');
-  $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Piese căutate de cumpărători';
+  $('#requestsTitle').textContent = mine ? 'Cererile mele' : 'Trimite oferte piese';
   $('#requestsCrumb').textContent = $('#requestsTitle').textContent;
   { const pg=$('#page-requests'), pc=pg&&pg.querySelector('.container'); if(pg) pg.classList.toggle('req-mine',!!mine); if(pc) pc.classList.toggle('narrow',!!mine); }
   { const ph=$('#page-requests .page-head'); if(ph) ph.classList.add('hd-compact'); const mb=$('#rqMineBar'); if(mb) mb.classList.toggle('hidden',!mine); grid.classList.toggle('rq-list',!!mine); const pb=$('#rqPubBar'); if(pb) pb.classList.toggle('hidden',!!mine); const ab=$('#rqAddBtn'); if(ab) ab.classList.toggle('hidden',!!mine); grid.classList.toggle('rq-pub-list',!mine); }
@@ -5169,7 +5169,7 @@ function addSwipe(el, onSwipe){
       L('Marcă, model, an, motor','Alege mașina. Datele se completează și automat, pe măsură ce scrii.'),
       L('Piesa căutată','Ex: far dreapta sau turbocompresor.'),
       L('Caută piese compatibile','Îți arată doar anunțurile care se potrivesc mașinii alese.')]},
-    'page-requests':{title:'Piese căutate de cumpărători',intro:'Cereri publicate de cumpărători. Dacă ai piesa, trimiți o ofertă.',items:[
+    'page-requests':{title:'Trimite oferte piese',intro:'Cereri publicate de cumpărători. Dacă ai piesa, trimiți o ofertă.',items:[
       L('Starea cererilor','Lista de sus (de exemplu „Nu am ofertat încă”) alege ce cereri vezi: toate, cele la care ai ofertat, cele amânate sau cele ignorate.'),
       L('Filtrează','Restrânge cererile după marcă, model, tip de piese, județ, număr de oferte sau cuvinte cheie.'),
       L('Deschide o cerere','Apasă pe ea ca să vezi detaliile și pozele cumpărătorului.'),
