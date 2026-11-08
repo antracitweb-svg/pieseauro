@@ -5049,20 +5049,3 @@ html .mdrawer .mi.mi-ask,html .mdrawer .mi.mi-send{background:linear-gradient(16
 @media(min-width:1800px) and (max-width:2199px){
   html{zoom:1.25}
 }
-
-/* ===== Cerere cu AI: un singur mesaj ===== */
-.ai-card{margin:0 0 18px;padding:14px 14px 10px;border:1.5px solid var(--gold,#b8935a);border-radius:12px;background:var(--pale,#f7f5f0)}
-.ai-card .req-sec{margin-top:0}
-.ai-card textarea{width:100%;min-height:84px;font-size:16px}
-.ai-actions{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 6px}
-.ai-actions .btn{flex:1 1 150px;min-height:48px}
-.ai-card .auto-car{margin:8px 0 4px}
-.ai-card .sf-hint{display:block;margin:6px 0 0}
-#reqAiMic[aria-pressed="true"]{background:#fde8e6;border-color:#d92d20;color:#a3322b}
-html.dark .ai-card{background:var(--card);border-color:var(--gold,#b8935a)}
-html.dark #reqAiMic[aria-pressed="true"]{background:#3a1d1b;color:#ffb4ab}
-
-
-/* ===== V50: semnul „Se potrivește” pe carduri (modul luminos și cel întunecat; fără să atingă sticla existentă) ===== */
-.lchip-fit{background:#ecf9f1;border:1px solid #bfe7cd;color:#14532d;font-weight:600}
-html.dark .lchip-fit{background:#12291c;border-color:#2a5a3c;color:#6fcf97}

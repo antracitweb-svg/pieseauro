@@ -907,35 +907,6 @@ app.get('/api/catalog/years',async(req,res)=>{
 });
 app.get('/api/catalog/resolve',async(req,res)=>{const q=String(req.query.q||'').trim();if(!q)return res.json({match:null});const c=await getVehicleRows();const match=resolveText(c,q);res.json({match});});
 
-/* ---------- AI: cerere scrisă liber → câmpuri completate (vezi ai-parse.js) ----------
-   Cheia (ZAI_API_KEY) rămâne doar aici, pe server. Fără cheie sau dacă AI-ul pică, clientul folosește detectarea locală.
-   Limite: 20 / oră și 60 / zi pe utilizator, plus un plafon zilnic total (AI_DAILY_MAX, implicit 800) sub limita planului gratuit. */
-const aiParse=require('./ai-parse');
-const AI_DAILY_MAX=Math.max(1,Number(process.env.AI_DAILY_MAX)||800);
-let aiDay='',aiCount=0;
-const AI_STATUS={AI_INDISPONIBIL:503,TEXT_PREA_SCURT:400,AI_RASPUNS_INVALID:422,AI_EROARE:502};
-app.post('/api/ai/parse',auth,needVerified,requireDb,ah(async(req,res)=>{
- const apiKey=process.env.ZAI_API_KEY;
- if(!apiKey)return res.status(503).json({error:'AI_INDISPONIBIL'});
- const text=req.body&&req.body.text;
- if(typeof text!=='string'||aiParse.cleanText(text).length<5)return res.status(400).json({error:'TEXT_PREA_SCURT'});
- if(!throttle(authAttempts,'ai:'+req.user.id,20,60*60*1000)||!throttle(authAttempts,'aid:'+req.user.id,60,24*3600*1000))return res.status(429).json({error:'AI_LIMITA'});
- const day=new Date().toISOString().slice(0,10); if(day!==aiDay){aiDay=day;aiCount=0;}
- if(aiCount>=AI_DAILY_MAX)return res.status(429).json({error:'AI_LIMITA_ZILNICA'});
- const rows=await getVehicleRows(); const makes=new Map(),models=new Map();
- for(const x of rows){const mk=vkey(x.make);if(!mk)continue;if(!makes.has(mk))makes.set(mk,x.make);if(!models.has(mk))models.set(mk,new Set());if(x.model)models.get(mk).add(x.model);}
- aiCount++;
- try{
-  const data=await aiParse.parseRequestText(text,{makes:[...makes.values()],modelsFor:m=>[...(models.get(vkey(m))||[])],counties:IMPORT_COUNTIES},
-   {apiKey,model:process.env.ZAI_MODEL||undefined,baseUrl:process.env.ZAI_BASE_URL||undefined,thinking:process.env.ZAI_THINKING||undefined});
-  res.json({ok:true,data});
- }catch(e){
-  const code=AI_STATUS[e&&e.code]?e.code:'AI_EROARE';
-  if(code==='AI_EROARE')console.error('AI parse:',e&&e.message,e&&e.status||'');
-  res.status(AI_STATUS[code]).json({error:code});
- }
-}));
-
 /* ---------- administrare vehicule ---------- */
 function parseVehicle(b){
  b=b||{};
@@ -2312,7 +2283,6 @@ app.patch('/api/listings/:id',auth,needVerified,requireDb,async(req,res)=>{
 app.get('/api/requests',requireDb,ah(async(req,res)=>{
  const uid=await optUserId(req);
  const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images[1:1] images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+",(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT o.status FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer,(SELECT o.id FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer_id,(SELECT m.mark FROM request_marks m WHERE m.request_id=r.id AND m.user_id=$1::int) my_mark FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.status='open' AND r.expires_at>NOW() ORDER BY r.created_at DESC LIMIT 100",[uid]);
- if(!uid)for(const x of r.rows)x.images=[];   // pozele cererilor (pot conține talonul) doar pentru utilizatori logați
  res.json({requests:r.rows});
 }));
 app.get('/api/requests/mine',auth,requireDb,async(req,res)=>{
@@ -2336,7 +2306,6 @@ app.get('/api/requests/:id(\\d+)',requireDb,ah(async(req,res)=>{
  const uid=await optUserId(req);
  const r=await pool.query("SELECT r.id,r.title,r.make,r.model,r.year,r.variant,r.engine,r.kind,r.county,r.city,r.extra_parts,r.description,r.created_at,r.images,r.user_id,COALESCE(u.nickname,u.name) user_name,"+BUYER_RATE('r.user_id','user_rating')+",u.created_at buyer_since,(SELECT COUNT(*)::int FROM offers o WHERE o.request_id=r.id) offers_count,(SELECT COUNT(*)::int FROM part_requests x WHERE x.user_id=r.user_id AND EXISTS(SELECT 1 FROM offers o2 WHERE o2.request_id=x.id)) buyer_with_offers,(SELECT COUNT(*)::int FROM part_requests x WHERE x.user_id=r.user_id AND x.status='closed') buyer_closed,(SELECT COUNT(*)::int FROM part_requests x WHERE x.user_id=r.user_id AND x.status='matched') buyer_matched,(SELECT COUNT(*)::int FROM buyer_ratings br WHERE br.buyer_id=r.user_id AND br.stars>=4) buyer_pos,(SELECT o.status FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer,(SELECT o.id FROM offers o WHERE o.request_id=r.id AND o.seller_id=$1::int ORDER BY o.id DESC LIMIT 1) my_offer_id,(SELECT m.mark FROM request_marks m WHERE m.request_id=r.id AND m.user_id=$1::int) my_mark FROM part_requests r LEFT JOIN users u ON u.id=r.user_id WHERE r.id=$2 AND r.status='open'",[uid,req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
- if(!uid)r.rows[0].images=[];   // pozele cererii (pot conține talonul) doar pentru utilizatori logați
  res.json({request:r.rows[0]});
 }));
 app.get('/api/requests/:id/contact',auth,requireDb,async(req,res)=>{
