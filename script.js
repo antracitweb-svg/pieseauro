@@ -2664,7 +2664,7 @@ function ensureOption(el, val){
 }
 function setReqMode(editId){
   const form=$('#requestForm'); form.dataset.editId=editId||'';
-  const h=document.querySelector('#page-request h2'); if(h) h.textContent=editId?'Modifică cererea':'Primește oferte piese';
+  const h=document.querySelector('#page-request h2'); if(h) h.textContent=editId?'Modifică cererea':'Cere oferte piese';
   const b=form.querySelector('button[type="submit"]'); if(b) b.textContent=editId?'Salvează modificările':'Trimite cererea';
 }
 async function fillRequestEdit(id){
@@ -5128,7 +5128,7 @@ function addSwipe(el, onSwipe){
       L('Salvează căutarea','Salvează căutarea curentă. Primești o notificare când apare un anunț nou care i se potrivește (e nevoie de cont).'),
       L('Inimioara de pe anunț','Adaugă anunțul la Favorite, ca să îl găsești ușor mai târziu.'),
       L('Deschide un anunț','Apasă pe el ca să vezi pozele, detaliile și datele vânzătorului. De acolo îl poți contacta sau comanda.'),
-      L('Nu găsești piesa?','Folosește „Primește oferte piese”. Vânzătorii îți trimit oferte.')]},
+      L('Nu găsești piesa?','Folosește „Cere oferte piese”. Vânzătorii îți trimit oferte.')]},
     'seller':{title:'Anunțurile vânzătorului',intro:'Lista cu toate anunțurile active ale acestui vânzător.',items:[
       L('Înapoi','Te întoarce la pagina de unde ai venit.'),
       L('Calificativ și stele','Părerea cumpărătorilor care au comandat de la el. Apasă pe ele ca să vezi recenziile.'),

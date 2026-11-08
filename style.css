@@ -2537,7 +2537,7 @@ button,a,[role="button"],[role="link"],.ar-row,.listing{touch-action:manipulatio
   html.menu-open .bottom-nav{transform:translateY(240%);opacity:0;pointer-events:none}
 }
 
-/* ===== „Alege mașina ta” — același antet și aceleași elemente ca pagina „Primește oferte piese” ===== */
+/* ===== „Alege mașina ta” — același antet și aceleași elemente ca pagina „Cere oferte piese” ===== */
 #page-request-pick .cp-card{padding:18px 16px 20px}
 #page-request-pick .cp-list{padding:0}
 #page-request-pick .cp-item{font-size:16px;padding:14px 4px}
