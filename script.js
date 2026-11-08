@@ -425,7 +425,7 @@ function setupAvatarHold(){
     const img=btn.querySelector('img[data-av]'); if(!img) return;
     closePreview();
     ov=document.createElement('div'); ov.className='avatar-preview'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-label','Poza de profil');
-    const big=document.createElement('img'); big.src=img.src; big.alt='Poza de profil';
+    const big=document.createElement('img'); big.src=img.src; big.alt=img.closest('.sv-logo')?'Logo firmă':'Poza de profil';
     ov.append(big);
     const del=document.createElement('button'); del.type='button'; del.className='avatar-del'; del.textContent='🗑️'; del.setAttribute('aria-label','Șterge poza'); del.title='Șterge poza';
     del.addEventListener('click',ev=>{ ev.stopPropagation(); if(confirm('Ștergi poza de profil?')){ closePreview(); removeAvatar(); } });
@@ -440,10 +440,10 @@ function setupAvatarHold(){
 }
 /* Poza altui utilizator: o apăsare pe poză din cardul vânzătorului o deschide mărită */
 document.addEventListener('click',e=>{
-  const img=e.target.closest&&e.target.closest('.seller-avatar img[data-av]'); if(!img) return;
+  const img=e.target.closest&&e.target.closest('.seller-avatar img[data-av], .sv-logo img[data-av]'); if(!img) return;
   e.preventDefault(); e.stopPropagation();
   const old=document.querySelector('.avatar-preview'); if(old) old.remove();
-  const ov=document.createElement('div'); ov.className='avatar-preview'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-label','Poza de profil');
+  const ov=document.createElement('div'); ov.className='avatar-preview'+(img.closest('.sv-logo')?' logo':''); ov.setAttribute('role','dialog'); ov.setAttribute('aria-label','Poza de profil');
   const big=document.createElement('img'); big.src=img.src; big.alt='Poza de profil';
   ov.append(big);
   const close=()=>{ ov.remove(); document.removeEventListener('keydown',onKey); };
@@ -2160,8 +2160,11 @@ function stCardHtml(s){
   const mk=(s.makes||[]), chips=mk.slice(0,4).map(m=>`<span class="sv-chip">${esc(m)}</span>`).join('')+(mk.length>4?`<span class="sv-chip sv-more">+${mk.length-4}</span>`:'');
   const where=[s.city,s.county].filter(Boolean).map(esc).join(', ');
   const idLine=[s.stype,s.cui?'CUI '+String(s.cui).replace(/\s+/g,' ').toUpperCase():''].filter(Boolean).map(esc).join(' · ');
+  /* logo dreptunghiular al firmei (dacă există), altfel poza de profil; dacă lipsesc ambele rămâne litera */
+  const logoSrc = s.has_logo ? `/api/stores/${Number(s.id)}/logo` : `/api/users/${Number(s.id)}/avatar`;
+  const logo = `<span class="sv-logo"><i>${avInit(s.name)}</i><img src="${logoSrc}" alt="" loading="lazy" decoding="async" data-av></span>`;
   return `<article class="sv-card">
-    <button type="button" class="sv-main" data-seller-profile="${s.id}" aria-label="Profilul firmei ${esc(s.name)}">${avatarSpan(s.id,s.name,'seller-avatar')}<span class="sv-title"><span class="sv-name">${esc(s.name)}</span>${s.vb?'<span class="sv-ver" title="Documentele firmei au fost verificate">✔ Verificat</span>':'<span class="sv-tag">DEZMEMBRĂRI</span>'}</span></button>
+    <div class="sv-head"><button type="button" class="sv-main" data-seller-profile="${s.id}" aria-label="Profilul firmei ${esc(s.name)}"><span class="sv-title"><span class="sv-name">${esc(s.name)}</span>${s.vb?'<span class="sv-ver" title="Documentele firmei au fost verificate">✔ Verificat</span>':'<span class="sv-tag">DEZMEMBRĂRI</span>'}</span></button>${logo}</div>
     ${idLine?`<p class="sv-id">${idLine}</p>`:''}
     <p class="rate-line sv-rate">${ratingLine({avg:s.rating_avg,count:s.rating_n},s.id,'seller')}</p>
     ${s.descr?`<p class="sv-desc">${esc(s.descr)}${s.descr.length>=160?'…':''}</p>`:''}
