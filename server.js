@@ -519,6 +519,10 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_type TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_address TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_county TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_desc TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_warranty TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_return TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_delivery TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_city TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_hours TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_google TEXT',
@@ -1155,7 +1159,7 @@ app.put('/api/account/details',requireDb,auth,async(req,res)=>{
 });
 app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
  try{
-  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_type,bill_name,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,store_type,store_address,store_hours,store_google,(store_logo IS NOT NULL) has_logo,(avatar IS NOT NULL) has_avatar,mail_msg,mail_offer,mail_order,mail_alert,show_presence,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
+  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_type,bill_name,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,store_type,store_address,store_hours,store_google,store_county,store_city,store_desc,store_warranty,store_return,store_delivery,(store_logo IS NOT NULL) has_logo,(avatar IS NOT NULL) has_avatar,mail_msg,mail_offer,mail_order,mail_alert,show_presence,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
   const phones=(await pool.query('SELECT id,phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id',[req.user.id])).rows;
   res.json({user:u,phones});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
@@ -1901,7 +1905,7 @@ app.post('/api/admin/users/:id/credits',auth,admin,requireDb,ah(async(req,res)=>
   res.json({ok:true,balance:bal});
 }));
 app.get('/api/sellers',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,COALESCE(NULLIF(u.store_county,''),MAX(l.county)) county,COALESCE(NULLIF(u.store_city,''),MAX(u.ship_city)) city,u.store_type stype,(CASE WHEN u.bill_type='pj' AND u.bill_cui ~* '^(RO)?[[:space:]]?[0-9]{2,10}$' THEN u.bill_cui END) cui,(SELECT COUNT(*)::int FROM firm_photos fp WHERE fp.user_id=u.id) photos,(SELECT COALESCE(ARRAY_AGG(DISTINCT x.make),'{}') FROM listings x WHERE x.user_id=u.id AND x.status='approved' AND x.type='dezmembrari' AND COALESCE(x.make,'')<>'') makes,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified,u.store_type,u.store_county,u.store_city,u.bill_type,u.bill_cui ORDER BY n DESC LIMIT 300");
+ const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,COALESCE(NULLIF(u.store_county,''),MAX(l.county)) county,COALESCE(NULLIF(u.store_city,''),MAX(u.ship_city)) city,u.store_type stype,LEFT(COALESCE(u.store_desc,''),160) descr,(CASE WHEN u.bill_type='pj' AND u.bill_cui ~* '^(RO)?[[:space:]]?[0-9]{2,10}$' THEN u.bill_cui END) cui,(SELECT COUNT(*)::int FROM firm_photos fp WHERE fp.user_id=u.id) photos,(SELECT COALESCE(ARRAY_AGG(DISTINCT x.make),'{}') FROM listings x WHERE x.user_id=u.id AND x.status='approved' AND x.type='dezmembrari' AND COALESCE(x.make,'')<>'') makes,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified,u.store_type,u.store_county,u.store_city,u.store_desc,u.bill_type,u.bill_cui ORDER BY n DESC LIMIT 300");
  res.json({sellers:r.rows});
 });
 /* ===== Notificări email, export date, ștergere cont ===== */
@@ -2083,7 +2087,7 @@ app.put('/api/account/store',requireDb,auth,ah(async(req,res)=>{
   const name=String(b.store_name||'').trim().slice(0,60);
   const site=String(b.store_site||'').trim().slice(0,200);
   if(site&&!/^https?:\/\/[^\s<>"']+$/i.test(site))return res.status(400).json({error:'SITE_INVALID'});
-  const cur=(await pool.query('SELECT store_logo,store_type,store_address,store_hours,store_google,store_county,store_city FROM users WHERE id=$1',[req.user.id])).rows[0]||{};
+  const cur=(await pool.query('SELECT store_logo,store_type,store_address,store_hours,store_google,store_county,store_city,store_desc,store_warranty,store_return,store_delivery FROM users WHERE id=$1',[req.user.id])).rows[0]||{};
   let logo=cur.store_logo||null;
   if(b.remove_logo===true)logo=null;
   else if(b.logo){
@@ -2091,14 +2095,15 @@ app.put('/api/account/store',requireDb,auth,ah(async(req,res)=>{
     logo=(await storeImages([b.logo],req.user.id))[0];
   }
   /* câmpurile noi se schimbă doar dacă sunt trimise (cererile vechi rămân valide) */
-  let type=cur.store_type||null,address=cur.store_address||null,hours=cur.store_hours||null,google=cur.store_google||null,scounty=cur.store_county||null,scity=cur.store_city||null;
+  let type=cur.store_type||null,address=cur.store_address||null,hours=cur.store_hours||null,google=cur.store_google||null,scounty=cur.store_county||null,scity=cur.store_city||null,sdesc=cur.store_desc||null,swar=cur.store_warranty||null,sret=cur.store_return||null,sdel=cur.store_delivery||null;
+  for(const [k,max,set] of [['store_desc',1200,v=>sdesc=v],['store_warranty',300,v=>swar=v],['store_return',300,v=>sret=v],['store_delivery',300,v=>sdel=v]]){ if(k in b){ const v=cleanText(b[k],max); if(v===null)return res.status(400).json({error:'TEXT_INVALID'}); set(v||null); } }
   if('store_county' in b){ const c=String(b.store_county||'').trim(); if(c&&!IMPORT_COUNTIES.includes(c))return res.status(400).json({error:'JUDET_INVALID'}); scounty=c||null; }
   if('store_city' in b){ const c=cleanText(b.store_city,80); if(c===null)return res.status(400).json({error:'ORAS_INVALID'}); scity=c||null; }
   if('store_type' in b){ const t=String(b.store_type||'').trim().toUpperCase(); if(t&&!FIRM_TYPES.includes(t))return res.status(400).json({error:'TIP_FIRMA_INVALID'}); type=t||null; }
   if('store_address' in b){ const a=cleanText(b.store_address,200); if(a===null)return res.status(400).json({error:'ADRESA_INVALIDA'}); address=a||null; }
   if('store_hours' in b){ const a=cleanText(b.store_hours,120); if(a===null)return res.status(400).json({error:'PROGRAM_INVALID'}); hours=a||null; }
   if('store_google' in b){ const g=cleanGoogleMapsUrl(b.store_google); if(g===null)return res.status(400).json({error:'GOOGLE_INVALID'}); google=g||null; }
-  await pool.query('UPDATE users SET store_name=$1,store_site=$2,store_logo=$3,store_type=$5,store_address=$6,store_hours=$7,store_google=$8,store_county=$9,store_city=$10 WHERE id=$4',[name||null,site||null,logo,req.user.id,type,address,hours,google,scounty,scity]);
+  await pool.query('UPDATE users SET store_name=$1,store_site=$2,store_logo=$3,store_type=$5,store_address=$6,store_hours=$7,store_google=$8,store_county=$9,store_city=$10,store_desc=$11,store_warranty=$12,store_return=$13,store_delivery=$14 WHERE id=$4',[name||null,site||null,logo,req.user.id,type,address,hours,google,scounty,scity,sdesc,swar,sret,sdel]);
   res.json({ok:true,has_logo:!!logo});
 }));
 // Pozele firmei (parc, depozit, magazin): publice, max. 10 per firmă.
@@ -2133,7 +2138,7 @@ app.delete('/api/account/store/photos/:id(\\d+)',requireDb,auth,ah(async(req,res
 app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const id=Number(req.params.id);
  if(!Number.isInteger(id)||id<=0)return res.status(404).json({error:'NOT_FOUND'});
- const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,bill_type,bill_cui,biz_verified,store_type,store_address,store_hours,store_google,store_county,store_city,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
+ const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,bill_type,bill_cui,biz_verified,store_type,store_address,store_hours,store_google,store_county,store_city,store_desc,store_warranty,store_return,store_delivery,bill_regcom,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
  const s=(await pool.query("SELECT COUNT(*)::int n,COALESCE(BOOL_OR(type='dezmembrari'),FALSE) dism,(ARRAY_AGG(seller_type ORDER BY created_at DESC))[1] seller_type,(ARRAY_AGG(county ORDER BY created_at DESC) FILTER (WHERE county IS NOT NULL AND county<>''))[1] county FROM listings WHERE user_id=$1 AND status='approved'",[id])).rows[0];
  const phones=u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[id])).rows:[];
@@ -2141,7 +2146,7 @@ app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const me=await optUserId(req); const blocked=me&&me!==id?(await blockState(me,id)).byMe:false;
  const rt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM seller_ratings WHERE seller_id=$1',[id])).rows[0];
  const bt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM buyer_ratings WHERE buyer_id=$1',[id])).rows[0];
- res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:u.store_county||s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified,firm:(s.dism||isCompany)?{type:u.store_type||null,city:u.store_city||null,cui:(u.bill_type==='pj'&&FIRM_CUI_RE.test(u.bill_cui||''))?u.bill_cui:null,address:u.store_address||null,hours:u.store_hours||null,google:u.store_google||null,photos:(await pool.query('SELECT COUNT(*)::int n FROM firm_photos WHERE user_id=$1',[id])).rows[0].n}:null}});
+ res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:u.store_county||s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified,firm:(s.dism||isCompany)?{type:u.store_type||null,city:u.store_city||null,desc:u.store_desc||null,warranty:u.store_warranty||null,ret:u.store_return||null,delivery:u.store_delivery||null,regcom:(u.bill_type==='pj'&&/^[A-Za-z0-9\/ .-]{3,30}$/.test(u.bill_regcom||''))?u.bill_regcom.trim():null,makes:(await pool.query("SELECT DISTINCT make FROM listings WHERE user_id=$1 AND status='approved' AND type='dezmembrari' AND COALESCE(make,'')<>'' ORDER BY make LIMIT 60",[id])).rows.map(r=>r.make),cui:(u.bill_type==='pj'&&FIRM_CUI_RE.test(u.bill_cui||''))?u.bill_cui:null,address:u.store_address||null,hours:u.store_hours||null,google:u.store_google||null,photos:(await pool.query('SELECT COUNT(*)::int n FROM firm_photos WHERE user_id=$1',[id])).rows[0].n}:null}});
 }));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 const ni=(v,lo,hi)=>{if(v==null||String(v).trim()==='')return null;const n=Math.round(Number(v));return Number.isFinite(n)&&n>=lo&&n<=hi?n:null;};

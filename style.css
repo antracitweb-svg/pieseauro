@@ -4963,3 +4963,17 @@ html.dark .sv-ph{background:linear-gradient(180deg,#2a251b,#1f1b13)!important;co
 .fp-del{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(20,17,12,.75);color:#fff;font-size:18px;line-height:1;cursor:pointer}
 html.dark .fp-item{background:#1d1a14}
 html.dark .fp-item figcaption{color:#e6c987}
+
+/* v22: profil firmă — secțiuni pliabile, descriere, linkuri locale */
+.fp-sec{border:1px solid var(--line,rgba(120,120,140,.25));border-radius:12px;margin:10px 0;background:rgba(255,255,255,.04)}
+.fp-sec>summary{cursor:pointer;padding:11px 14px;font-weight:700;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.fp-sec>summary::-webkit-details-marker{display:none}
+.fp-sec>summary::after{content:'+';font-size:1.2em;opacity:.7}
+.fp-sec[open]>summary::after{content:'–'}
+.fp-sec-b{padding:0 14px 12px}
+.fp-sec-b p{margin:6px 0;line-height:1.5}
+.fp-desc{white-space:pre-line}
+.fp-mk-t{margin-top:12px!important;font-weight:600}
+.fp-links{display:flex;flex-direction:column;gap:4px;margin:10px 0}
+.fp-link{background:none;border:0;padding:6px 0;text-align:left;color:var(--accent,#d32f2f);font:inherit;cursor:pointer;text-decoration:underline}
+.sv-desc{margin:4px 0 2px;font-size:.88rem;line-height:1.4;opacity:.8;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

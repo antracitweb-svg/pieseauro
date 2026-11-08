@@ -24,7 +24,7 @@
 <meta name="twitter:description" content="Caută piese auto noi și second-hand după cod OEM, marcă și model. Cere oferte de la dezmembrări și magazine auto din toată România.">
 <meta name="twitter:image" content="https://pieseauto.ro/assets/og-image.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f12'/%3E%3Cpath d='M16 6 L26 26 H21.5 L16 14 L10.5 26 H6 Z' fill='%23ffb020'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=plus21">
+<link rel="stylesheet" href="style.css?v=plus22">
 <script src="theme-init.js"></script>
 <script src="analytics.js" defer></script>
 <link rel="manifest" href="/manifest.webmanifest">
@@ -227,6 +227,10 @@
 <div class="set-field"><label for="storeCounty">Județ (parc / magazin):</label><select id="storeCounty"><option value="">Alege județul</option></select></div>
 <div class="set-field"><label for="storeCity">Oraș / localitate:</label><input id="storeCity" maxlength="80" placeholder="ex. Cluj-Napoca"><small class="sf-hint">Cu acestea apari în filtrul „Magazine verificate” (județ, oraș).</small></div>
 <div class="set-field"><label for="storeAddress">Adresă publică (parc / magazin):</label><input id="storeAddress" maxlength="200" placeholder="Str., nr., localitate, județ"><small class="sf-hint">Apare în profil, cu butoanele „Locație” și „Navighează”. Nu este adresa de facturare.</small></div>
+<div class="set-field"><label for="storeDesc">Despre firmă (descriere):</label><textarea id="storeDesc" rows="4" maxlength="1200" placeholder="Cu ce se ocupă firma, ce mărci dezmembrați, autorizații (RAR, mediu)…"></textarea></div>
+<div class="set-field"><label for="storeWarranty">Garanție:</label><input id="storeWarranty" maxlength="300" placeholder="ex. 30 de zile pentru piesele testate"></div>
+<div class="set-field"><label for="storeReturn">Retur:</label><input id="storeReturn" maxlength="300" placeholder="ex. 14 zile, piesa nemontată"></div>
+<div class="set-field"><label for="storeDelivery">Livrare:</label><input id="storeDelivery" maxlength="300" placeholder="ex. Curier în toată țara, ridicare personală din parc"></div>
 <div class="set-field"><label for="storeHours">Program (opțional):</label><input id="storeHours" maxlength="120" placeholder="L–V 08:00–17:00, S 08:00–13:00"></div>
 <div class="set-field"><label for="storeGoogle">Link Google Maps (pentru recenzii):</label><input id="storeGoogle" type="url" maxlength="300" placeholder="https://maps.app.goo.gl/…"><small class="sf-hint">Deschide firma ta pe Google Maps, apasă „Distribuie” și lipește linkul. Vizitatorii văd recenziile direct pe Google.</small></div>
 <div class="set-field"><label for="fpFile">Poze cu firma / parcul (maximum 10):</label><div class="fp-add"><select id="fpCat" aria-label="Categorie poză"><option value="parc">Parc dezmembrări</option><option value="depozit">Depozit</option><option value="magazin">Magazin</option></select><input id="fpFile" type="file" accept="image/jpeg,image/png,image/webp" multiple></div><small class="sf-hint">Pozele se încarcă imediat, fără să apeși „Salvează”.</small><p class="form-note" id="fpMsg"></p><div class="fp-grid" id="fpGrid"></div></div>
@@ -348,5 +352,5 @@
   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
 </div>
 <script src="realtime.js?v=4" defer></script>
-<script src="script.js?v=plus17" defer></script>
+<script src="script.js?v=plus18" defer></script>
 </body></html>
