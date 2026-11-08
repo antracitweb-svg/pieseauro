@@ -8,9 +8,9 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const ERR = {PRET_OBLIGATORIU:'Introdu prețul. Anunțul nu poate fi publicat fără preț.',
   AWB_INVALID:'AWB-ul poate conține doar litere, cifre și . _ - (3–40 caractere).',NIMIC_DE_SALVAT:'Nu ai modificat nimic.',CERERE_PROPRIE:'Aceasta este cererea ta.',MARCAJ_INVALID:'Marcaj necunoscut.',
   INVALID_LOGIN:'Email/nickname sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',BLOCARE_MAX_30_ZILE:'Moderatorii pot bloca între 1 și 30 de zile. Pentru blocare definitivă, cere unui administrator.',EMAIL_EXISTS:'Există deja un cont cu acest email.',
-  NICKNAME_EXISTS:'Nickname-ul este deja folosit.',COMENZI_ACTIVE:'Ai comenzi în curs. Finalizează sau anulează comenzile înainte de a șterge contul.',ADMIN_NU_SE_STERGE:'Conturile de administrator nu se pot șterge din interfață.',SITE_INVALID:'Adresa site-ului trebuie să înceapă cu http:// sau https://.',LOGO_INVALID:'Logo invalid sau prea mare (maximum ~450 KB după comprimare).',NICKNAME_INVALID:'Nickname-ul trebuie să aibă 3–30 de caractere (litere, cifre, _ . -).',
+  NICKNAME_EXISTS:'Nickname-ul este deja folosit.',COMENZI_ACTIVE:'Ai comenzi în curs. Finalizează sau anulează comenzile înainte de a șterge contul.',ADMIN_NU_SE_STERGE:'Conturile de administrator nu se pot șterge din interfață.',SITE_INVALID:'Adresa site-ului trebuie să înceapă cu http:// sau https://.',LOGO_INVALID:'Logo invalid sau prea mare (maximum ~450 KB după comprimare).',NICKNAME_INVALID:'Numele de utilizator trebuie să aibă 3–30 de caractere: litere, cifre, spații, _ . - (fără alte semne).',
   DATE_INVALIDE:'Verifică datele introduse.',AUTH_REQUIRED:'Trebuie să te autentifici.',
-  GOOGLE_INVALID:'Linkul trebuie să fie de pe Google Maps (google.com/maps, maps.app.goo.gl sau g.page).',TIP_FIRMA_INVALID:'Alege un tip de firmă din listă.',ADRESA_INVALIDA:'Adresa este prea lungă (maximum 200 de caractere).',PROGRAM_INVALID:'Programul este prea lung (maximum 120 de caractere).',POZA_INVALIDA:'Poza nu este validă sau este prea mare.',PREA_MULTE_POZE:'Poți avea cel mult 10 poze.',
+  GOOGLE_INVALID:'Linkul trebuie să fie de pe Google Maps (google.com/maps, maps.app.goo.gl sau g.page).',TIP_FIRMA_INVALID:'Alege un tip de firmă din listă.',JUDET_INVALID:'Alege un județ din listă.',ORAS_INVALID:'Orașul conține caractere nepermise.',ADRESA_INVALIDA:'Adresa este prea lungă (maximum 200 de caractere).',PROGRAM_INVALID:'Programul este prea lung (maximum 120 de caractere).',POZA_INVALIDA:'Poza nu este validă sau este prea mare.',PREA_MULTE_POZE:'Poți avea cel mult 10 poze.',
   EMAIL_NOT_CONFIGURED:'Trimiterea emailurilor nu este configurată încă pe server.',EMAIL_SENDER_NOT_CONFIGURED:'Lipsește expeditorul email (RESEND_FROM).',
   EMAIL_SENDER_INVALID:'Adresa configurată pentru RESEND_FROM nu este validă.',EMAIL_SENDER_NOT_VERIFIED:'Expeditorul email nu este verificat în Resend.',EMAIL_SMTP_AUTH:'Serviciul de email a refuzat autentificarea. Verifică cheia/parola configurată pe server.',DEJA_VERIFICAT:'Firma ta este deja verificată.',MOTIV_OBLIGATORIU:'Scrie motivul (minimum 3 caractere).',
   EMAIL_PROVIDER_FORBIDDEN:'Serviciul de email a refuzat trimiterea. Verifică cheia API și expeditorul.',EMAIL_RATE_LIMIT:'Prea multe cereri către serviciul de email. Încearcă peste câteva minute.',
@@ -2871,6 +2871,7 @@ async function loadSettings(){
   const bt = u.bill_type || ((u.bill_company||u.bill_cui)?'pj':'pf'); $$('input[name="billType"]').forEach(r=>{ r.checked = r.value===bt; }); syncBillType(); $('#billCui').value = u.bill_cui || ''; $('#billRegcom').value = u.bill_regcom || '';
   $('#billAddress').value = u.bill_address || ''; $('#billBank').value = u.bill_bank || ''; $('#billIban').value = u.bill_iban || '';
   $('#storeName').value = u.store_name || ''; $('#storeSite').value = u.store_site || '';
+  { const scs=$('#storeCounty'); if(scs&&scs.options.length<2) scs.insertAdjacentHTML('beforeend',COUNTIES.map(c=>`<option>${esc(c)}</option>`).join('')); if(scs) scs.value=u.store_county||''; const sci=$('#storeCity'); if(sci) sci.value=u.store_city||''; }
   $('#storeType').value = u.store_type || ''; $('#storeAddress').value = u.store_address || ''; $('#storeHours').value = u.store_hours || ''; $('#storeGoogle').value = u.store_google || '';
   fpLoad();
   state.storeLogo = undefined; state.storeLogoRemove = false; $('#storeLogoFile').value = '';
@@ -3095,7 +3096,7 @@ document.addEventListener('click',async e=>{
 async function saveStore(e){
   e.preventDefault(); const msg=$('#storeMsg'); setMsg(msg,'');
   try{
-    const body={store_name:$('#storeName').value,store_site:$('#storeSite').value,store_type:$('#storeType').value,store_address:$('#storeAddress').value,store_hours:$('#storeHours').value,store_google:$('#storeGoogle').value};
+    const body={store_name:$('#storeName').value,store_site:$('#storeSite').value,store_type:$('#storeType').value,store_county:$('#storeCounty').value,store_city:$('#storeCity').value,store_address:$('#storeAddress').value,store_hours:$('#storeHours').value,store_google:$('#storeGoogle').value};
     if(state.storeLogo) body.logo=state.storeLogo;
     if(state.storeLogoRemove) body.remove_logo=true;
     await api('/api/account/store',{method:'PUT',body:JSON.stringify(body)});
@@ -3815,7 +3816,7 @@ async function openSellerProfile(id){
     const own=currentUser&&currentUser.id===s.id;
     const f=s.firm||null, enc=encodeURIComponent, lnk=(href,txt)=>`<a class="btn ghost small" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
     const fpActions=f?`<div class="fp-actions">${f.address?lnk('https://www.google.com/maps/search/?api=1&query='+enc(f.address),'📍 Locație')+lnk('https://waze.com/ul?q='+enc(f.address)+'&navigate=yes','🧭 Navighează'):''}${f.google?lnk(f.google,'⭐ Recenzii Google'):''}${f.photos?`<button type="button" class="btn ghost small" data-firm-photos="${s.id}">📷 Poze (${f.photos})</button>`:''}</div>`:'';
-    const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Tip firmă',f&&f.type],['CUI',f&&f.cui],['Adresă',f&&f.address],['Program',f&&f.hours],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
+    const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Tip firmă',f&&f.type],['CUI',f&&f.cui],['Oraș',f&&f.city],['Adresă',f&&f.address],['Program',f&&f.hours],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
     const phones=contactHtml(s.phones||[],'Vânzătorul',s.id,own,null), canMsg=!own, hasPh=(s.phones||[]).length>0;
     box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small>${s.verified_business?'<span class="badge new" title="Documentele firmei au fost verificate">✔ Firmă verificată</span>':''}<div class="rate-line">Ca vânzător: ${ratingLine(s.rating,s.id,'seller')}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating,s.id,'buyer')}</div></div></div>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>

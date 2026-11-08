@@ -123,7 +123,7 @@ setInterval(()=>{const now=Date.now();for(const m of [authAttempts,recoveryAttem
 function clientIp(req){return String(req.ip||req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0].trim();}
 const {expandTerm,wordsRegex}=require('./search-terms');
 const {buildSuggestions,tokenVariants}=require('./search-suggest');
-function normalizeIdentifier(value){return String(value||'').trim();}
+function normalizeIdentifier(value){return String(value||'').trim().replace(/\s+/g,' ');}
 const COMMON_PW=new Set(['12345678','123456789','1234567890','11111111','00000000','87654321','password','password1','password123','parola123','parola1234','parola','parola1','parolamea','qwertyui','qwertyuiop','qwerty123','asdfghjk','asdfghjkl','abcd1234','abcdefgh','iloveyou','admin123','administrator','autopiese','autopiese1','autopiese123','test1234','testtest','welcome1','romania1','romania123','bucuresti','dacialogan','master123','letmein1','changeme','abc12345','1q2w3e4r','1qaz2wsx','zaq12wsx']);
 function weakPassword(pw,ctx={}){
  const p=String(pw||''),l=p.toLowerCase();
@@ -136,7 +136,9 @@ function weakPassword(pw,ctx={}){
  if(nick.length>=4&&l.includes(nick))return true;
  return false;
 }
-const NICK_RE=/^[A-Za-z0-9_.-]{3,30}$/;
+/* Nickname: 3–30 de caractere; litere (și diacritice), cifre, spații, _ . -; începe și se termină cu literă sau cifră. */
+const NICK_RE=/^[\p{L}\p{N}][\p{L}\p{N} ._-]{1,28}[\p{L}\p{N}]$/u;
+const normNick=v=>String(v==null?'':v).normalize('NFC').trim().replace(/\s+/g,' ');
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Express 4 nu prinde excepțiile din handlere async; le trimitem la middleware-ul de erori.
@@ -516,6 +518,8 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_logo TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_type TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_address TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_county TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_city TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_hours TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_google TEXT',
   "CREATE TABLE IF NOT EXISTS firm_photos (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, category TEXT NOT NULL DEFAULT 'parc', url TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
@@ -1158,9 +1162,11 @@ app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
 });
 app.patch('/api/account/profile',requireDb,auth,async(req,res)=>{
  try{
-  const name=String((req.body||{}).name||'').trim(), nickname=String((req.body||{}).nickname||'').trim();
-  if(!name||name.length>100||!NICK_RE.test(nickname))return res.status(400).json({error:'NICKNAME_INVALID'});
-  const exists=await pool.query('SELECT id FROM users WHERE LOWER(nickname)=LOWER($1) AND id<>$2',[nickname,req.user.id]);
+  const name=String((req.body||{}).name||'').trim(), nickname=normNick((req.body||{}).nickname);
+  /* dacă nickname-ul nu s-a schimbat, nu-l mai validăm (conturile vechi pot avea unul cu spații sau alte caractere) */
+  const sameNick=nickname.toLowerCase()===String(req.user.nickname||'').toLowerCase();
+  if(!name||name.length>100||(!sameNick&&!NICK_RE.test(nickname)))return res.status(400).json({error:'NICKNAME_INVALID'});
+  const exists=await pool.query("SELECT id FROM users WHERE LOWER(REPLACE(COALESCE(nickname,''),' ',''))=LOWER(REPLACE($1,' ','')) AND id<>$2",[nickname,req.user.id]);
   if(exists.rowCount)return res.status(409).json({error:'NICKNAME_EXISTS'});
   const r=await pool.query('UPDATE users SET name=$1,nickname=$2 WHERE id=$3 RETURNING id,name,nickname,email,phone,show_phone,email_verified',[name,nickname,req.user.id]);
   res.json({user:r.rows[0]});
@@ -1244,11 +1250,11 @@ app.post('/api/auth/register',requireDb,async(req,res)=>{
   const {name,nickname,email,phone,password,remember=true,accept_terms}=req.body||{};
   if(accept_terms!==true)return res.status(400).json({error:'TERMENI_NEACCEPTATI'});
   if(typeof name!=='string'||typeof nickname!=='string'||typeof email!=='string'||typeof password!=='string'||!name.trim()||!nickname.trim()||password.length<8||password.length>72||name.length>100||email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())||(phone&&!/^\+?[0-9 ().-]{6,20}$/.test(String(phone).trim())))return res.status(400).json({error:'DATE_INVALIDE'});
-  const em=email.trim().toLowerCase(), nick=nickname.trim();
+  const em=email.trim().toLowerCase(), nick=normNick(nickname);
   if(!NICK_RE.test(nick))return res.status(400).json({error:'NICKNAME_INVALID'});
   if(weakPassword(password,{email:em,nickname:nick}))return res.status(400).json({error:'PAROLA_SLABA'});
   if(!throttle(authAttempts,'reg:'+clientIp(req),10,60*60*1000))return res.status(429).json({error:'LOGIN_RATE_LIMIT'});
-  const exists=await pool.query('SELECT id,email,nickname FROM users WHERE LOWER(email)=$1 OR LOWER(nickname)=LOWER($2)',[em,nick]);
+  const exists=await pool.query("SELECT id,email,nickname FROM users WHERE LOWER(email)=$1 OR LOWER(REPLACE(COALESCE(nickname,''),' ',''))=LOWER(REPLACE($2,' ',''))",[em,nick]);
   if(exists.rowCount)return res.status(409).json({error:String(exists.rows[0].email).toLowerCase()===em?'EMAIL_EXISTS':'NICKNAME_EXISTS'});
   const hash=await bcrypt.hash(password,12);
   const r=await pool.query('INSERT INTO users(name,nickname,email,phone,password_hash,terms_accepted_at) VALUES($1,$2,$3,$4,$5,NOW()) RETURNING id,name,nickname,email,phone,show_phone,role,status,email_verified',[name.trim(),nick,em,phone?String(phone).trim():null,hash]);
@@ -1268,7 +1274,8 @@ app.post('/api/auth/login',requireDb,async(req,res)=>{
   // Limită pe IP, indiferent de identificator: fiecare încercare costă un bcrypt (CPU).
   if(!throttle(authAttempts,'loginip:'+clientIp(req),40,15*60*1000))return res.status(429).json({error:'LOGIN_RATE_LIMIT'});
   if(!throttle(authAttempts,key,8,15*60*1000)||!throttle(authAttempts,'acct:'+id.toLowerCase(),40,15*60*1000)||await loginBlocked('ip:'+key,'acct:'+id.toLowerCase()))return res.status(429).json({error:'LOGIN_RATE_LIMIT'});
-  const r=await pool.query("SELECT * FROM users WHERE LOWER(email)=LOWER($1) OR LOWER(COALESCE(nickname,''))=LOWER($1) LIMIT 1",[id]);
+  /* Intri cu email sau nickname; la nickname nu contează majusculele și nici spațiile în plus (ex. „Dez kamle1” = „dezkamle1”). */
+  const r=await pool.query("SELECT * FROM users WHERE LOWER(email)=LOWER($1) OR LOWER(REGEXP_REPLACE(COALESCE(nickname,''),'[[:space:]]+',' ','g'))=LOWER($1) OR LOWER(REPLACE(COALESCE(nickname,''),' ',''))=LOWER(REPLACE($1,' ','')) ORDER BY (LOWER(email)=LOWER($1)) DESC,(LOWER(COALESCE(nickname,''))=LOWER($1)) DESC,id LIMIT 1",[id]);
   // Comparăm mereu cu un hash (și pentru conturi inexistente) ca să nu se poată afla ce emailuri există după timpul de răspuns.
   const okPass=await bcrypt.compare(String(password).slice(0,72),r.rowCount?r.rows[0].password_hash:DUMMY_HASH);
   if(!r.rowCount||!okPass){await loginFailed('ip:'+key,'acct:'+id.toLowerCase());return res.status(401).json({error:'INVALID_LOGIN'});}
@@ -1894,7 +1901,7 @@ app.post('/api/admin/users/:id/credits',auth,admin,requireDb,ah(async(req,res)=>
   res.json({ok:true,balance:bal});
 }));
 app.get('/api/sellers',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,MAX(u.ship_city) city,u.store_type stype,(CASE WHEN u.bill_type='pj' AND u.bill_cui ~* '^(RO)?[[:space:]]?[0-9]{2,10}$' THEN u.bill_cui END) cui,(SELECT COUNT(*)::int FROM firm_photos fp WHERE fp.user_id=u.id) photos,(SELECT COALESCE(ARRAY_AGG(DISTINCT x.make),'{}') FROM listings x WHERE x.user_id=u.id AND x.status='approved' AND x.type='dezmembrari' AND COALESCE(x.make,'')<>'') makes,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified,u.store_type,u.bill_type,u.bill_cui ORDER BY n DESC LIMIT 300");
+ const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,COALESCE(NULLIF(u.store_county,''),MAX(l.county)) county,COALESCE(NULLIF(u.store_city,''),MAX(u.ship_city)) city,u.store_type stype,(CASE WHEN u.bill_type='pj' AND u.bill_cui ~* '^(RO)?[[:space:]]?[0-9]{2,10}$' THEN u.bill_cui END) cui,(SELECT COUNT(*)::int FROM firm_photos fp WHERE fp.user_id=u.id) photos,(SELECT COALESCE(ARRAY_AGG(DISTINCT x.make),'{}') FROM listings x WHERE x.user_id=u.id AND x.status='approved' AND x.type='dezmembrari' AND COALESCE(x.make,'')<>'') makes,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified,u.store_type,u.store_county,u.store_city,u.bill_type,u.bill_cui ORDER BY n DESC LIMIT 300");
  res.json({sellers:r.rows});
 });
 /* ===== Notificări email, export date, ștergere cont ===== */
@@ -2076,7 +2083,7 @@ app.put('/api/account/store',requireDb,auth,ah(async(req,res)=>{
   const name=String(b.store_name||'').trim().slice(0,60);
   const site=String(b.store_site||'').trim().slice(0,200);
   if(site&&!/^https?:\/\/[^\s<>"']+$/i.test(site))return res.status(400).json({error:'SITE_INVALID'});
-  const cur=(await pool.query('SELECT store_logo,store_type,store_address,store_hours,store_google FROM users WHERE id=$1',[req.user.id])).rows[0]||{};
+  const cur=(await pool.query('SELECT store_logo,store_type,store_address,store_hours,store_google,store_county,store_city FROM users WHERE id=$1',[req.user.id])).rows[0]||{};
   let logo=cur.store_logo||null;
   if(b.remove_logo===true)logo=null;
   else if(b.logo){
@@ -2084,12 +2091,14 @@ app.put('/api/account/store',requireDb,auth,ah(async(req,res)=>{
     logo=(await storeImages([b.logo],req.user.id))[0];
   }
   /* câmpurile noi se schimbă doar dacă sunt trimise (cererile vechi rămân valide) */
-  let type=cur.store_type||null,address=cur.store_address||null,hours=cur.store_hours||null,google=cur.store_google||null;
+  let type=cur.store_type||null,address=cur.store_address||null,hours=cur.store_hours||null,google=cur.store_google||null,scounty=cur.store_county||null,scity=cur.store_city||null;
+  if('store_county' in b){ const c=String(b.store_county||'').trim(); if(c&&!IMPORT_COUNTIES.includes(c))return res.status(400).json({error:'JUDET_INVALID'}); scounty=c||null; }
+  if('store_city' in b){ const c=cleanText(b.store_city,80); if(c===null)return res.status(400).json({error:'ORAS_INVALID'}); scity=c||null; }
   if('store_type' in b){ const t=String(b.store_type||'').trim().toUpperCase(); if(t&&!FIRM_TYPES.includes(t))return res.status(400).json({error:'TIP_FIRMA_INVALID'}); type=t||null; }
   if('store_address' in b){ const a=cleanText(b.store_address,200); if(a===null)return res.status(400).json({error:'ADRESA_INVALIDA'}); address=a||null; }
   if('store_hours' in b){ const a=cleanText(b.store_hours,120); if(a===null)return res.status(400).json({error:'PROGRAM_INVALID'}); hours=a||null; }
   if('store_google' in b){ const g=cleanGoogleMapsUrl(b.store_google); if(g===null)return res.status(400).json({error:'GOOGLE_INVALID'}); google=g||null; }
-  await pool.query('UPDATE users SET store_name=$1,store_site=$2,store_logo=$3,store_type=$5,store_address=$6,store_hours=$7,store_google=$8 WHERE id=$4',[name||null,site||null,logo,req.user.id,type,address,hours,google]);
+  await pool.query('UPDATE users SET store_name=$1,store_site=$2,store_logo=$3,store_type=$5,store_address=$6,store_hours=$7,store_google=$8,store_county=$9,store_city=$10 WHERE id=$4',[name||null,site||null,logo,req.user.id,type,address,hours,google,scounty,scity]);
   res.json({ok:true,has_logo:!!logo});
 }));
 // Pozele firmei (parc, depozit, magazin): publice, max. 10 per firmă.
@@ -2124,7 +2133,7 @@ app.delete('/api/account/store/photos/:id(\\d+)',requireDb,auth,ah(async(req,res
 app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const id=Number(req.params.id);
  if(!Number.isInteger(id)||id<=0)return res.status(404).json({error:'NOT_FOUND'});
- const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,bill_type,bill_cui,biz_verified,store_type,store_address,store_hours,store_google,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
+ const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,bill_type,bill_cui,biz_verified,store_type,store_address,store_hours,store_google,store_county,store_city,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
  const s=(await pool.query("SELECT COUNT(*)::int n,COALESCE(BOOL_OR(type='dezmembrari'),FALSE) dism,(ARRAY_AGG(seller_type ORDER BY created_at DESC))[1] seller_type,(ARRAY_AGG(county ORDER BY created_at DESC) FILTER (WHERE county IS NOT NULL AND county<>''))[1] county FROM listings WHERE user_id=$1 AND status='approved'",[id])).rows[0];
  const phones=u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[id])).rows:[];
@@ -2132,7 +2141,7 @@ app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const me=await optUserId(req); const blocked=me&&me!==id?(await blockState(me,id)).byMe:false;
  const rt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM seller_ratings WHERE seller_id=$1',[id])).rows[0];
  const bt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM buyer_ratings WHERE buyer_id=$1',[id])).rows[0];
- res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified,firm:(s.dism||isCompany)?{type:u.store_type||null,cui:(u.bill_type==='pj'&&FIRM_CUI_RE.test(u.bill_cui||''))?u.bill_cui:null,address:u.store_address||null,hours:u.store_hours||null,google:u.store_google||null,photos:(await pool.query('SELECT COUNT(*)::int n FROM firm_photos WHERE user_id=$1',[id])).rows[0].n}:null}});
+ res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:u.store_county||s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified,firm:(s.dism||isCompany)?{type:u.store_type||null,city:u.store_city||null,cui:(u.bill_type==='pj'&&FIRM_CUI_RE.test(u.bill_cui||''))?u.bill_cui:null,address:u.store_address||null,hours:u.store_hours||null,google:u.store_google||null,photos:(await pool.query('SELECT COUNT(*)::int n FROM firm_photos WHERE user_id=$1',[id])).rows[0].n}:null}});
 }));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 const ni=(v,lo,hi)=>{if(v==null||String(v).trim()==='')return null;const n=Math.round(Number(v));return Number.isFinite(n)&&n>=lo&&n<=hi?n:null;};
