@@ -845,7 +845,11 @@ async function ensureVehicleDb(){
  }catch(e){console.error('Vehicle DB sync failed:',e.message);}
 }
 
-app.get('/api/health',(req,res)=>res.json({ok:true,database:!!pool,catalog:'local',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':'local'}));
+const BUILD_ID='2026-11-08-firme-v21';
+/* Marcaj de versiune: arată dacă fișierele noi (stiluri, script, pagină) sunt cele de pe server. Se calculează o singură dată la pornire. */
+const BUILD_FILES=(()=>{try{const rd=f=>require('fs').readFileSync(path.join(__dirname,f),'utf8');return{style:/\.sv-card/.test(rd('style.css')),script:/function stFiltered/.test(rd('script.js')),index:/id="stFilterBtn"/.test(rd('index.html'))};}catch{return null;}})();
+console.log('VERSIUNE site:',BUILD_ID,JSON.stringify(BUILD_FILES));
+app.get('/api/health',(req,res)=>res.json({ok:true,build:BUILD_ID,files:BUILD_FILES,database:!!pool,catalog:'local',catalogLoaded:Array.isArray(vehicleRows||catalogCache),catalogCount:(vehicleRows||catalogCache||[]).length,catalogSource:vehicleRows?'database':'local'}));
 
 /* ===== Analytics fără scripturi externe (respectă CSP-ul: doar 'self') =====
    Pagina trimite evenimente către /api/track; serverul le înaintează către Plausible
