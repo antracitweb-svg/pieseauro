@@ -4945,3 +4945,21 @@ html.dark .sv-tag{color:#e6c987;background:rgba(201,165,106,.18)}
 html.dark .sv-chip{color:#e6c987;background:rgba(40,35,26,.8);border-color:rgba(201,165,106,.35)}
 html.dark .sv-go{background:linear-gradient(180deg,#2a251b,#1f1b13)!important;color:#e6c987!important;border-color:rgba(201,165,106,.5)!important}
 @media(prefers-reduced-motion:reduce){.sv-go::after{animation:none}.sv-card,.sv-pill{transition:none}}
+
+/* ===== v21: profil firmă: CUI/tip pe card, butoane, poze ===== */
+.sv-id{position:relative;margin:0;font-size:12.5px;font-weight:800;letter-spacing:.3px;color:#8f6d38}
+.sv-btns{position:relative;display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.sv-btns .btn{margin:0}
+.sv-ph{border-color:rgba(184,147,90,.7)!important;color:#6f5428!important;font-weight:800;background:linear-gradient(180deg,#fffdf8,#f4e7c6)!important}
+html.dark .sv-id{color:#e6c987}
+html.dark .sv-ph{background:linear-gradient(180deg,#2a251b,#1f1b13)!important;color:#e6c987!important;border-color:rgba(201,165,106,.5)!important}
+.fp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.fp-actions .btn{text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:38px}
+.fp-add{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px}
+.fp-item{position:relative;margin:0;border-radius:12px;overflow:hidden;border:1px solid rgba(184,147,90,.45);background:#fffdf8}
+.fp-item img{display:block;width:100%;aspect-ratio:1;object-fit:cover}
+.fp-item figcaption{font-size:11px;font-weight:700;text-align:center;padding:3px 4px;color:#6f5428}
+.fp-del{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(20,17,12,.75);color:#fff;font-size:18px;line-height:1;cursor:pointer}
+html.dark .fp-item{background:#1d1a14}
+html.dark .fp-item figcaption{color:#e6c987}

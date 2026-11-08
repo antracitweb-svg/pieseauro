@@ -200,7 +200,7 @@ app.post('/api/payments/webhook',express.raw({type:'application/json',limit:'1mb
 });
 // Limită mare (6 MB) doar pe rutele care primesc poze/CSV; restul primesc maximum 256 KB.
 const JSON_SMALL=express.json({limit:'256kb'}),JSON_BIG=express.json({limit:'6mb'});
-const BIG_JSON_RE=/^\/api\/(listings(\/(\d+|import))?|requests(\/\d+\/offers)?|offers\/\d+|account\/store|account\/business-verification)\/?$/;
+const BIG_JSON_RE=/^\/api\/(listings(\/(\d+|import))?|requests(\/\d+\/offers)?|offers\/\d+|account\/store(\/photos)?|account\/business-verification)\/?$/;
 app.use((req,res,next)=>(['POST','PUT','PATCH'].includes(req.method)&&BIG_JSON_RE.test(req.path))?JSON_BIG(req,res,next):JSON_SMALL(req,res,next));
 app.use(cookieParser());
 // Protecție CSRF suplimentară (pe lângă sameSite=lax): cererile care modifică date și vin cu un Origin străin sunt respinse.
@@ -514,6 +514,12 @@ async function dbReady(){
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_name TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_site TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_logo TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_type TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_address TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_hours TEXT',
+  'ALTER TABLE users ADD COLUMN IF NOT EXISTS store_google TEXT',
+  "CREATE TABLE IF NOT EXISTS firm_photos (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, category TEXT NOT NULL DEFAULT 'parc', url TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  'CREATE INDEX IF NOT EXISTS firm_photos_user_idx ON firm_photos(user_id,id)',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_type TEXT',
   'ALTER TABLE users ADD COLUMN IF NOT EXISTS bill_name TEXT',
@@ -1141,7 +1147,7 @@ app.put('/api/account/details',requireDb,auth,async(req,res)=>{
 });
 app.get('/api/account/settings',requireDb,auth,async(req,res)=>{
  try{
-  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_type,bill_name,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,(store_logo IS NOT NULL) has_logo,(avatar IS NOT NULL) has_avatar,mail_msg,mail_offer,mail_order,mail_alert,show_presence,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
+  const u=(await pool.query('SELECT id,name,nickname,email,phone,show_phone,email_verified,ship_county,ship_city,ship_details,bill_company,bill_type,bill_name,bill_cui,bill_regcom,bill_address,bill_bank,bill_iban,store_name,store_site,store_type,store_address,store_hours,store_google,(store_logo IS NOT NULL) has_logo,(avatar IS NOT NULL) has_avatar,mail_msg,mail_offer,mail_order,mail_alert,show_presence,vacation,vacation_until::text vacation_until FROM users WHERE id=$1',[req.user.id])).rows[0];
   const phones=(await pool.query('SELECT id,phone,is_whatsapp,verified,created_at FROM user_phones WHERE user_id=$1 ORDER BY id',[req.user.id])).rows;
   res.json({user:u,phones});
  }catch(e){console.error(e);res.status(500).json({error:'SERVER_ERROR'});}
@@ -1884,7 +1890,7 @@ app.post('/api/admin/users/:id/credits',auth,admin,requireDb,ah(async(req,res)=>
   res.json({ok:true,balance:bal});
 }));
 app.get('/api/sellers',requireDb,async(req,res)=>{
- const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,MAX(u.ship_city) city,(SELECT COALESCE(ARRAY_AGG(DISTINCT x.make),'{}') FROM listings x WHERE x.user_id=u.id AND x.status='approved' AND x.type='dezmembrari' AND COALESCE(x.make,'')<>'') makes,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified ORDER BY n DESC LIMIT 300");
+ const r=await pool.query("SELECT u.id,COALESCE(u.nickname,u.name) name,u.biz_verified vb,COUNT(*)::int n,BOOL_OR(l.type='dezmembrari') dism,MAX(l.county) county,MAX(u.ship_city) city,u.store_type stype,(CASE WHEN u.bill_type='pj' AND u.bill_cui ~* '^(RO)?[[:space:]]?[0-9]{2,10}$' THEN u.bill_cui END) cui,(SELECT COUNT(*)::int FROM firm_photos fp WHERE fp.user_id=u.id) photos,(SELECT COALESCE(ARRAY_AGG(DISTINCT x.make),'{}') FROM listings x WHERE x.user_id=u.id AND x.status='approved' AND x.type='dezmembrari' AND COALESCE(x.make,'')<>'') makes,(SELECT ROUND(AVG(stars),1)::float FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_avg,(SELECT COUNT(*)::int FROM seller_ratings sr WHERE sr.seller_id=u.id) rating_n FROM listings l JOIN users u ON u.id=l.user_id WHERE l.status='approved' AND NOT "+VAC_SQL('u')+" GROUP BY u.id,u.nickname,u.name,u.biz_verified,u.store_type,u.bill_type,u.bill_cui ORDER BY n DESC LIMIT 300");
  res.json({sellers:r.rows});
 });
 /* ===== Notificări email, export date, ștergere cont ===== */
@@ -2044,25 +2050,77 @@ app.get('/api/stores/:id(\\d+)/logo',requireDb,ah(async(req,res)=>{
   if(isStoredUrl(v)){res.set('Cache-Control','public, max-age=300');return res.redirect(302,v);}
   res.status(404).end();
 }));
+/* ----- Profil firmă: tip, adresă publică, program, link Google Maps, poze ----- */
+const FIRM_CUI_RE=/^(RO)?\s?[0-9]{2,10}$/i;
+const FIRM_TYPES=['SRL','SA','PFA','II','IF'];
+const FIRM_PHOTO_CATS=['parc','depozit','magazin'];
+const FIRM_PHOTO_MAX=10, FIRM_PHOTO_BYTES=700000;
+/* Acceptăm doar linkuri Google Maps (altfel o firmă ar putea trimite vizitatorii pe alt site). */
+function cleanGoogleMapsUrl(v){
+  const x=String(v||'').trim(); if(!x) return '';
+  if(x.length>300) return null;
+  let u; try{ u=new URL(x); }catch{ return null; }
+  if(u.protocol!=='https:') return null;
+  const h=u.hostname.toLowerCase();
+  const ok=((h==='google.com'||h==='www.google.com'||h==='maps.google.com')&&(u.pathname.startsWith('/maps')||h==='maps.google.com'))
+    ||h==='maps.app.goo.gl'||h==='g.page'||(h==='goo.gl'&&u.pathname.startsWith('/maps'));
+  return ok?u.toString():null;
+}
+const cleanText=(v,max)=>{const x=String(v==null?'':v).replace(/[<>]/g,'').replace(/\s+/g,' ').trim();return x.length>max?null:x;};
 app.put('/api/account/store',requireDb,auth,ah(async(req,res)=>{
   const b=req.body||{};
   const name=String(b.store_name||'').trim().slice(0,60);
   const site=String(b.store_site||'').trim().slice(0,200);
   if(site&&!/^https?:\/\/[^\s<>"']+$/i.test(site))return res.status(400).json({error:'SITE_INVALID'});
-  const cur=(await pool.query('SELECT store_logo FROM users WHERE id=$1',[req.user.id])).rows[0]||{};
+  const cur=(await pool.query('SELECT store_logo,store_type,store_address,store_hours,store_google FROM users WHERE id=$1',[req.user.id])).rows[0]||{};
   let logo=cur.store_logo||null;
   if(b.remove_logo===true)logo=null;
   else if(b.logo){
     if(!isDataImg(b.logo)||b.logo.length>STORE_LOGO_MAX)return res.status(400).json({error:'LOGO_INVALID'});
     logo=(await storeImages([b.logo],req.user.id))[0];
   }
-  await pool.query('UPDATE users SET store_name=$1,store_site=$2,store_logo=$3 WHERE id=$4',[name||null,site||null,logo,req.user.id]);
+  /* câmpurile noi se schimbă doar dacă sunt trimise (cererile vechi rămân valide) */
+  let type=cur.store_type||null,address=cur.store_address||null,hours=cur.store_hours||null,google=cur.store_google||null;
+  if('store_type' in b){ const t=String(b.store_type||'').trim().toUpperCase(); if(t&&!FIRM_TYPES.includes(t))return res.status(400).json({error:'TIP_FIRMA_INVALID'}); type=t||null; }
+  if('store_address' in b){ const a=cleanText(b.store_address,200); if(a===null)return res.status(400).json({error:'ADRESA_INVALIDA'}); address=a||null; }
+  if('store_hours' in b){ const a=cleanText(b.store_hours,120); if(a===null)return res.status(400).json({error:'PROGRAM_INVALID'}); hours=a||null; }
+  if('store_google' in b){ const g=cleanGoogleMapsUrl(b.store_google); if(g===null)return res.status(400).json({error:'GOOGLE_INVALID'}); google=g||null; }
+  await pool.query('UPDATE users SET store_name=$1,store_site=$2,store_logo=$3,store_type=$5,store_address=$6,store_hours=$7,store_google=$8 WHERE id=$4',[name||null,site||null,logo,req.user.id,type,address,hours,google]);
   res.json({ok:true,has_logo:!!logo});
+}));
+// Pozele firmei (parc, depozit, magazin): publice, max. 10 per firmă.
+app.get('/api/sellers/:id(\\d+)/photos',requireDb,ah(async(req,res)=>{
+  const r=await pool.query("SELECT fp.id,fp.category FROM firm_photos fp JOIN users u ON u.id=fp.user_id AND u.status='active' WHERE fp.user_id=$1 ORDER BY fp.id",[Number(req.params.id)]);
+  res.json({photos:r.rows.map(x=>({id:x.id,category:x.category,src:'/api/firm-photos/'+x.id}))});
+}));
+app.get('/api/firm-photos/:id(\\d+)',requireDb,ah(async(req,res)=>{
+  const r=await pool.query("SELECT fp.url FROM firm_photos fp JOIN users u ON u.id=fp.user_id AND u.status='active' WHERE fp.id=$1",[Number(req.params.id)]);
+  const v=r.rows[0]&&r.rows[0].url; if(!v)return res.status(404).end();
+  const m=/^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(v);
+  if(m){res.set('Cache-Control','public, max-age=86400').type('image/'+m[1]).send(Buffer.from(m[2],'base64'));return;}
+  if(isStoredUrl(v)){res.set('Cache-Control','public, max-age=3600');return res.redirect(302,v);}
+  res.status(404).end();
+}));
+app.post('/api/account/store/photos',requireDb,auth,ah(async(req,res)=>{
+  const b=req.body||{}, cat=FIRM_PHOTO_CATS.includes(b.category)?b.category:'parc';
+  if(!isDataImg(b.image)||b.image.length>FIRM_PHOTO_BYTES)return res.status(400).json({error:'POZA_INVALIDA'});
+  const n=(await pool.query('SELECT COUNT(*)::int n FROM firm_photos WHERE user_id=$1',[req.user.id])).rows[0].n;
+  if(n>=FIRM_PHOTO_MAX)return res.status(400).json({error:'PREA_MULTE_POZE'});
+  let url; try{ url=(await storeImages([b.image],req.user.id))[0]; }catch{ return res.status(502).json({error:'STORAGE_EROARE'}); }
+  const r=await pool.query('INSERT INTO firm_photos(user_id,category,url) SELECT $1,$2,$3 WHERE (SELECT COUNT(*) FROM firm_photos WHERE user_id=$1)<$4 RETURNING id',[req.user.id,cat,url,FIRM_PHOTO_MAX]);
+  if(!r.rowCount){ deleteStoredUrls([url]); return res.status(400).json({error:'PREA_MULTE_POZE'}); }
+  res.status(201).json({photo:{id:r.rows[0].id,category:cat,src:'/api/firm-photos/'+r.rows[0].id}});
+}));
+app.delete('/api/account/store/photos/:id(\\d+)',requireDb,auth,ah(async(req,res)=>{
+  const r=await pool.query('DELETE FROM firm_photos WHERE id=$1 AND user_id=$2 RETURNING url',[Number(req.params.id),req.user.id]);
+  if(!r.rowCount)return res.status(404).json({error:'NOT_FOUND'});
+  deleteStoredUrls([r.rows[0].url]);
+  res.json({ok:true});
 }));
 app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const id=Number(req.params.id);
  if(!Number.isInteger(id)||id<=0)return res.status(404).json({error:'NOT_FOUND'});
- const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,biz_verified,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
+ const u=(await pool.query("SELECT id,COALESCE(nickname,name) nick,show_phone,bill_company,bill_type,bill_cui,biz_verified,store_type,store_address,store_hours,store_google,created_at,"+VAC_SQL('users')+" on_vac,vacation_until::text vac_until FROM users WHERE id=$1 AND status='active'",[id])).rows[0];
  if(!u)return res.status(404).json({error:'NOT_FOUND'});
  const s=(await pool.query("SELECT COUNT(*)::int n,COALESCE(BOOL_OR(type='dezmembrari'),FALSE) dism,(ARRAY_AGG(seller_type ORDER BY created_at DESC))[1] seller_type,(ARRAY_AGG(county ORDER BY created_at DESC) FILTER (WHERE county IS NOT NULL AND county<>''))[1] county FROM listings WHERE user_id=$1 AND status='approved'",[id])).rows[0];
  const phones=u.show_phone?(await pool.query('SELECT phone,is_whatsapp FROM user_phones WHERE user_id=$1 ORDER BY id',[id])).rows:[];
@@ -2070,7 +2128,7 @@ app.get('/api/sellers/:id',requireDb,ah(async(req,res)=>{
  const me=await optUserId(req); const blocked=me&&me!==id?(await blockState(me,id)).byMe:false;
  const rt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM seller_ratings WHERE seller_id=$1',[id])).rows[0];
  const bt=(await pool.query('SELECT ROUND(AVG(stars),1)::float avg,COUNT(*)::int n FROM buyer_ratings WHERE buyer_id=$1',[id])).rows[0];
- res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified}});
+ res.json({seller:{rating:{avg:rt.avg,count:rt.n},buyer_rating:{avg:bt.avg,count:bt.n},id:u.id,name:u.nick,seller_type:s.seller_type||null,dism:s.dism,county:s.county||null,count:s.n,since:u.created_at,company:isCompany&&u.bill_company?u.bill_company:null,phones,vacation:u.on_vac?{until:u.vac_until}:null,blocked_by_me:blocked,verified_business:!!u.biz_verified,firm:(s.dism||isCompany)?{type:u.store_type||null,cui:(u.bill_type==='pj'&&FIRM_CUI_RE.test(u.bill_cui||''))?u.bill_cui:null,address:u.store_address||null,hours:u.store_hours||null,google:u.store_google||null,photos:(await pool.query('SELECT COUNT(*)::int n FROM firm_photos WHERE user_id=$1',[id])).rows[0].n}:null}});
 }));
 // Validare comună pentru publicare și editare anunț. Returnează {error,status} sau {v}.
 const ni=(v,lo,hi)=>{if(v==null||String(v).trim()==='')return null;const n=Math.round(Number(v));return Number.isFinite(n)&&n>=lo&&n<=hi?n:null;};

@@ -24,7 +24,7 @@
 <meta name="twitter:description" content="Caută piese auto noi și second-hand după cod OEM, marcă și model. Cere oferte de la dezmembrări și magazine auto din toată România.">
 <meta name="twitter:image" content="https://pieseauto.ro/assets/og-image.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0f12'/%3E%3Cpath d='M16 6 L26 26 H21.5 L16 14 L10.5 26 H6 Z' fill='%23ffb020'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=plus20">
+<link rel="stylesheet" href="style.css?v=plus21">
 <script src="theme-init.js"></script>
 <script src="analytics.js" defer></script>
 <link rel="manifest" href="/manifest.webmanifest">
@@ -223,6 +223,11 @@
 <small class="sf-hint">Pentru firme și parcuri de dezmembrări. Poți încărca logo-ul sau o poză cu firma/parcul. Apare lângă numele tău în oferte, comenzi și în profilul tău, iar în subsolul paginilor cât timp ai cel puțin un anunț activ.</small>
 <div class="set-field"><label for="storeName">Nume magazin:</label><input id="storeName" maxlength="60" placeholder="ex. Dezmembrări Auto Petriuc"></div>
 <div class="set-field"><label for="storeSite">Site (opțional):</label><input id="storeSite" type="url" maxlength="200" placeholder="https://"></div>
+<div class="set-field"><label for="storeType">Tip firmă:</label><select id="storeType"><option value="">Alege…</option><option value="SRL">SRL</option><option value="SA">SA</option><option value="PFA">PFA</option><option value="II">II (întreprindere individuală)</option><option value="IF">IF (întreprindere familială)</option></select><small class="sf-hint">CUI-ul îl completezi la „Date de facturare” (persoană juridică) și apare pe cardul firmei.</small></div>
+<div class="set-field"><label for="storeAddress">Adresă publică (parc / magazin):</label><input id="storeAddress" maxlength="200" placeholder="Str., nr., localitate, județ"><small class="sf-hint">Apare în profil, cu butoanele „Locație” și „Navighează”. Nu este adresa de facturare.</small></div>
+<div class="set-field"><label for="storeHours">Program (opțional):</label><input id="storeHours" maxlength="120" placeholder="L–V 08:00–17:00, S 08:00–13:00"></div>
+<div class="set-field"><label for="storeGoogle">Link Google Maps (pentru recenzii):</label><input id="storeGoogle" type="url" maxlength="300" placeholder="https://maps.app.goo.gl/…"><small class="sf-hint">Deschide firma ta pe Google Maps, apasă „Distribuie” și lipește linkul. Vizitatorii văd recenziile direct pe Google.</small></div>
+<div class="set-field"><label for="fpFile">Poze cu firma / parcul (maximum 10):</label><div class="fp-add"><select id="fpCat" aria-label="Categorie poză"><option value="parc">Parc dezmembrări</option><option value="depozit">Depozit</option><option value="magazin">Magazin</option></select><input id="fpFile" type="file" accept="image/jpeg,image/png,image/webp" multiple></div><small class="sf-hint">Pozele se încarcă imediat, fără să apeși „Salvează”.</small><p class="form-note" id="fpMsg"></p><div class="fp-grid" id="fpGrid"></div></div>
 <div class="set-field"><label for="storeLogoFile">Logo sau poză firmă:</label><div class="store-logo-edit"><img id="storeLogoPreview" class="hidden" alt="Logo magazin"><input id="storeLogoFile" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="text-btn hidden" id="storeLogoRemove">Șterge poza</button></div></div>
 <button class="btn primary">Salvează profilul de magazin</button><p class="form-note" id="storeMsg"></p>
 </form>
@@ -341,5 +346,5 @@
   <div class="image-lightbox-counter" id="imageLightboxCounter">1 / 1</div>
 </div>
 <script src="realtime.js?v=4" defer></script>
-<script src="script.js?v=plus14" defer></script>
+<script src="script.js?v=plus15" defer></script>
 </body></html>

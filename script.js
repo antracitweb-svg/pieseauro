@@ -10,6 +10,7 @@ const ERR = {PRET_OBLIGATORIU:'Introdu prețul. Anunțul nu poate fi publicat f�
   INVALID_LOGIN:'Email/nickname sau parolă incorectă.',ACCOUNT_BLOCKED:'Contul este blocat.',BLOCARE_MAX_30_ZILE:'Moderatorii pot bloca între 1 și 30 de zile. Pentru blocare definitivă, cere unui administrator.',EMAIL_EXISTS:'Există deja un cont cu acest email.',
   NICKNAME_EXISTS:'Nickname-ul este deja folosit.',COMENZI_ACTIVE:'Ai comenzi în curs. Finalizează sau anulează comenzile înainte de a șterge contul.',ADMIN_NU_SE_STERGE:'Conturile de administrator nu se pot șterge din interfață.',SITE_INVALID:'Adresa site-ului trebuie să înceapă cu http:// sau https://.',LOGO_INVALID:'Logo invalid sau prea mare (maximum ~450 KB după comprimare).',NICKNAME_INVALID:'Nickname-ul trebuie să aibă 3–30 de caractere (litere, cifre, _ . -).',
   DATE_INVALIDE:'Verifică datele introduse.',AUTH_REQUIRED:'Trebuie să te autentifici.',
+  GOOGLE_INVALID:'Linkul trebuie să fie de pe Google Maps (google.com/maps, maps.app.goo.gl sau g.page).',TIP_FIRMA_INVALID:'Alege un tip de firmă din listă.',ADRESA_INVALIDA:'Adresa este prea lungă (maximum 200 de caractere).',PROGRAM_INVALID:'Programul este prea lung (maximum 120 de caractere).',POZA_INVALIDA:'Poza nu este validă sau este prea mare.',PREA_MULTE_POZE:'Poți avea cel mult 10 poze.',
   EMAIL_NOT_CONFIGURED:'Trimiterea emailurilor nu este configurată încă pe server.',EMAIL_SENDER_NOT_CONFIGURED:'Lipsește expeditorul email (RESEND_FROM).',
   EMAIL_SENDER_INVALID:'Adresa configurată pentru RESEND_FROM nu este validă.',EMAIL_SENDER_NOT_VERIFIED:'Expeditorul email nu este verificat în Resend.',EMAIL_SMTP_AUTH:'Serviciul de email a refuzat autentificarea. Verifică cheia/parola configurată pe server.',DEJA_VERIFICAT:'Firma ta este deja verificată.',MOTIV_OBLIGATORIU:'Scrie motivul (minimum 3 caractere).',
   EMAIL_PROVIDER_FORBIDDEN:'Serviciul de email a refuzat trimiterea. Verifică cheia API și expeditorul.',EMAIL_RATE_LIMIT:'Prea multe cereri către serviciul de email. Încearcă peste câteva minute.',
@@ -2158,12 +2159,14 @@ function stFillSelects(){
 function stCardHtml(s){
   const mk=(s.makes||[]), chips=mk.slice(0,4).map(m=>`<span class="sv-chip">${esc(m)}</span>`).join('')+(mk.length>4?`<span class="sv-chip sv-more">+${mk.length-4}</span>`:'');
   const where=[s.city,s.county].filter(Boolean).map(esc).join(', ');
+  const idLine=[s.stype,s.cui?'CUI '+String(s.cui).replace(/\s+/g,' ').toUpperCase():''].filter(Boolean).map(esc).join(' · ');
   return `<article class="sv-card">
     <button type="button" class="sv-main" data-seller-profile="${s.id}" aria-label="Profilul firmei ${esc(s.name)}">${avatarSpan(s.id,s.name,'seller-avatar')}<span class="sv-title"><span class="sv-name">${esc(s.name)}</span>${s.vb?'<span class="sv-ver" title="Documentele firmei au fost verificate">✔ Verificat</span>':'<span class="sv-tag">DEZMEMBRĂRI</span>'}</span></button>
+    ${idLine?`<p class="sv-id">${idLine}</p>`:''}
     <p class="rate-line sv-rate">${ratingLine({avg:s.rating_avg,count:s.rating_n},s.id,'seller')}</p>
     <p class="sv-meta">${s.n} ${s.n===1?'anunț':'anunțuri'}${where?' · '+where:''}</p>
     ${chips?`<div class="sv-chips">${chips}</div>`:''}
-    <button type="button" class="btn ghost small sv-go" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button></article>`;
+    <div class="sv-btns"><button type="button" class="btn ghost small sv-go" data-seller="${s.id}" data-sname="${esc(s.name)}">Vezi anunțurile</button>${s.photos>0?`<button type="button" class="btn ghost small sv-ph" data-firm-photos="${s.id}">📷 Poze (${s.photos})</button>`:''}</div></article>`;
 }
 function stRender(){
   const S=stState, list=stFiltered(), grid=$('#storesGrid'); if(!grid)return;
@@ -2868,6 +2871,8 @@ async function loadSettings(){
   const bt = u.bill_type || ((u.bill_company||u.bill_cui)?'pj':'pf'); $$('input[name="billType"]').forEach(r=>{ r.checked = r.value===bt; }); syncBillType(); $('#billCui').value = u.bill_cui || ''; $('#billRegcom').value = u.bill_regcom || '';
   $('#billAddress').value = u.bill_address || ''; $('#billBank').value = u.bill_bank || ''; $('#billIban').value = u.bill_iban || '';
   $('#storeName').value = u.store_name || ''; $('#storeSite').value = u.store_site || '';
+  $('#storeType').value = u.store_type || ''; $('#storeAddress').value = u.store_address || ''; $('#storeHours').value = u.store_hours || ''; $('#storeGoogle').value = u.store_google || '';
+  fpLoad();
   state.storeLogo = undefined; state.storeLogoRemove = false; $('#storeLogoFile').value = '';
   const pv = $('#storeLogoPreview');
   if(u.has_logo){ pv.src = '/api/stores/'+u.id+'/logo?v='+Date.now(); pv.classList.remove('hidden'); $('#storeLogoRemove').classList.remove('hidden'); }
@@ -3056,10 +3061,41 @@ async function onStoreLogoPick(){
   try{ state.storeLogo=await logoToDataUrl(f); state.storeLogoRemove=false; const pv=$('#storeLogoPreview'); pv.src=state.storeLogo; pv.classList.remove('hidden'); $('#storeLogoRemove').classList.remove('hidden'); }
   catch(err){ state.storeLogo=undefined; $('#storeLogoFile').value=''; setMsg(msg,err.message,'error'); }
 }
+/* Pozele firmei (parc / depozit / magazin) */
+const FP_LABEL={parc:'Parc dezmembrări',depozit:'Depozit',magazin:'Magazin'};
+async function fpLoad(){
+  const g=$('#fpGrid'); if(!g||!currentUser) return;
+  try{ state.fp=(await api('/api/sellers/'+currentUser.id+'/photos')).photos||[]; fpRender(); }catch{}
+}
+function fpRender(){
+  const g=$('#fpGrid'); if(!g) return; const list=state.fp||[];
+  g.innerHTML=list.length?list.map(p=>`<figure class="fp-item"><img src="${esc(p.src)}" alt="${esc(FP_LABEL[p.category]||'Poză')}" loading="lazy"><figcaption>${esc(FP_LABEL[p.category]||'')}</figcaption><button type="button" class="fp-del" data-fp-del="${p.id}" aria-label="Șterge poza">×</button></figure>`).join(''):'<p class="muted">Încă nu ai poze.</p>';
+}
+async function fpUpload(files){
+  const msg=$('#fpMsg'), cat=$('#fpCat').value; setMsg(msg,'');
+  let done=0;
+  for(const f of files){
+    if((state.fp||[]).length>=10){ setMsg(msg,ERR.PREA_MULTE_POZE,'error'); break; }
+    try{
+      setMsg(msg,'Se încarcă… ('+(done+1)+'/'+files.length+')');
+      const image=await fileToDataUrl(f);
+      const r=await api('/api/account/store/photos',{method:'POST',body:JSON.stringify({image,category:cat})});
+      (state.fp=state.fp||[]).push(r.photo); done++; fpRender();
+    }catch(err){ setMsg(msg,err.message,'error'); return; }
+  }
+  setMsg(msg,done?(done===1?'Poza a fost adăugată.':done+' poze au fost adăugate.'):'', done?'ok':'');
+}
+document.addEventListener('change',e=>{ if(e.target&&e.target.id==='fpFile'){ const fs=[...e.target.files]; e.target.value=''; if(fs.length) fpUpload(fs); } });
+document.addEventListener('click',async e=>{
+  const b=e.target.closest&&e.target.closest('[data-fp-del]'); if(!b) return;
+  if(!confirm('Ștergi poza?')) return;
+  try{ await api('/api/account/store/photos/'+Number(b.dataset.fpDel),{method:'DELETE'}); state.fp=(state.fp||[]).filter(p=>String(p.id)!==b.dataset.fpDel); fpRender(); }
+  catch(err){ setMsg($('#fpMsg'),err.message,'error'); }
+});
 async function saveStore(e){
   e.preventDefault(); const msg=$('#storeMsg'); setMsg(msg,'');
   try{
-    const body={store_name:$('#storeName').value,store_site:$('#storeSite').value};
+    const body={store_name:$('#storeName').value,store_site:$('#storeSite').value,store_type:$('#storeType').value,store_address:$('#storeAddress').value,store_hours:$('#storeHours').value,store_google:$('#storeGoogle').value};
     if(state.storeLogo) body.logo=state.storeLogo;
     if(state.storeLogoRemove) body.remove_logo=true;
     await api('/api/account/store',{method:'PUT',body:JSON.stringify(body)});
@@ -3777,16 +3813,28 @@ async function openSellerProfile(id){
   try{
     const s=(await api('/api/sellers/'+id)).seller, nm=esc(s.name||'Vânzător');
     const own=currentUser&&currentUser.id===s.id;
-    const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
+    const f=s.firm||null, enc=encodeURIComponent, lnk=(href,txt)=>`<a class="btn ghost small" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
+    const fpActions=f?`<div class="fp-actions">${f.address?lnk('https://www.google.com/maps/search/?api=1&query='+enc(f.address),'📍 Locație')+lnk('https://waze.com/ul?q='+enc(f.address)+'&navigate=yes','🧭 Navighează'):''}${f.google?lnk(f.google,'⭐ Recenzii Google'):''}${f.photos?`<button type="button" class="btn ghost small" data-firm-photos="${s.id}">📷 Poze (${f.photos})</button>`:''}</div>`:'';
+    const rows=[['Tip vânzător',s.dism?'Dezmembrări':s.seller_type],['Firmă',s.company],['Tip firmă',f&&f.type],['CUI',f&&f.cui],['Adresă',f&&f.address],['Program',f&&f.hours],['Județ',s.county],['Pe site din',s.since?fmtDate(s.since):''],['Anunțuri active',String(s.count)]].filter(r=>r[1]);
     const phones=contactHtml(s.phones||[],'Vânzătorul',s.id,own,null), canMsg=!own, hasPh=(s.phones||[]).length>0;
     box.innerHTML=`<div class="seller-head">${avatarSpan(s.id,s.name||'V','seller-avatar')}<div><b>${nm}</b><small>${esc(s.dism?'Dezmembrări':(s.seller_type||'Vânzător'))}</small>${s.verified_business?'<span class="badge new" title="Documentele firmei au fost verificate">✔ Firmă verificată</span>':''}<div class="rate-line">Ca vânzător: ${ratingLine(s.rating,s.id,'seller')}</div><div class="rate-line">Ca cumpărător: ${ratingLine(s.buyer_rating,s.id,'buyer')}</div></div></div>
     <dl class="detail-grid">${rows.map(r=>`<div><dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd></div>`).join('')}</dl>
+    ${fpActions}
     ${s.vacation?`<div class="vac-banner">🌴 Vânzătorul este în vacanță${s.vacation.until?' până la '+esc(fmtDate(s.vacation.until+'T00:00:00')):''}.</div>`:''}
     ${(hasPh||canMsg)?contactFoldHtml(phones+(canMsg?`<button type="button" class="btn ghost contact-msg" data-seller-msg="${s.id}">✉️ Trimite mesaj</button>`:'')):''}
     <div class="contact-row"><button type="button" class="btn ghost small" data-seller="${s.id}" data-sname="${nm}">Vezi anunțurile</button>${(own||!currentUser)?'':`<button type="button" class="btn ghost small" data-seller-block="${s.id}" data-blocked="${s.blocked_by_me?1:0}">${s.blocked_by_me?'Deblochează':'🚫 Blochează'}</button>`}</div><div class="rate-list hidden" id="sellerRatings"></div>`;
     if((s.rating&&s.rating.count)||(s.buyer_rating&&s.buyer_rating.count)) loadSellerRatings(s.id);
   }catch(e){ box.innerHTML=`<p>${esc(e.message||'Profilul nu a putut fi încărcat.')}</p>`; }
 }
+/* „Poze” firmă: se deschid în vizualizatorul de poze (cu săgeți), din card sau din profil */
+document.addEventListener('click',async e=>{
+  const b=e.target.closest&&e.target.closest('[data-firm-photos]'); if(!b) return;
+  e.preventDefault(); e.stopPropagation();
+  try{
+    const r=await api('/api/sellers/'+Number(b.dataset.firmPhotos)+'/photos'), srcs=(r.photos||[]).map(p=>p.src);
+    if(srcs.length) openLightbox(srcs[0],srcs,0,'Poze firmă'); else toast('Firma nu are încă poze.');
+  }catch(err){ toast(err.message); }
+});
 /* Contul meu: pe telefon (<=800px) se deschide o singură secțiune o dată; pe desktop rămân independente */
 document.addEventListener('click', e=>{
   const sum = e.target.closest && e.target.closest('.account-sections summary');
