@@ -1495,7 +1495,7 @@ app.get('/api/listings/:id(\\d+)/thumb',requireDb,ah(async(req,res)=>{
  if(!r.rowCount){res.set('Cache-Control','public, max-age=60');return res.redirect(302,'/api/listings/'+Number(req.params.id)+'/img/0?w=640');}
  res.set({'Content-Type':'image/webp','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff'}).send(r.rows[0].data);
 }));
-const THUMB_W=480;
+const THUMB_W=640;
 async function makeThumbBuffer(img){
  let buf;const m=/^data:image\/(?:jpeg|png|webp);base64,(.+)$/.exec(img||'');
  if(m)buf=Buffer.from(m[1],'base64');

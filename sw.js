@@ -4,14 +4,14 @@
    - Navigarea: network-first, cu fallback la index.html din cache când e offline.
    - Shell static (css/js/iconițe): stale-while-revalidate.
 */
-const VERSION = 'autoparts-v58';
+const VERSION = 'autoparts-v59';
 const THUMBS = 'autoparts-thumbs-v1';   /* miniaturile anunțurilor: imuabile (au ?v= în URL), cache-first, plafon 400 */
 const THUMBS_MAX = 400;
 const SHELL = [
   '/',
   '/index.html',
-  '/style.css?v=plus13',
-  '/script.js?v=plus10',
+  '/style.css?v=plus22',
+  '/script.js?v=plus18',
   '/realtime.js?v=4',
   '/theme-init.js',
   '/analytics.js',
