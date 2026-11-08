@@ -98,3 +98,11 @@ try{
     }
   }
 }catch(e){}
+
+/* Televizoare (ex. Sony Android TV): marchează <html class="tv"> ca paginile să folosească toată lățimea ecranului.
+   Detectare: cuvinte-cheie de TV în user-agent, sau Android fără „Mobile” cu ecran foarte lat (tabletele au sub 1500 px).
+   Scris în ES5, ca să ruleze și pe browsere vechi. */
+try{
+  var __ua=navigator.userAgent||'', __w=Math.max(window.innerWidth||0,document.documentElement.clientWidth||0);
+  if(/SmartTV|Smart-TV|SMART-TV|BRAVIA|GoogleTV|Google TV|AndroidTV|Android TV|HbbTV|Tizen|Web0S|WebOS|NetCast|CrKey|AFT[A-Z]|\bTV\b/i.test(__ua) || (/Android/i.test(__ua) && !/Mobile/i.test(__ua) && __w>=1500)) document.documentElement.className+=' tv';
+}catch(e){}

@@ -400,7 +400,7 @@ function avatarSpan(id,name,cls,has){
   return `<span class="${cls} av-img"><i>${avInit(name)}</i>${img}</span>`;
 }
 /* CSP nu permite onerror inline: dacă poza lipsește, rămâne litera */
-document.addEventListener('error',e=>{ const t=e.target; if(t&&t.tagName==='IMG'&&t.hasAttribute('data-av')) t.remove(); },true);
+document.addEventListener('error',e=>{ const t=e.target; if(t&&t.tagName==='IMG'&&t.hasAttribute('data-av')){ const p=t.parentElement; if(p&&p.classList.contains('sv-logo')) p.classList.add('no-img'); t.remove(); } },true);
 function avatarToDataUrl(file){
   return new Promise((resolve,reject)=>{
     if(!/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error('Alege o poză JPG, PNG sau WebP.'));
@@ -2196,7 +2196,7 @@ function stBind(){
 }
 async function loadStores(parks){
   const grid = $('#storesGrid'); $('#storesEmpty').classList.add('hidden');
-  const title = parks ? 'Parcuri partenere' : 'Magazine verificate';
+  const title = 'Parcuri & Magazine Auto';
   $('#storesTitle').textContent = title; $('#storesCrumb').textContent = title;
   stBind();
   grid.innerHTML = '<p class="muted">Se încarcă…</p>';
@@ -5154,7 +5154,7 @@ function addSwipe(el, onSwipe){
       L('Județ și Cod OEM','Județul te ajută să fii găsit local. Mulți cumpărători caută după codul OEM.'),
       L('Publică anunțul','Trimite anunțul la verificare. Până la aprobare îl vezi în Contul meu → Anunțurile mele, cu starea „În așteptare”.'),
       L('Renunță la modificări','Apare când editezi un anunț. Închide editarea fără să salveze.')]},
-    'page-dism':{title:'Mașini pentru piese',intro:'Vehicule aflate la dezmembrare, cu piesele lor disponibile.',items:[
+    'page-dism':{title:'Dezmembrări mașini',intro:'Vehicule aflate la dezmembrare, cu piesele lor disponibile.',items:[
       L('Cardul mașinii','Arată mașina, anul, motorul și ce piese sunt disponibile. Apasă pe el ca să întrebi vânzătorul.'),
       L('＋ Adaugă o mașină la dezmembrat','Pentru parcuri și dezmembrări: publici mașina, iar cumpărătorii te contactează pentru piese.')]},
     'page-avariate':{title:'Mașini avariate / defecte',intro:'Autoturisme avariate, accidentate sau cu defecte, de vânzare.',items:[
@@ -5182,7 +5182,7 @@ function addSwipe(el, onSwipe){
       L('Ofertele primite','Deschide o cerere ca să vezi ofertele. Poți accepta, respinge sau pune întrebări.'),
       L('Acceptă oferta','Se creează o comandă, iar vânzătorul primește adresa de livrare.'),
       L('Editare','Cererea se poate modifica doar în primele 10 minute după publicare.')]},
-    'page-stores':{title:'Magazine și parcuri',intro:'Vânzători verificați și parcuri de dezmembrări.',items:[
+    'page-stores':{title:'Parcuri & Magazine Auto',intro:'Parcuri de dezmembrări și magazine de piese auto.',items:[
       L('Cardul vânzătorului','Apasă pe el ca să vezi toate anunțurile lui, calificativele și datele de contact.')]},
     'page-mine':{title:'Anunțurile mele',intro:'Aici gestionezi anunțurile pe care le-ai publicat.',items:[
       L('Cum postezi un anunț','Din meniu apasă „Postează un anunț”. Completezi titlul, pozele, mașina și prețul, apoi „Publică anunțul”. Anunțul apare întâi „În așteptare”, până îl verifică echipa.'),

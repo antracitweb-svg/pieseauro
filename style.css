@@ -4997,3 +4997,20 @@ html.dark .sv-logo{border-color:rgba(201,165,106,.45);box-shadow:0 4px 10px rgba
 /* logo mărit: se vede întreg, dreptunghiular, nu decupat în cerc */
 .avatar-preview.logo img{width:auto;height:auto;max-width:560px;max-width:min(88vw,560px);max-height:70vh;object-fit:contain;border-radius:14px;background:#fff;box-shadow:0 0 0 4px #b8935a,0 18px 40px rgba(0,0,0,.5)}
 html.dark .avatar-preview.logo img{background:#fff}
+
+
+/* ===== V47: televizoare (html.tv, pus de theme-init.js) — pagini pe toată lățimea; cadranul pozei firmei cât poza ===== */
+html.tv .container,html.tv .narrow,html.tv .header .container.nav,html.tv #page-results>.container,html.tv #page-results>.narrow,html.tv #page-account>.container,html.tv #page-account>.narrow,html.tv #page-request-pick>.container,html.tv #page-request-pick>.narrow,html.tv #page-request>.container,html.tv #page-request>.narrow,html.tv #page-sell>.container,html.tv #page-sell>.narrow,html.tv #page-dism>.container,html.tv #page-dism>.narrow,html.tv #page-services>.container,html.tv #page-services>.narrow,html.tv #page-match>.container,html.tv #page-match>.narrow,html.tv #page-requests>.container,html.tv #page-requests>.narrow,html.tv #page-stores>.container,html.tv #page-stores>.narrow,html.tv #page-mine>.container,html.tv #page-mine>.narrow,html.tv #page-messages>.container,html.tv #page-messages>.narrow,html.tv #page-saved>.container,html.tv #page-saved>.narrow,html.tv #page-privacy>.container,html.tv #page-privacy>.narrow,html.tv #page-cookies>.container,html.tv #page-cookies>.narrow,html.tv #page-rules>.container,html.tv #page-rules>.narrow,html.tv #page-contact>.container,html.tv #page-contact>.narrow,html.tv #page-terms>.container,html.tv #page-terms>.narrow,html.tv #page-reset-password>.container,html.tv #page-reset-password>.narrow,html.tv #page-admin>.container,html.tv #page-admin>.narrow,html.tv #page-account-tool>.container,html.tv #page-account-tool>.narrow,html.tv #page-settings>.container,html.tv #page-settings>.narrow,html.tv #page-verify-email-change>.container,html.tv #page-verify-email-change>.narrow,html.tv #page-verify-email>.container,html.tv #page-verify-email>.narrow,html.tv #page-home>.container,html.tv #page-home>.narrow,html.tv #page-avariate>.container,html.tv #page-avariate>.narrow{width:calc(100% - 96px)!important;max-width:none!important}
+html.tv #page-sell .narrow,html.tv #page-account .container.narrow{width:calc(100% - 96px)!important;max-width:none!important}
+html.tv .home-bottom{max-width:none}
+html.tv .mine-card{max-width:none}
+html.tv .sv-grid{max-width:none;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+html.tv #listingGrid.ar-list{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+html.tv #dismGrid.ar-list,html.tv #avarGrid.ar-list{grid-template-columns:repeat(4,minmax(0,1fr))!important;max-width:none!important}
+
+/* cadranul alb se potrivește pe poză (telefon, laptop, TV): fără margini albe în plus */
+.sv-logo{display:inline-flex!important;align-items:center;justify-content:center;width:auto!important;height:auto!important;min-width:0;line-height:0;padding:0}
+.sv-logo img{position:static!important;display:block;width:auto!important;height:auto!important;max-width:150px;max-height:90px;padding:0!important;object-fit:contain;background:#fff}
+.sv-logo i{display:none}
+.sv-logo.no-img i{display:grid;place-items:center;width:64px;height:48px;line-height:1}
+@media(max-width:800px){.sv-logo img{max-width:108px;max-height:66px}.sv-logo.no-img i{width:52px;height:40px}}
